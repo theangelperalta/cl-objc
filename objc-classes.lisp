@@ -3,7 +3,7 @@
 (defun count-objc-classes ()
   (objc-cffi::objc_getclasslist (cffi:null-pointer) 0))
 
-(defvar *objc-classes* nil)
+(defvar *objc-classes* (make-hash-table :test #'equal))
 
 (defun read-objc-classes ()
   (let ((class-count (count-objc-classes)))
