@@ -9,6 +9,3 @@
   (let ((class-count (count-objc-classes)))
     (setf *objc-classes* (cffi:foreign-alloc 'objc-cffi::objc_class :count class-count))
     (objc-cffi::objc_getclasslist *objc-classes* class-count)))
-
-;(defun objc-class (idx)
-;  (cffi:
