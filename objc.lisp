@@ -1,4 +1,5 @@
 
+(in-package "OBJC-CFFI")
 
 ;;;SWIG wrapper code starts here
 
@@ -16,9 +17,9 @@
 (defcstruct objc_object
 	(isa :pointer))
 
-(defconstant Nil 0)
+(defconstant objc-Nil-class 0)
 
-(defconstant nil 0)
+(defconstant objc-nil-instance 0)
 
 (defcfun ("sel_isMapped" sel_isMapped) :char
   (sel :pointer))
@@ -52,35 +53,35 @@
 	(cache :pointer)
 	(protocols :pointer))
 
-(defconstant CLS_CLASS #x1L)
+(defconstant CLS_CLASS #x1)
 
-(defconstant CLS_META #x2L)
+(defconstant CLS_META #x2)
 
-(defconstant CLS_INITIALIZED #x4L)
+(defconstant CLS_INITIALIZED #x4)
 
-(defconstant CLS_POSING #x8L)
+(defconstant CLS_POSING #x8)
 
-(defconstant CLS_MAPPED #x10L)
+(defconstant CLS_MAPPED #x10)
 
-(defconstant CLS_FLUSH_CACHE #x20L)
+(defconstant CLS_FLUSH_CACHE #x20)
 
-(defconstant CLS_GROW_CACHE #x40L)
+(defconstant CLS_GROW_CACHE #x40)
 
-(defconstant CLS_NEED_BIND #x80L)
+(defconstant CLS_NEED_BIND #x80)
 
-(defconstant CLS_METHOD_ARRAY #x100L)
+(defconstant CLS_METHOD_ARRAY #x100)
 
-(defconstant CLS_JAVA_HYBRID #x200L)
+(defconstant CLS_JAVA_HYBRID #x200)
 
-(defconstant CLS_JAVA_CLASS #x400L)
+(defconstant CLS_JAVA_CLASS #x400)
 
 (defconstant CLS_INITIALIZING #x800)
 
-(defconstant CLS_FROM_BUNDLE #x1000L)
+(defconstant CLS_FROM_BUNDLE #x1000)
 
-(defconstant CLS_HAS_CXX_STRUCTORS #x2000L)
+(defconstant CLS_HAS_CXX_STRUCTORS #x2000)
 
-(defconstant CLS_NO_METHOD_ARRAY #x4000L)
+(defconstant CLS_NO_METHOD_ARRAY #x4000)
 
 (defcstruct objc_category
 	(category_name :string)
@@ -262,24 +263,24 @@
 (defcfun ("objc_msgSend" objc_msgSend) :pointer
   (self :pointer)
   (op :pointer)
-  (arg2 ))
+  &rest)
 
 (defcfun ("objc_msgSendSuper" objc_msgSendSuper) :pointer
   (super :pointer)
   (op :pointer)
-  (arg2 ))
+  &rest)
 
 (defcfun ("objc_msgSend_stret" objc_msgSend_stret) :void
   (stretAddr :pointer)
   (self :pointer)
   (op :pointer)
-  (arg3 ))
+  &rest)
 
 (defcfun ("objc_msgSendSuper_stret" objc_msgSendSuper_stret) :void
   (stretAddr :pointer)
   (super :pointer)
   (op :pointer)
-  (arg3 ))
+  &rest)
 
 (defcfun ("objc_msgSendv" objc_msgSendv) :pointer
   (self :pointer)
