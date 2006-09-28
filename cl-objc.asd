@@ -15,5 +15,5 @@
                  (:file "objc" :depends-on ("objc-cffi"))
                  (:file "objc-classes" :depends-on ("objc"))
                  )
-    :depends-on (:cffi)
+    :depends-on (:cffi :cl-graph)
     )
