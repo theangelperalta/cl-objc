@@ -32,25 +32,26 @@
       (format stream "ObjC Class ~A" name))))
 
 (defun read-objc-class (class-ptr)
-  (with-foreign-slots ((objc-cffi::isa 
-                        objc-cffi::super_class 
-                        objc-cffi::name 
-                        objc-cffi::version
-                        objc-cffi::info 
-                        objc-cffi::instance_size 
-                        objc-cffi::ivars
-                        objc-cffi::methodlists 
-                        objc-cffi::cache 
-                        objc-cffi::protocols)
-                       class-ptr objc-cffi::objc_class)
-    (make-instance 'objc-class
-                   :isa objc-cffi::isa
-                   :super-class objc-cffi::super_class
-                   :name objc-cffi::name
-                   :version objc-cffi::version
-                   :info objc-cffi::info
-                   :instance-size objc-cffi::instance_size
-                   :ivars objc-cffi::ivars
-                   :method-lists objc-cffi::methodlists
-                   :cache objc-cffi::cache
-                   :protocols objc-cffi::protocols)))
+  (when (not (null-pointer-p class-ptr))
+    (with-foreign-slots ((objc-cffi::isa
+                          objc-cffi::super_class
+                          objc-cffi::name
+                          objc-cffi::version
+                          objc-cffi::info
+                          objc-cffi::instance_size
+                          objc-cffi::ivars
+                          objc-cffi::methodlists
+                          objc-cffi::cache
+                          objc-cffi::protocols)
+                         class-ptr objc-cffi::objc_class)
+      (make-instance 'objc-class
+                     :isa objc-cffi::isa
+                     :super-class objc-cffi::super_class
+                     :name objc-cffi::name
+                     :version objc-cffi::version
+                     :info objc-cffi::info
+                     :instance-size objc-cffi::instance_size
+                     :ivars objc-cffi::ivars
+                     :method-lists objc-cffi::methodlists
+                     :cache objc-cffi::cache
+                     :protocols objc-cffi::protocols))))
