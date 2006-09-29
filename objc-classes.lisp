@@ -55,3 +55,27 @@
                      :method-lists objc-cffi::methodlists
                      :cache objc-cffi::cache
                      :protocols objc-cffi::protocols))))
+
+(defun objc-class-graph ()
+  (let ((g (cl-graph:make-graph 'cl-graph:graph-container)))
+    (loop for cls being the hash-values in *objc-classes*
+         do (cl-graph:add-vertex g (slot-value cls 'isa)))
+    (loop for cls being the hash-values in *objc-classes*
+         do (cl-graph:add-edge-between-vertexes g 
+                                                (slot-value cls 'isa)
+                                                (slot-value cls 'super-class)))
+    g))
+
+(defun root-class-p (class)
+  (null-pointer-p (slot-value class 'super-class)))
+
+(defun read-meta-class (class)
+  (read-objc-class (slot-value class 'isa)))
+
+(defgeneric decode-class-info (value)
+  (:documentation "Retrieves the list of symbols representing the objc flags set on a class"))
+(defmethod decode-class-info ((cls objc-class))
+  (decode-class-info (slot-value cls 'info)))
+
+(defmethod decode-class-info ((flags integer))
+  (cffi:foreign-bitfield-symbols 'objc-cffi::class-flags flags))
