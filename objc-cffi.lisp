@@ -143,7 +143,10 @@
 
 (defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-class-pointer)))
   (slot-value class 'class-ptr))
-
+#| This needs more thought
+(defmethod translate-to-foreign ((class-name string) (type (eql 'objc-class-pointer)))
+  (objc-get-class class-name))
+|#
 (defmethod translate-to-foreign (pointer (type (eql 'objc-class-pointer)))
   pointer)
 
@@ -192,6 +195,41 @@
     (loop for method-idx from 0 below method_count
          collect (mem-aref method_list 'objc-method method-idx))))
 
-(defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
+(defcfun ("class_nextMethodList" class-next-method-list) :pointer
   (class-ptr objc-class-pointer)
   (iterator :pointer))
+
+(defgeneric get-class-methods (class))
+
+(defmethod get-class-methods ((class-name string))
+  (get-class-methods (objc-get-class class-name)))
+
+(defmethod get-class-methods ((class objc-class))
+  (with-foreign-object (itr :pointer)
+    (setf (mem-ref itr :int) 0)
+    (let* ((class-ptr (slot-value class 'class-ptr))
+           (mlist-ptr (class-next-method-list class-ptr itr)))
+        (with-foreign-slots ((method_count method_list) mlist-ptr objc-method-list)
+          (loop for method-idx from 0 below method_count
+             collect (mem-aref method_list 'objc-method method-idx))))))
+
+(defun test ()
+  (with-foreign-object (itr :pointer)
+    (setf (mem-ref itr :int) 0)
+    (let* ((class-ptr (slot-value (objc-get-class "Object") 'class-ptr))
+           (mlist-ptr (class-next-method-list class-ptr itr)))
+      (with-foreign-slots ((method_count method_list) mlist-ptr objc-method-list)
+        (loop for method-idx from 0 below method_count
+           for m-ptr = (mem-aref method_list 'objc-method method-idx)
+           collect (list method-idx (hex-dump m-ptr (foreign-type-size 'objc-method)))
+        )))))
+#|
+        (loop for method-idx from 0 below method_count
+             for method-struct-ptr = (mem-aref method_list 'objc-method method-idx)
+           collect 
+             (with-foreign-slots ((method_name method_types method_imp) method-struct-ptr objc-method)
+               (list method-idx method_name method_types method_imp)))))))
+|#
+(defun hex-dump (ptr len)
+  (let ((bytes (loop for i from 0 below len collect (mem-ref ptr :unsigned-char i))))
+    (format nil "~{~2,'0x ~}" bytes)))
