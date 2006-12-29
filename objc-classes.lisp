@@ -12,8 +12,9 @@
     (with-foreign-object (class-ptrs :pointer class-count)
       (objc-cffi::objc_getclasslist class-ptrs class-count)
       (loop for class-idx from 0 below class-count
-           collect (let ((class (read-objc-class (mem-aref class-ptrs :pointer class-idx))))
-                     (setf (gethash (slot-value class 'name) *objc-classes*) class))))))
+         for class = (read-objc-class (mem-aref class-ptrs :pointer class-idx))
+         collect
+           (setf (gethash (slot-value class 'name) *objc-classes*) class)))))
 
 (defclass objc-class ()
   ((isa :initarg :isa)
