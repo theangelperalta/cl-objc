@@ -34,15 +34,14 @@
 (defcfun ("sel_registerName" sel-register-name) objc-sel
   (str :string))
 
-
 (defclass objc-selector ()
   ((name :initarg :name)
    (uid :initarg :uid)))
 
-(defmethod translate-from-foreign (value (type (eql 'objc-sel)))
+(defmethod translate-from-foreign (uid (type (eql 'objc-sel)))
   (make-instance 'objc-selector
-                 :name (sel-register-name value)
-                 :uid value))
+                 :name (sel-get-name uid)
+                 :uid uid))
 
 (defmethod translate-to-foreign ((sel objc-selector) (type (eql 'objc-sel)))
   (slot-value sel 'uid))
