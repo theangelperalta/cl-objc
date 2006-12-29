@@ -3,7 +3,9 @@
 (defun count-objc-classes ()
   (objc-cffi::objc_getclasslist (cffi:null-pointer) 0))
 
-(defvar *objc-classes* (make-hash-table :test #'equal))
+(defvar *objc-classes* 
+  (make-hash-table :test #'equal)
+  "A list of all objective-c classes read by cl-objc")
 
 (defun read-objc-classes ()
   (let ((class-count (count-objc-classes)))
