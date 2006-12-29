@@ -12,9 +12,6 @@
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:file "package")
                  (:file "objc-cffi" :depends-on ("package"))
-                 (:file "objc" :depends-on ("objc-cffi"))
-                 (:file "objc-addendum" :depends-on ("objc"))
-                 (:file "objc-classes" :depends-on ("objc"))
                  )
-    :depends-on (:cffi :cl-graph)
+    :depends-on (:cffi)
     )
