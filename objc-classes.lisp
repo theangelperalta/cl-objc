@@ -1,5 +1,6 @@
 (common-lisp:in-package "CL-OBJC")
 
+
 (defun count-objc-classes ()
   (objc-cffi::objc_getclasslist (cffi:null-pointer) 0))
 
@@ -27,6 +28,7 @@
    (method-lists :initarg :method-lists)
    (cache :initarg :cache)
    (protocols :initarg :protocols)
+   (ptr :initarg :ptr)
    ))
 
 (defmethod print-object ((class objc-class) stream)
@@ -82,3 +84,6 @@
 
 (defmethod decode-class-info ((flags integer))
   (cffi:foreign-bitfield-symbols 'objc-cffi::class-flags flags))
+
+(defun read-class-method-list (class)
+  
