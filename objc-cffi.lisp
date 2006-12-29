@@ -100,18 +100,33 @@
 ;;; objc-class printer
 (defmethod print-object ((class objc-class) stream)
   (print-unreadable-object (class stream)
-    (with-slots (name) class
-      (format stream "ObjC-Class ~A" name))))
+    (with-slots (name info) class
+      (format stream "ObjC-~@[Meta~1*~]Class ~A"
+              (member :META info)
+              name))))
 
 ;;; objc-class describer
 (defmethod describe-object ((class objc-class) stream)
-  (with-slots (name version info instance-size) class
-    (format stream "~&~S is an Objective C class named ~S,~
-                    ~%Version ~D~
-                    ~%Instance size ~D~
-                    ~%Flags: ~{~A~^, ~}~%"
-            class name version instance-size
-            info)))
+  (with-slots (isa super-class name version info
+               instance-size ivars method-lists
+               cache protocols class-ptr) class
+    (let ((method-desc (cond ((null-pointer-p method-lists) "No method lists")
+                             ((member :NO_METHOD_ARRAY info) "One method list")
+                             (t "Multiple method lists"))))
+      (format stream "~&~S is an Objective C ~@[meta ~1*~]class named ~S.~
+                      ~%~A~
+                      ~[~1*~:;~%Version ~D~]~
+                      ~%Instance size ~D~
+                      ~%Isa ~8,'0X Super ~8,'0X~
+                      ~%Flags: ~{~A~^, ~}~%"
+            class
+            (member :META info)
+            name
+            method-desc
+            version version
+            instance-size
+            (pointer-address isa) (pointer-address super-class)
+            info))))
 
 (defmethod translate-from-foreign (class-ptr (type (eql 'objc-class-pointer)))
   (with-foreign-slots ((isa super_class name
