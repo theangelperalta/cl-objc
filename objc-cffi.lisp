@@ -28,8 +28,8 @@
 (defcfun ("sel_isMapped" sel-is-mapped) objc-bool
   (sel objc-sel))
 
-(defcfun ("sel_getUid" sel-get-uid) objc-sel
-  (str :string))
+(defcfun ("sel_getName" sel-get-name) :string
+  (sel objc-sel))
 
 (defcfun ("sel_registerName" sel-register-name) objc-sel
   (str :string))
