@@ -269,3 +269,26 @@
     (loop for (mlist-ptr mlist) = (class-next-method-list class itr)
        while (not (null-pointer-p mlist-ptr))
        collect mlist)))
+
+(defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
+  (class objc-class-pointer)
+  (sel objc-sel))
+
+(defcfun ("class_getClassMethod" class_getClassMethod) objc-method-pointer
+  (class objc-class-pointer)
+  (sel objc-sel))
+
+
+;;; Method arguments
+
+(defcfun ("method_getNumberOfArguments" method-get-number-of-arguments) :unsigned-int
+  (method objc-method-pointer))
+
+(defcfun ("method_getSizeOfArguments" method-get-size-of-arguments) :unsigned-int
+  (method objc-method-pointer))
+
+(defcfun ("method_getArgumentInfo" method-get-argument-info) :unsigned-int
+  (m objc-method-pointer)
+  (arg :int)
+  (type :pointer)
+  (offset :pointer))
