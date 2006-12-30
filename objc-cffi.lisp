@@ -274,7 +274,7 @@
   (class objc-class-pointer)
   (sel objc-sel))
 
-(defcfun ("class_getClassMethod" class_getClassMethod) objc-method-pointer
+(defcfun ("class_getClassMethod" class-get-class-method) objc-method-pointer
   (class objc-class-pointer)
   (sel objc-sel))
 
