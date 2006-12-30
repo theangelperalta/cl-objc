@@ -197,6 +197,31 @@
 	(method_name objc-sel)
 	(method_types :string)
 	(method_imp objc-imp))
+(defclass objc-method ()
+  ((name :initarg :name)
+   (types :initarg :types)
+   (imp :initarg :imp)
+   (objc-method-ptr :initarg :ptr :accessor method-ptr)))
+
+;;; objc-method printer
+(defmethod print-object ((method objc-method) stream)
+  (print-unreadable-object (method stream)
+    (with-slots (name) method
+      (format stream "ObjC-Method ~A"
+              (sel-name name)))))
+
+;;; objc-method describer
+(defmethod describe-object ((method objc-method) stream)
+  (with-slots (name types imp objc-method-ptr) method
+    (format stream "~&~S is an Objective C method named ~S.~
+                      ~%Type defintion ~A~
+                      ~%Implementation pointer ~A~
+                      ~%*objc_method ~A~%"
+            method
+            (sel-name name)
+            types
+            imp
+            objc-method-ptr)))
 
 (defcstruct objc-method-list
 	(obsolete :pointer)
