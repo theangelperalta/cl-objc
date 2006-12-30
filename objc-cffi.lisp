@@ -151,17 +151,18 @@
             info))))
 
 (defmethod translate-from-foreign (class-ptr (type (eql 'objc-class-pointer)))
-  (with-foreign-slots ((isa super_class name
-                        version info instance_size
-                        ivars methodlists
-                        cache protocols)
-                       class-ptr objc-class)
-    (make-instance 'objc-class
-                   :isa isa :super-class super_class :name name
-                   :version version :info info :instance-size instance_size
-                   :ivars ivars :method-lists methodlists
-                   :cache cache :protocols protocols
-                   :ptr class-ptr)))
+  (when (not (null-pointer-p class-ptr))
+    (with-foreign-slots ((isa super_class name
+                          version info instance_size
+                          ivars methodlists
+                          cache protocols)
+                         class-ptr objc-class)
+      (make-instance 'objc-class
+                     :isa isa :super-class super_class :name name
+                     :version version :info info :instance-size instance_size
+                     :ivars ivars :method-lists methodlists
+                     :cache cache :protocols protocols
+                     :ptr class-ptr))))
 
 (defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-class-pointer)))
   (slot-value class 'class-ptr))
