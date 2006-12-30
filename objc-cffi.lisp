@@ -190,7 +190,7 @@
 	(isa :pointer))
 
 (defctype objc-id :pointer
-  :documentation "Objective C id - pointer to an objc-object")
+  :documentation "Objective C id - pointer to an objc_object struct")
 
 (defcfun ("objc_getClass" objc-get-class) objc-class-pointer
   (name :string))
