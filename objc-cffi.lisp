@@ -206,11 +206,17 @@
   :documentation "Objective C method_list pointer")
 
 (defmethod translate-from-foreign (mlist-ptr (type (eql 'objc-method-list-pointer)))
-  (with-foreign-slots ((method_count method_list) mlist-ptr objc-method-list)
-    (loop for method-idx from 0 below method_count
-         collect (mem-aref method_list 'objc-method method-idx))))
+  (list mlist-ptr
+        (if (not (null-pointer-p mlist-ptr))
+            (with-foreign-slots ((method_count) mlist-ptr objc-method-list)
+              (loop for method-idx from 0 below method_count
+                 for method-ptr = (mem-aref (foreign-slot-pointer mlist-ptr 'objc-method-list 'method_list) 'objc-method method-idx)
+                 collect
+                   (with-foreign-slots ((method_name method_types method_imp) method-ptr objc-method)
+                     (list method_name method_types method_imp))))
+            nil)))
 
-(defcfun ("class_nextMethodList" class-next-method-list) :pointer
+(defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
   (class-ptr objc-class-pointer)
   (iterator :pointer))
 
