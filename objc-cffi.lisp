@@ -107,8 +107,8 @@
 
 (defclass objc-class ()
   ((isa :initarg :isa)
-   (super-class :initarg :super-class)
-   (name :initarg :name)
+   (super-class :initarg :super-class :accessor super-class)
+   (name :initarg :name :accessor class-name)
    (version :initarg :version)
    (info :initarg :info)
    (instance-size :initarg :instance-size)
