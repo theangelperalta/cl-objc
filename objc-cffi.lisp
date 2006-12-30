@@ -35,7 +35,7 @@
   (str :string))
 
 (defclass objc-selector ()
-  ((name :initarg :name)
+  ((name :initarg :name :accessor sel-name)
    (uid :initarg :uid)))
 
 ;;; objc-sel printer
@@ -50,6 +50,7 @@
   (with-slots (name uid) sel
     (format stream "~&~S is an Objective C SEL for the method ~S.~
                       ~%UID ~A~%"
+            sel
             name
             uid)))
 
