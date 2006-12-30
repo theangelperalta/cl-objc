@@ -281,7 +281,6 @@
   (class objc-class-pointer)
   (sel objc-sel))
 
-
 ;;; Method arguments
 
 (defcfun ("method_getNumberOfArguments" method-get-number-of-arguments) :unsigned-int
@@ -295,3 +294,68 @@
   (arg :int)
   (type :pointer)
   (offset :pointer))
+
+;;; Instance variables
+
+(defcstruct objc-ivar
+	(ivar_name :string)
+	(ivar_type :string)
+	(ivar_offset :int))
+
+(defclass objc-ivar ()
+  ((name :initarg :name)
+   (type :initarg :type)
+   (offset :initarg :offset)
+   (ivar-ptr :initarg :ptr)))
+
+;;; objc-ivar printer
+(defmethod print-object ((ivar objc-ivar) stream)
+  (print-unreadable-object (ivar stream)
+    (with-slots (name) ivar
+      (format stream "ObjC-Ivar ~A"
+              name))))
+
+;;; objc-ivar describer
+(defmethod describe-object ((ivar objc-ivar) stream)
+  (with-slots (name type offset ivar-ptr) ivar
+    (format stream "~&~S is an Objective C instance variable of type ~S.~
+                      ~%Type ~A~
+                      ~%Offset ~D~
+                      ~%*objc_ivar ~A~%"
+            ivar
+            (objc-typechar-to-type type)
+            type
+            offset
+            ivar-ptr)))
+
+(defcstruct objc-ivar-list
+	(ivar_count :int)
+	(ivar_list :pointer))
+
+(defctype objc-ivar-list-pointer :pointer
+  :documentation "A pointer to an objc_ivar_list struct.")
+
+(defctype objc-ivar-pointer :pointer
+  :documentation "A pointer to an objc_ivar struct.")
+
+(defmethod translate-from-foreign (ilist-ptr (type (eql 'objc-ivar-list-pointer)))
+  (if (not (null-pointer-p ilist-ptr))
+      (with-foreign-slots ((ivar_count) ilist-ptr objc-ivar-list)
+        (loop for ivar-idx from 0 below ivar_count
+           for ivar-ptr = (mem-aref (foreign-slot-pointer ilist-ptr 'objc-ivar-list 'ivar_list) 'objc-ivar ivar-idx)
+           collect (convert-from-foreign ivar-ptr 'objc-ivar-pointer)))
+      nil))
+
+(defmethod translate-from-foreign (ivar-ptr (type (eql 'objc-ivar-pointer)))
+  (if (not (null-pointer-p ivar-ptr))
+      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar)
+        (make-instance 'objc-ivar
+                       :name ivar_name
+                       :type ivar_type
+                       :offset ivar_offset
+                       :ptr ivar-ptr))
+      nil))
+
+(defcfun ("class_getInstanceVariable" class-get-instance-variable) objc-ivar-pointer
+  (class objc-class-pointer)
+  (variable-name :string))
