@@ -158,10 +158,10 @@
 
 (defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-class-pointer)))
   (slot-value class 'class-ptr))
-#| This needs more thought
+;;; This is still not optimal - I really want to avoid the pointer -> objc-class conversion on return from objc-get-class.
 (defmethod translate-to-foreign ((class-name string) (type (eql 'objc-class-pointer)))
-  (objc-get-class class-name))
-|#
+  (slot-value (objc-get-class class-name) 'class-ptr))
+
 (defmethod translate-to-foreign (pointer (type (eql 'objc-class-pointer)))
   pointer)
 
