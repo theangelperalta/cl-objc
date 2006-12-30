@@ -38,6 +38,21 @@
   ((name :initarg :name)
    (uid :initarg :uid)))
 
+;;; objc-sel printer
+(defmethod print-object ((sel objc-selector) stream)
+  (print-unreadable-object (sel stream)
+    (with-slots (name) sel
+      (format stream "ObjC-SEL ~A"
+              name))))
+
+;;; objc-sel describer
+(defmethod describe-object ((sel objc-selector) stream)
+  (with-slots (name uid) sel
+    (format stream "~&~S is an Objective C SEL for the method ~S.~
+                      ~%UID ~A~%"
+            name
+            uid)))
+
 (defmethod translate-from-foreign (uid (type (eql 'objc-sel)))
   (make-instance 'objc-selector
                  :name (sel-get-name uid)
