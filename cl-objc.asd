@@ -8,10 +8,11 @@
 (defsystem cl-objc
     :name "CL-OBJC"
     :author "Geoff Cant"
-    :version "0.0.2"
+    :version "0.0.3"
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:file "package")
-                 (:file "objc-cffi" :depends-on ("package"))
+                 (:file "objc-utils" :depends-on ("package"))
+                 (:file "objc-cffi" :depends-on ("package" "objc-utils"))
                  )
     :depends-on (:cffi)
     )
