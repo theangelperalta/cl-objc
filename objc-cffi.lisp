@@ -7,6 +7,9 @@
 (define-foreign-library libobjc
   (t (:default "libobjc")))
 
+(define-foreign-library foundation-framework
+  (t (:framework "Foundation")))
+
 (use-foreign-library libobjc)
 
 ;;; Type Translations -- Yes/No booleans
