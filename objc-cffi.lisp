@@ -324,7 +324,7 @@
                       ~%Offset ~D~
                       ~%*objc_ivar ~A~%"
             ivar
-            (objc-typechar-to-type type)
+            (or (objc-typechar-to-type type) type)
             type
             offset
             ivar-ptr)))
