@@ -360,3 +360,91 @@
 (defcfun ("class_getInstanceVariable" class-get-instance-variable) objc-ivar-pointer
   (class objc-class-pointer)
   (variable-name :string))
+
+;;; Objects
+
+(defcstruct objc-object
+	(isa objc-class-pointer))
+
+(defclass objc-object ()
+  ((isa :initarg :isa :accessor obj-class)
+   (id :initarg :id)))
+
+;;; objc-object printer
+(defmethod print-object ((obj objc-object) stream)
+  (print-unreadable-object (obj stream)
+    (with-slots (isa id) obj
+      (format stream "ObjC-~A x~8,'0X"
+              (class-name isa)
+              (pointer-address id)))))
+
+;;; objc-ivar describer
+(defmethod describe-object ((obj objc-object) stream)
+  (with-slots (isa id) obj
+    (format stream "~&~S is an Objective C object at ~8,'0X.~
+                      ~%Class ~A~%"
+            obj
+            id
+            isa)))
+
+(defvar objc-nil-object
+  (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
+  "The Objective C Object/instance nil")
+
+(defmethod translate-from-foreign (id (type (eql 'objc-id)))
+  (if (not (null-pointer-p id))
+      (with-foreign-slots ((isa) id objc-object)
+        (make-instance 'objc-object
+                       :isa isa
+                       :id id))
+      objc-nil-object))
+
+(defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-id)))
+  (slot-value class 'class-ptr))
+
+(defmethod translate-to-foreign ((object objc-object) (type (eql 'objc-id)))
+  (slot-value object 'id))
+
+
+(defcfun ("object_setInstanceVariable" object-set-instance-variable) objc-ivar-pointer
+  (id objc-id)
+  (ivar-name :string)
+  (value :pointer))
+
+(defcfun ("object_getInstanceVariable" object-get-instance-variable) objc-ivar-pointer
+  (id objc-id)
+  (ivar-name :string)
+  (ref :pointer))
+
+;;; Probably unwanted - better to use the class alloc method.
+(defcfun ("class_createInstance" class-create-instance) objc-id
+  (class objc-class-pointer)
+  (extra-bytes :unsigned-int))
+
+;;; Method calls
+
+(defcfun ("objc_msgSend" objc-msg-send) objc-id
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(defcfun ("objc_msgSend_stret" objc-msg-send-stret) :void
+  (stret-addr :pointer)
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(defgeneric super-classes (item))
+
+(defmethod super-classes ((obj objc-object))
+  (let ((class (obj-class obj)))
+    (super-classes class)))
+
+(defmethod super-classes ((class objc-class))
+  (cons class
+        (let ((super-class-ptr (slot-value class 'super-class)))
+          (if (not (null-pointer-p super-class-ptr))
+              (super-classes (convert-from-foreign super-class-ptr 'objc-class-pointer))))))
+
+(defun class-ivars (class)
+  (convert-from-foreign (slot-value class 'ivars) 'objc-ivar-list-pointer))
