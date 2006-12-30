@@ -229,7 +229,10 @@
 	(method_list :pointer))
 
 (defctype objc-method-list-pointer :pointer
-  :documentation "Objective C method_list pointer")
+  :documentation "Objective C objc_method_list pointer")
+
+(defctype objc-method-pointer :pointer
+  :documentation "Objective C objc_method pointer")
 
 (defmethod translate-from-foreign (mlist-ptr (type (eql 'objc-method-list-pointer)))
   (list mlist-ptr
@@ -237,10 +240,21 @@
             (with-foreign-slots ((method_count) mlist-ptr objc-method-list)
               (loop for method-idx from 0 below method_count
                  for method-ptr = (mem-aref (foreign-slot-pointer mlist-ptr 'objc-method-list 'method_list) 'objc-method method-idx)
-                 collect
-                   (with-foreign-slots ((method_name method_types method_imp) method-ptr objc-method)
-                     (list method_name method_types method_imp))))
+                 collect (convert-from-foreign method-ptr 'objc-method-pointer)))
             nil)))
+
+(defmethod translate-from-foreign (method-ptr (type (eql 'objc-method-pointer)))
+  (if (not (null-pointer-p method-ptr))
+      (with-foreign-slots ((method_name method_types method_imp) method-ptr objc-method)
+        (make-instance 'objc-method
+                       :name method_name
+                       :types method_types
+                       :imp method_imp
+                       :ptr method-ptr))
+      nil))
+
+(defmethod translate-to-foreign ((method objc-method) (type (eql 'objc-method-pointer)))
+  (method-ptr method))
 
 (defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
   (class-ptr objc-class-pointer)
@@ -251,4 +265,4 @@
     (setf (mem-ref itr :int) 0)
     (loop for (mlist-ptr mlist) = (class-next-method-list class itr)
        while (not (null-pointer-p mlist-ptr))
-       append (mapcar #'first mlist))))
+       collect mlist)))
