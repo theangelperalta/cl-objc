@@ -62,6 +62,9 @@
 (defmethod translate-to-foreign ((sel objc-selector) (type (eql 'objc-sel)))
   (slot-value sel 'uid))
 
+(defmethod translate-to-foreign ((name string) (type (eql 'objc-sel)))
+  (slot-value (sel-register-name name) 'uid))
+
 (defmethod translate-to-foreign (sel (type (eql 'objc-sel)))
   sel)
 
