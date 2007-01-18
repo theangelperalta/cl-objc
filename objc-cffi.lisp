@@ -121,6 +121,14 @@
    (class-ptr :initarg :ptr)
    ))
 
+(defparameter nil-class
+  (let ((n (null-pointer)))
+    (make-instance 'objc-class
+                   :isa n :super-class n :name "Nil" :version 0
+                   :info '(:class) :instance-size 0 :ivars n
+                   :method-lists n :cache n :protocols n
+                   :ptr n)))
+
 ;;; objc-class printer
 (defmethod print-object ((class objc-class) stream)
   (print-unreadable-object (class stream)
