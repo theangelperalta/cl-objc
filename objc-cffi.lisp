@@ -461,3 +461,13 @@
 
 (defun class-ivars (class)
   (convert-from-foreign (slot-value class 'ivars) 'objc-ivar-list-pointer))
+
+(defun private-ivar (ivar-name)
+  (string= "_" ivar-name :end2 1))
+
+(defun class-has-public-ivars (class)
+  (loop 
+     for ivar in (class-ivars class)
+     for ivar-name = (slot-value ivar 'name)
+     when (not (private-ivar ivar-name))
+     append (list class ivar-name)))
