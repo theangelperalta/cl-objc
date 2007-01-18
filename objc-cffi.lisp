@@ -145,13 +145,14 @@
     (let ((method-desc (cond ((null-pointer-p method-lists) "No method lists")
                              ((member :NO_METHOD_ARRAY info) "One method list")
                              (t "Multiple method lists"))))
-      (format stream "~&~S is an Objective C ~@[meta ~1*~]class named ~S.~
+      (format stream "~&~S is an Objective C ~@[root ~1*~]~@[meta ~1*~]class named ~S.~
                       ~%~A~
                       ~[~1*~:;~%Version ~D~]~
                       ~%Instance size ~D~
                       ~%Isa ~8,'0X Super ~8,'0X~
                       ~%Flags: ~{~A~^, ~}~%"
             class
+            (null-pointer-p super-class)
             (member :META info)
             name
             method-desc
