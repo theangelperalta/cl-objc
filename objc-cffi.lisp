@@ -12,6 +12,8 @@
 
 (use-foreign-library libobjc)
 
+(use-foreign-library foundation-framework)
+
 ;;; Type Translations -- Yes/No booleans
 
 (defctype objc-bool :char
