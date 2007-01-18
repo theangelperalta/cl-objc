@@ -285,7 +285,7 @@
     (setf (mem-ref itr :int) 0)
     (loop for (mlist-ptr mlist) = (class-next-method-list class itr)
        while (not (null-pointer-p mlist-ptr))
-       collect mlist)))
+       append mlist)))
 
 (defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
   (class objc-class-pointer)
