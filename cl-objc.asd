@@ -13,6 +13,7 @@
     :components ((:file "package")
                  (:file "objc-utils" :depends-on ("package"))
                  (:file "objc-cffi" :depends-on ("package" "objc-utils"))
+                 (:file "objc-types" :depends-on ("package"))
                  )
-    :depends-on (:cffi)
+    :depends-on (:cffi :yacc)
     )

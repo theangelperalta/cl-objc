@@ -8,3 +8,9 @@
 
 (defpackage "CL-OBJC"
   (:use "COMMON-LISP" "CFFI"))
+
+(defpackage "OBJC-TYPES"
+  (:use "COMMON-LISP" "YACC")
+  (:export "PARSE-OBJC-TYPESTR" "LEX-TYPESTR" "*OBJC-TYPE-PARSER*" "TYPESTR-LEXER"
+           "OBJC-UNKNOWN-TYPE")
+  )
