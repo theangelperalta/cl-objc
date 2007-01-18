@@ -219,7 +219,7 @@
 	(method_imp objc-imp))
 (defclass objc-method ()
   ((name :initarg :name)
-   (types :initarg :types)
+   (types :initarg :types :accessor method-type-signature)
    (imp :initarg :imp)
    (objc-method-ptr :initarg :ptr :accessor method-ptr)))
 
