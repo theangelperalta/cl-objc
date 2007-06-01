@@ -404,7 +404,9 @@
   (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
   "The Objective C Object/instance nil")
 
-(defmethod translate-from-foreign (id (type (eql 'objc-id)))
+
+(defun translate-objc-id-from-foreign (id)
+  ;(type (eql 'objc-id))
   (if (not (null-pointer-p id))
       (with-foreign-slots ((isa) id objc-object)
         (make-instance 'objc-object
@@ -415,9 +417,30 @@
 (defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-id)))
   (slot-value class 'class-ptr))
 
-(defmethod translate-to-foreign ((object objc-object) (type (eql 'objc-id)))
-  (slot-value object 'id))
+(defmacro with-gensyms (names &body forms)
+  `(let ,(mapcar #'(lambda (name) (list name '(gensym))) names)
+     ,@forms))
 
+(defmacro typed-objc-msg-send (id sel &rest rest)
+  (with-gensyms (gsel gid  gclass gmethod gtype-signature gtype-decoded greturn-type greturn-value)
+    `(let* ((,gsel ,sel)
+	    (,gid ,id)
+	    (,gclass (class-name (etypecase ,gid
+				   (objc-object (slot-value ,gid 'isa))
+				   (objc-class ,gid))))
+	    (,gmethod (etypecase ,gid
+			(objc-class (class-get-class-method ,gclass ,gsel))
+			(objc-object (class-get-instance-method ,gclass ,gsel))))
+	    (,gtype-signature (method-type-signature ,gmethod))
+	    (,gtype-decoded (objc-types:parse-objc-typestr ,gtype-signature))
+	    (,greturn-type (caddar ,gtype-decoded))
+	    (,greturn-value (objc-msg-send (etypecase ,gid
+					     (objc-class ,gid)
+					     (objc-object (slot-value ,gid 'id))) 
+					   ,gsel ,@rest)))
+       (ecase ,greturn-type
+	 (objc-id (translate-objc-id-from-foreign ,greturn-value))
+	 ((:unsigned-short :unsigned-int) (pointer-address ,greturn-value))))))
 
 (defcfun ("object_setInstanceVariable" object-set-instance-variable) objc-ivar-pointer
   (id objc-id)
@@ -436,7 +459,7 @@
 
 ;;; Method calls
 
-(defcfun ("objc_msgSend" objc-msg-send) objc-id
+(defcfun ("objc_msgSend" objc-msg-send) :pointer
   (id objc-id)
   (sel objc-sel)
   &rest)
