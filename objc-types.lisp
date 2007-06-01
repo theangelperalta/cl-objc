@@ -98,8 +98,8 @@
   (:terminals (start-array end-array start-struct end-struct start-union end-union prim-type name-separator bitfield methodcode pointer alignment))
   
   (type-sequence
-   (possibly-aligned-type type-sequence #'(lambda (a b) (cons a b)))
-   (possibly-aligned-type #'(lambda (a) (cons a nil))))
+   (possibly-aligned-type type-sequence #'cons)
+   (possibly-aligned-type #'list))
 
   (possibly-aligned-type
    (type alignment #'(lambda (a b) (list :align b a)))
