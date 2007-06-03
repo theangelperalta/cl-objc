@@ -422,7 +422,7 @@
      ,@forms))
 
 (defmacro typed-objc-msg-send (id sel &rest rest)
-  (with-gensyms (gsel gid  gclass gmethod gtype-signature gtype-decoded greturn-type greturn-value)
+  (with-gensyms (gsel gid  gclass gmethod greceiver gtype-signature gtype-decoded greturn-type greturn-value)
     `(let* ((,gsel ,sel)
 	    (,gid ,id)
 	    (,gclass (class-name (etypecase ,gid
@@ -431,16 +431,20 @@
 	    (,gmethod (etypecase ,gid
 			(objc-class (class-get-class-method ,gclass ,gsel))
 			(objc-object (class-get-instance-method ,gclass ,gsel))))
-	    (,gtype-signature (method-type-signature ,gmethod))
-	    (,gtype-decoded (objc-types:parse-objc-typestr ,gtype-signature))
-	    (,greturn-type (caddar ,gtype-decoded))
-	    (,greturn-value (objc-msg-send (etypecase ,gid
-					     (objc-class ,gid)
-					     (objc-object (slot-value ,gid 'id))) 
-					   ,gsel ,@rest)))
-       (ecase ,greturn-type
-	 (objc-id (translate-objc-id-from-foreign ,greturn-value))
-	 ((:unsigned-short :unsigned-int) (pointer-address ,greturn-value))))))
+	    (,greceiver (etypecase ,gid
+			  (objc-class ,gid)
+			  (objc-object (slot-value ,gid 'id)))))
+       (if ,gmethod
+	   (let* ((,gtype-signature (method-type-signature ,gmethod))
+		  (,gtype-decoded (objc-types:parse-objc-typestr ,gtype-signature))
+		  (,greturn-type (caddar ,gtype-decoded))
+		  (,greturn-value (objc-msg-send ,greceiver ,gsel ,@rest)))
+	     (ecase ,greturn-type
+	       (objc-id (translate-objc-id-from-foreign ,greturn-value))
+	       ((:unsigned-short :unsigned-int) (pointer-address ,greturn-value))))
+	   (progn
+	     (warn "ObjC method ~a not found. Calling it anyway" ,gsel)
+	     (objc-msg-send ,greceiver ,gsel ,@rest))))))
 
 (defcfun ("object_setInstanceVariable" object-set-instance-variable) objc-ivar-pointer
   (id objc-id)
