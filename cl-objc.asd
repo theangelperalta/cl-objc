@@ -17,3 +17,18 @@
                  )
     :depends-on (:cffi :yacc)
     )
+
+(defsystem  cl-objc.test
+  :components ((:module :t
+			:components ((:file "suite")
+				     (:file "objc-cffi" :depends-on ("suite")))))
+  :depends-on (:cl-objc :FiveAM))
+
+;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)
+(defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system 'cl-objc))))
+  (asdf:oos 'asdf:load-op 'cl-objc.test)
+  (funcall (intern (string :run!) (string :it.bese.FiveAM))
+           :cl-objc))
+
+(defmethod operation-done-p ((op test-op) (system (eql (find-system 'cl-objc))))
+  nil)
