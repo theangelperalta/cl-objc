@@ -400,19 +400,18 @@
             id
             isa)))
 
-(defvar objc-nil-object
-  (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
-  "The Objective C Object/instance nil")
-
-
-(defun translate-objc-id-from-foreign (id)
-  ;(type (eql 'objc-id))
+;;; objc transformer
+(defmethod translate-from-foreign (id (type (eql 'objc-id)))
   (if (not (null-pointer-p id))
       (with-foreign-slots ((isa) id objc-object)
         (make-instance 'objc-object
                        :isa isa
                        :id id))
       objc-nil-object))
+
+(defvar objc-nil-object
+  (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
+  "The Objective C Object/instance nil")
 
 (defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-id)))
   (slot-value class 'class-ptr))
@@ -421,8 +420,37 @@
   `(let ,(mapcar #'(lambda (name) (list name '(gensym))) names)
      ,@forms))
 
+(cffi:defcfun ("objc_msgSend_fpret" objc-msg-send-fpret) :double
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(cffi:defcfun ("objc_msgSend_fpret" objc-msg-send-sfpret) :float
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(defun allowed-objc-types ()
+  (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
+
+(defun make-objc-msg-send-symbol (type)
+  (intern 
+   (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
+   (find-package "OBJC-CFFI")))
+
+(defmacro build-objc-msg-send ()
+  `(progn
+     ,@(mapcar (lambda (type)
+		 `(cffi:defcfun ("objc_msgSend" ,(make-objc-msg-send-symbol type)) ,type
+				(id objc-id)
+				(sel objc-sel)
+				&rest))
+	       (allowed-objc-types))))
+
+(build-objc-msg-send)
+
 (defmacro typed-objc-msg-send (id sel &rest rest)
-  (with-gensyms (gsel gid  gclass gmethod greceiver gtype-signature gtype-decoded greturn-type greturn-value)
+  (with-gensyms (gsel gid  gclass gmethod greceiver gtype-signature gtype-decoded greturn-type)
     `(let* ((,gsel ,sel)
 	    (,gid ,id)
 	    (,gclass (class-name (etypecase ,gid
@@ -437,11 +465,15 @@
        (if ,gmethod
 	   (let* ((,gtype-signature (method-type-signature ,gmethod))
 		  (,gtype-decoded (objc-types:parse-objc-typestr ,gtype-signature))
-		  (,greturn-type (caddar ,gtype-decoded))
-		  (,greturn-value (objc-msg-send ,greceiver ,gsel ,@rest)))
-	     (ecase ,greturn-type
-	       (objc-id (translate-objc-id-from-foreign ,greturn-value))
-	       ((:unsigned-short :unsigned-int) (pointer-address ,greturn-value))))
+		  (,greturn-type (caddar ,gtype-decoded)))
+	     (case ,greturn-type 
+	       (:float  (objc-msg-send-sfpret ,greceiver ,gsel ,@rest))
+	       (:double (objc-msg-send-fpret ,greceiver ,gsel ,@rest))
+	       (otherwise 
+		(ecase ,greturn-type
+		  ,@(mapcar (lambda (type)
+			      `(,type (,(make-objc-msg-send-symbol type) ,greceiver ,gsel ,@rest)))
+			    (allowed-objc-types))))))
 	   (progn
 	     (warn "ObjC method ~a not found. Calling it anyway" ,gsel)
 	     (objc-msg-send ,greceiver ,gsel ,@rest))))))
