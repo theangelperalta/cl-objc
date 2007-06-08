@@ -16,19 +16,21 @@
 
 ;;; Type Translations -- Yes/No booleans
 
-(defctype objc-bool :char
-  :documentation "Objective C YES/NO Boolean")
-(defmethod translate-from-foreign (value (type (eql :objc-bool)))
-  (not (eql value 0)))
-(defmethod translate-to-foreign (value (type (eql :objc-bool)))
+(defun bool-c-to-lisp (value)
+  (not (zerop value)))
+(defun bool-lisp-to-c (value)
   (if value
       1
       0))
+(defctype objc-bool (:wrapper :char :from-c bool-c-to-lisp :to-c bool-lisp-to-c)
+  "Objective C YES/NO Boolean")
 
 ;;; Selectors
-
-(defctype objc-sel :pointer
-  :documentation "Objective C SEL")
+(define-foreign-type objc-sel ()
+  ()
+  (:actual-type :pointer)
+  (:simple-parser objc-sel)
+  (:documentation "Objective C SEL"))
 
 (defcfun ("sel_isMapped" sel-is-mapped) objc-bool
   (sel objc-sel))
@@ -59,18 +61,18 @@
             name
             uid)))
 
-(defmethod translate-from-foreign (uid (type (eql 'objc-sel)))
+(defmethod translate-from-foreign (uid (type objc-sel))
   (make-instance 'objc-selector
                  :name (sel-get-name uid)
                  :uid uid))
 
-(defmethod translate-to-foreign ((sel objc-selector) (type (eql 'objc-sel)))
+(defmethod translate-to-foreign ((sel objc-selector) (type objc-sel))
   (slot-value sel 'uid))
 
-(defmethod translate-to-foreign ((name string) (type (eql 'objc-sel)))
+(defmethod translate-to-foreign ((name string) (type objc-sel))
   (slot-value (sel-register-name name) 'uid))
 
-(defmethod translate-to-foreign (sel (type (eql 'objc-sel)))
+(defmethod translate-to-foreign (sel (type objc-sel))
   sel)
 
 ;;; Classes
@@ -92,8 +94,12 @@
   (:HAS_CXX_STRUCTORS #x2000)
   (:NO_METHOD_ARRAY #x4000))
 
-(defctype objc-class-pointer :pointer
-  :documentation "Objective C objc_class pointer")
+(define-foreign-type objc-class-pointer () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-class-pointer)
+  (:documentation
+   "Objective C objc_class pointer"))
 
 (defcstruct objc-class
 	(isa :pointer)
@@ -161,7 +167,7 @@
             (pointer-address isa) (pointer-address super-class)
             info))))
 
-(defmethod translate-from-foreign (class-ptr (type (eql 'objc-class-pointer)))
+(defmethod translate-from-foreign (class-ptr (type objc-class-pointer))
   (if (not (null-pointer-p class-ptr))
       (with-foreign-slots ((isa super_class name
                                 version info instance_size
@@ -177,13 +183,13 @@
 ;      nil-class
     ))
 
-(defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-class-pointer)))
+(defmethod translate-to-foreign ((class objc-class) (type objc-class-pointer))
   (slot-value class 'class-ptr))
 ;;; This is still not optimal - I really want to avoid the pointer -> objc-class conversion on return from objc-get-class.
-(defmethod translate-to-foreign ((class-name string) (type (eql 'objc-class-pointer)))
+(defmethod translate-to-foreign ((class-name string) (type objc-class-pointer))
   (slot-value (objc-get-class class-name) 'class-ptr))
 
-(defmethod translate-to-foreign (pointer (type (eql 'objc-class-pointer)))
+(defmethod translate-to-foreign (pointer (type objc-class-pointer))
   pointer)
 
 (defcfun ("objc_getClassList" objc-get-class-list) :int
@@ -202,16 +208,24 @@
 (defcstruct objc-object
 	(isa :pointer))
 
-(defctype objc-id :pointer
-  :documentation "Objective C id - pointer to an objc_object struct")
+(define-foreign-type objc-id () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-id)
+  (:documentation
+   "Objective C id - pointer to an objc_object struct"))
 
 (defcfun ("objc_getClass" objc-get-class) objc-class-pointer
   (name :string))
 
 ;;; Methods
 
-(defctype objc-imp :pointer
-  :documentation "Objective C IMP function pointer")
+(define-foreign-type objc-imp () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-imp)
+  (:documentation
+   "Objective C IMP function pointer"))
 
 (defcstruct objc-method
 	(method_name objc-sel)
@@ -248,13 +262,21 @@
 	(method_count :int)
 	(method_list :pointer))
 
-(defctype objc-method-list-pointer :pointer
-  :documentation "Objective C objc_method_list pointer")
+(define-foreign-type objc-method-list-pointer () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-method-list-pointer)
+  (:documentation
+   "Objective C objc_method_list pointer"))
 
-(defctype objc-method-pointer :pointer
-  :documentation "Objective C objc_method pointer")
+(define-foreign-type objc-method-pointer () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-method-pointer)
+  (:documentation
+   "Objective C objc_method pointer"))
 
-(defmethod translate-from-foreign (mlist-ptr (type (eql 'objc-method-list-pointer)))
+(defmethod translate-from-foreign (mlist-ptr (type objc-method-list-pointer))
   (list mlist-ptr
         (if (not (null-pointer-p mlist-ptr))
             (with-foreign-slots ((method_count) mlist-ptr objc-method-list)
@@ -263,7 +285,7 @@
                  collect (convert-from-foreign method-ptr 'objc-method-pointer)))
             nil)))
 
-(defmethod translate-from-foreign (method-ptr (type (eql 'objc-method-pointer)))
+(defmethod translate-from-foreign (method-ptr (type objc-method-pointer))
   (if (not (null-pointer-p method-ptr))
       (with-foreign-slots ((method_name method_types method_imp) method-ptr objc-method)
         (make-instance 'objc-method
@@ -273,7 +295,7 @@
                        :ptr method-ptr))
       nil))
 
-(defmethod translate-to-foreign ((method objc-method) (type (eql 'objc-method-pointer)))
+(defmethod translate-to-foreign ((method objc-method) (type objc-method-pointer))
   (method-ptr method))
 
 (defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
@@ -346,13 +368,21 @@
 	(ivar_count :int)
 	(ivar_list :pointer))
 
-(defctype objc-ivar-list-pointer :pointer
-  :documentation "A pointer to an objc_ivar_list struct.")
+(define-foreign-type objc-ivar-list-pointer () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-ivar-list-pointer)
+  (:documentation
+   "A pointer to an objc_ivar_list struct."))
 
-(defctype objc-ivar-pointer :pointer
-  :documentation "A pointer to an objc_ivar struct.")
+(define-foreign-type objc-ivar-pointer () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-ivar-pointer)
+  (:documentation
+   "A pointer to an objc_ivar struct."))
 
-(defmethod translate-from-foreign (ilist-ptr (type (eql 'objc-ivar-list-pointer)))
+(defmethod translate-from-foreign (ilist-ptr (type objc-ivar-list-pointer))
   (if (not (null-pointer-p ilist-ptr))
       (with-foreign-slots ((ivar_count) ilist-ptr objc-ivar-list)
         (loop for ivar-idx from 0 below ivar_count
@@ -360,7 +390,7 @@
            collect (convert-from-foreign ivar-ptr 'objc-ivar-pointer)))
       nil))
 
-(defmethod translate-from-foreign (ivar-ptr (type (eql 'objc-ivar-pointer)))
+(defmethod translate-from-foreign (ivar-ptr (type objc-ivar-pointer))
   (if (not (null-pointer-p ivar-ptr))
       (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar)
         (make-instance 'objc-ivar
@@ -401,7 +431,7 @@
             isa)))
 
 ;;; objc transformer
-(defmethod translate-from-foreign (id (type (eql 'objc-id)))
+(defmethod translate-from-foreign (id (type objc-id))
   (if (not (null-pointer-p id))
       (with-foreign-slots ((isa) id objc-object)
         (make-instance 'objc-object
@@ -413,7 +443,7 @@
   (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
   "The Objective C Object/instance nil")
 
-(defmethod translate-to-foreign ((class objc-class) (type (eql 'objc-id)))
+(defmethod translate-to-foreign ((class objc-class) (type objc-id))
   (slot-value class 'class-ptr))
 
 (defmacro with-gensyms (names &body forms)
@@ -447,7 +477,8 @@
 				&rest))
 	       (allowed-objc-types))))
 
-(build-objc-msg-send)
+(eval-when (:load-toplevel :execute) 
+  (build-objc-msg-send))
 
 (defmacro typed-objc-msg-send (id sel &rest rest)
   (with-gensyms (gsel gid  gclass gmethod greceiver gtype-signature gtype-decoded greturn-type)
