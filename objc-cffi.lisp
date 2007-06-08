@@ -460,25 +460,25 @@
   (sel objc-sel)
   &rest)
 
-(defun allowed-objc-types ()
-  (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun allowed-objc-types ()
+    (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
 
-(defun make-objc-msg-send-symbol (type)
-  (intern 
-   (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
-   (find-package "OBJC-CFFI")))
+  (defun make-objc-msg-send-symbol (type)
+    (intern 
+     (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
+     (find-package "OBJC-CFFI"))))
 
 (defmacro build-objc-msg-send ()
   `(progn
      ,@(mapcar (lambda (type)
 		 `(cffi:defcfun ("objc_msgSend" ,(make-objc-msg-send-symbol type)) ,type
-				(id objc-id)
-				(sel objc-sel)
-				&rest))
+		    (id objc-id)
+		    (sel objc-sel)
+		    &rest))
 	       (allowed-objc-types))))
 
-(eval-when (:load-toplevel :execute) 
-  (build-objc-msg-send))
+(build-objc-msg-send)
 
 (defmacro typed-objc-msg-send (id sel &rest rest)
   (with-gensyms (gsel gid  gclass gmethod greceiver gtype-signature gtype-decoded greturn-type)
