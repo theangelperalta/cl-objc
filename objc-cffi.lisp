@@ -430,6 +430,10 @@
             id
             isa)))
 
+(defvar objc-nil-object
+  (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
+  "The Objective C Object/instance nil")
+
 ;;; objc transformer
 (defmethod translate-from-foreign (id (type objc-id))
   (if (not (null-pointer-p id))
@@ -438,10 +442,6 @@
                        :isa isa
                        :id id))
       objc-nil-object))
-
-(defvar objc-nil-object
-  (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
-  "The Objective C Object/instance nil")
 
 (defmethod translate-to-foreign ((class objc-class) (type objc-id))
   (slot-value class 'class-ptr))
