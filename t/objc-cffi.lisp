@@ -60,3 +60,11 @@ value usign NSNumber#intValue"
 	(is (= num
 	       (typed-objc-msg-send (typed-objc-msg-send (objc-get-class "NSNumber") "numberWithFloat:" :float num)
 				    "floatValue")))))
+
+(test struct-returning-values "Test with method returning struct value"
+      (cffi:defcstruct nsrange (location :unsigned-int) (length :unsigned-int))
+      (let ((range (cffi:foreign-alloc 'nsrange))
+	    (intval 4))
+	(setf (cffi:foreign-slot-value range 'nsrange 'length) intval)
+	(let ((value-with-range (typed-objc-msg-send (objc-get-class "NSValue") "valueWithRange:" nsrange range)))
+	  (is (= intval (cffi:foreign-slot-value (typed-objc-msg-send value-with-range "rangeValue") 'nsrange 'length))))))

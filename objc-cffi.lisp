@@ -480,8 +480,15 @@
 
 (build-objc-msg-send)
 
+(defmethod method-return-type ((method objc-method))
+  (caddar (objc-types:parse-objc-typestr (method-type-signature method))))
+
+(defmethod method-type-size ((method objc-method))
+  (let ((fields-type (caddr (method-return-type method))))
+    (reduce #'+ (mapcar #'foreign-type-size fields-type))))
+
 (defmacro typed-objc-msg-send (id sel &rest rest)
-  (with-gensyms (gsel gid  gclass gmethod greceiver gtype-signature gtype-decoded greturn-type)
+  (with-gensyms (gsel gid  gclass gmethod greceiver greturn-type)
     `(let* ((,gsel ,sel)
 	    (,gid ,id)
 	    (,gclass (class-name (etypecase ,gid
@@ -494,13 +501,15 @@
 			  (objc-class ,gid)
 			  (objc-object (slot-value ,gid 'id)))))
        (if ,gmethod
-	   (let* ((,gtype-signature (method-type-signature ,gmethod))
-		  (,gtype-decoded (objc-types:parse-objc-typestr ,gtype-signature))
-		  (,greturn-type (caddar ,gtype-decoded)))
-	     (case ,greturn-type 
-	       (:float  (objc-msg-send-sfpret ,greceiver ,gsel ,@rest))
-	       (:double (objc-msg-send-fpret ,greceiver ,gsel ,@rest))
-	       (otherwise 
+	   (let ((,greturn-type (method-return-type ,gmethod)))
+	     (cond
+	       ((eq ,greturn-type :float)  (objc-msg-send-sfpret ,greceiver ,gsel ,@rest))
+	       ((eq ,greturn-type :double) (objc-msg-send-fpret ,greceiver ,gsel ,@rest))
+	       ((and (listp ,greturn-type) (eq (car ,greturn-type) :struct)) 
+		(if (<= (method-type-size ,gmethod) 8)
+		    (objc-msg-send ,greceiver ,gsel ,@rest)
+		    (objc-msg-send-stret ,greceiver ,gsel ,@rest)))
+	       (t 
 		(ecase ,greturn-type
 		  ,@(mapcar (lambda (type)
 			      `(,type (,(make-objc-msg-send-symbol type) ,greceiver ,gsel ,@rest)))
@@ -531,8 +540,7 @@
   (sel objc-sel)
   &rest)
 
-(defcfun ("objc_msgSend_stret" objc-msg-send-stret) :void
-  (stret-addr :pointer)
+(defcfun ("objc_msgSend_stret" objc-msg-send-stret) :pointer
   (id objc-id)
   (sel objc-sel)
   &rest)
