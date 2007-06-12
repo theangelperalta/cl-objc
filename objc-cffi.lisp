@@ -483,9 +483,15 @@
 (defmethod method-return-type ((method objc-method))
   (caddar (objc-types:parse-objc-typestr (method-type-signature method))))
 
+(defun objc-foreign-type-size (type)
+  ;; FIXME. Consider padding
+  (cond 
+    ((and (listp type) (eq (car type) :struct))
+     (reduce #'+ (mapcar #'objc-foreign-type-size (caddr type))))
+    (t (foreign-type-size type))))
+
 (defmethod method-type-size ((method objc-method))
-  (let ((fields-type (caddr (method-return-type method))))
-    (reduce #'+ (mapcar #'foreign-type-size fields-type))))
+  (objc-foreign-type-size (method-return-type method)))
 
 (defmacro typed-objc-msg-send (id sel &rest rest)
   (with-gensyms (gsel gid  gclass gmethod greceiver greturn-type)
@@ -508,7 +514,7 @@
 	       ((and (listp ,greturn-type) (eq (car ,greturn-type) :struct)) 
 		(if (<= (method-type-size ,gmethod) 8)
 		    (objc-msg-send ,greceiver ,gsel ,@rest)
-		    (objc-msg-send-stret ,greceiver ,gsel ,@rest)))
+		    (objc-msg-send-stret ,(cadr rest) ,greceiver ,gsel ,@(cddr rest))))
 	       (t 
 		(ecase ,greturn-type
 		  ,@(mapcar (lambda (type)
@@ -541,6 +547,7 @@
   &rest)
 
 (defcfun ("objc_msgSend_stret" objc-msg-send-stret) :pointer
+  (stret :pointer)
   (id objc-id)
   (sel objc-sel)
   &rest)
