@@ -10,3 +10,4 @@
 
 (5am:def-suite :cl-objc)
 (5am:def-suite :objc-cffi :in :cl-objc)
+(5am:def-suite :objc-reader :in :cl-objc)
