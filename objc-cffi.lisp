@@ -492,7 +492,7 @@
 (defmethod method-type-size ((method objc-method))
   (objc-foreign-type-size (method-return-type method)))
 
-(defmacro typed-objc-msg-send (id sel &rest rest)
+(defmacro typed-objc-msg-send ((id sel &optional stret) &rest rest)
   (with-gensyms (gsel gid  gclass gmethod greceiver greturn-type)
     `(let* ((,gsel ,sel)
 	    (,gid ,id)
@@ -513,7 +513,7 @@
 	       ((and (listp ,greturn-type) (eq (car ,greturn-type) :struct)) 
 		(if (<= (method-type-size ,gmethod) 8)
 		    (objc-msg-send ,greceiver ,gsel ,@rest)
-		    (objc-msg-send-stret ,(cadr rest) ,greceiver ,gsel ,@(cddr rest))))
+		    (objc-msg-send-stret (or ,stret (null-pointer)) ,greceiver ,gsel ,@rest)))
 	       (t 
 		(ecase ,greturn-type
 		  ,@(mapcar (lambda (type)
