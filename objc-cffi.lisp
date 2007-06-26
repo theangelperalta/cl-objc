@@ -472,10 +472,10 @@
 (defmacro build-objc-msg-send ()
   `(progn
      ,@(mapcar (lambda (type)
-		 `(cffi:defcfun ("objc_msgSend" ,(make-objc-msg-send-symbol type)) ,type
-		    (id objc-id)
-		    (sel objc-sel)
-		    &rest))
+		 `(cffi:defcfun ("objc_msgSend" ,(make-objc-msg-send-symbol type) :cconv :objc) ,type
+		   (id objc-id)
+		   (sel objc-sel)
+		   &rest))
 	       (allowed-objc-types))))
 
 (build-objc-msg-send)
@@ -484,7 +484,6 @@
   (caddar (objc-types:parse-objc-typestr (method-type-signature method))))
 
 (defun objc-foreign-type-size (type)
-  ;; FIXME. Consider padding
   (cond 
     ((and (listp type) (eq (car type) :struct))
      (reduce #'+ (mapcar #'objc-foreign-type-size (caddr type))))
