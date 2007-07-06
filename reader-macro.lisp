@@ -77,5 +77,12 @@ The args will be read with the lisp readtable.
     (setf lisp-readtable (copy-readtable))
     (set-macro-character #\[ #'objc-read-left-square-bracket)
     (set-macro-character #\] #'objc-read-right-square-bracket)
+    (unless (get-macro-character #\@)
+      (make-dispatch-macro-character #\@))
+    (set-dispatch-macro-character #\@ #\" 
+				  (lambda (stream char n)
+				    (declare (ignore n))
+				    (unread-char char stream)
+				    (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSString") "alloc")) "initWithUTF8String:") :string (read stream t nil t))))
     (setf objc-readtable (copy-readtable))))
 
