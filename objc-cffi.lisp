@@ -483,6 +483,12 @@
 (defmethod method-return-type ((method objc-method))
   (caddar (objc-types:parse-objc-typestr (method-type-signature method))))
 
+(defmethod method-argument-types ((method objc-method))
+  (mapcar #'caddr (cdddr (objc-types:parse-objc-typestr (method-type-signature method)))))
+
+(defun interpose (lst1 lst2)
+  (merge 'list lst1 lst2 (let ((foo t)) (lambda (e1 e2) (declare (ignore e1 e2)) (setf foo (not foo))))))
+
 (defun objc-foreign-type-size (type)
   (cond 
     ((and (listp type) (eq (car type) :struct))
@@ -522,6 +528,38 @@
 	   (progn
 	     (warn "ObjC method ~a not found. Calling it anyway" ,gsel)
 	     (objc-msg-send ,greceiver ,gsel ,@rest))))))
+
+(defun canocalize-objc-struct-name (name)
+  (let ((struct-name
+	 (intern (if (char-equal (aref name 0) #\_) 
+		     (subseq name 1)
+		     name))))
+    (if (gethash struct-name cffi::*type-parsers*)
+	struct-name
+	(error "There is no struct named ~s in the package ~a" struct-name (package-name *package*)))))
+
+(defmacro untyped-objc-msg-send (receiver selector &rest args)
+  (with-gensyms (greceiver gselector gclass gmethod greturn-type gargument-types)
+    `(let* ((,greceiver ,receiver)
+	    (,gselector ,selector)
+	    (,gclass (class-name (etypecase ,greceiver
+				   (objc-object (slot-value ,greceiver 'isa))
+				   (objc-class ,greceiver))))
+	    (,gmethod (etypecase ,greceiver
+			(objc-class (class-get-class-method ,gclass ,gselector))
+			(objc-object (class-get-instance-method ,gclass ,gselector))))
+	    (,greturn-type (method-return-type ,gmethod))
+	    (,gargument-types (method-argument-types ,gmethod)))
+       (if (and (listp ,greturn-type) (eq (car ,greturn-type) :struct)) ; is return type a struct?
+	   (funcall 
+	    (compile nil
+		     `(lambda ()
+			(let ((ret (foreign-alloc (canocalize-objc-struct-name (cadr ,,greturn-type)))))
+			  (typed-objc-msg-send (,,greceiver ,,gselector ret) ,@(interpose ,gargument-types ',args))))))
+	   (funcall 
+	    (compile nil 
+		     `(lambda () 
+			(typed-objc-msg-send (,,greceiver ,,gselector) ,@(interpose ,gargument-types ',args)))))))))
 
 (defcfun ("object_setInstanceVariable" object-set-instance-variable) objc-ivar-pointer
   (id objc-id)
