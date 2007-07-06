@@ -3,17 +3,18 @@
 (let ((lisp-readtable)
       (objc-readtable))
 
-  (defmacro with-lisp-readtable (&body body)
-    `(let ((*readtable* lisp-readtable))
-       ,@body))
+  (eval-when (:execute :compile-toplevel :load-toplevel)
+    (defmacro with-lisp-readtable (&body body)
+      `(let ((*readtable* lisp-readtable))
+	 ,@body))
 
-  (defmacro with-objc-readtable (&body body)
-    `(let ((*readtable* objc-readtable))
-       (setf (readtable-case *readtable*) :preserve)
-       (prog1
-	   (progn
-	     ,@body)
-	 (setf (readtable-case *readtable*) (readtable-case lisp-readtable)))))
+    (defmacro with-objc-readtable (&body body)
+      `(let ((*readtable* objc-readtable))
+	 (setf (readtable-case *readtable*) :preserve)
+	 (prog1
+	     (progn
+	       ,@body)
+	   (setf (readtable-case *readtable*) (readtable-case lisp-readtable))))))
 
   (defun end-selector-char-p (char)
     (member char '(#\Space #\])))
