@@ -5,6 +5,7 @@
    :common-lisp
    :objc-cffi
    :objc-types
+   :objc-reader
    :cl-objc
    :fiveam))
 
