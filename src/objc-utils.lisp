@@ -30,3 +30,19 @@
   (loop for (sym typechar) in objc-typechar-map
        when (string= type typechar)
        return sym))
+
+(defmacro with-gensyms (names &body forms)
+  `(let ,(mapcar #'(lambda (name) (list name '(gensym))) names)
+     ,@forms))
+
+(defun interpose (lst1 lst2)
+  "Merge two lists in one having as (2*n-1)-th element the n-th
+element of `lst1` and as (2*n)-th element the n-th element of
+`lst2`"
+  (merge 'list 
+	 lst1 
+	 lst2 
+	 (let ((foo t)) 
+	   (lambda (e1 e2) 
+	     (declare (ignore e1 e2)) 
+	     (setf foo (not foo))))))

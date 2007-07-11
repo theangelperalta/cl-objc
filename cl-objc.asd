@@ -11,9 +11,10 @@
     :version "0.0.3"
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:file "package")
-    		 (:file "reader-macro" :depends-on ("package" "objc-cffi"))
+    		 (:file "objc-reader-macro" :depends-on ("package" "objc-cffi" "objc-msg-send"))
                  (:file "objc-utils" :depends-on ("package"))
                  (:file "objc-cffi" :depends-on ("package" "objc-utils" "objc-types"))
+		 (:file "objc-msg-send" :depends-on ("package" "objc-utils" "objc-types" "objc-cffi"))
                  (:file "objc-types" :depends-on ("package"))
                  )
     :depends-on (:cffi :yacc)
