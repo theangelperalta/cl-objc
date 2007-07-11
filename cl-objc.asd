@@ -10,20 +10,21 @@
     :author "Geoff Cant"
     :version "0.0.3"
     :description "Common Lisp / ObjectiveC Interface"
-    :components ((:file "package")
-    		 (:file "objc-reader-macro" :depends-on ("package" "objc-cffi" "objc-msg-send"))
-                 (:file "objc-utils" :depends-on ("package"))
-                 (:file "objc-cffi" :depends-on ("package" "objc-utils" "objc-types"))
-		 (:file "objc-msg-send" :depends-on ("package" "objc-utils" "objc-types" "objc-cffi"))
-                 (:file "objc-types" :depends-on ("package"))
-                 )
-    :depends-on (:cffi :yacc)
-    )
+    :components ((:module :src
+			  :components ((:file "package")
+				       (:file "objc-reader-macro" :depends-on ("package" "objc-cffi" "objc-msg-send"))
+				       (:file "objc-utils" :depends-on ("package"))
+				       (:file "objc-cffi" :depends-on ("package" "objc-utils" "objc-types"))
+				       (:file "objc-msg-send" :depends-on ("package" "objc-utils" "objc-types" "objc-cffi"))
+				       (:file "objc-types" :depends-on ("package")))))
+    :depends-on (:cffi :yacc))
 
 (defsystem  cl-objc.test
   :components ((:module :t
 			:components ((:file "suite")
-				     (:file "objc-cffi" :depends-on ("suite"))
+				     (:file "utils" :depends-on ("suite"))
+				     (:file "typed" :depends-on ("suite" "utils"))
+				     (:file "untyped" :depends-on ("suite" "utils"))
 				     (:file "reader" :depends-on ("suite")))))
   :depends-on (:cl-objc :FiveAM))
 
