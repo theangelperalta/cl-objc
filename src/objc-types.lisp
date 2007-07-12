@@ -113,13 +113,13 @@
    prim-type
    bitfield
    (methodcode type #'(lambda (a b) (list :method a b)))
-   (pointer type #'(lambda (a b) (list :pointer b)))
-   (start-array type end-array #'(lambda (a b c) (list :array a b)))
-   (start-struct end-struct #'(lambda (a b) (list :struct a)))
-   (start-union end-union #'(lambda (a b) (list :union a)))
-   (start-struct name-separator end-struct #'(lambda (a b c) (list :struct a)))
-   (start-struct name-separator type-sequence end-struct #'(lambda (a b c d) (list :struct a c)))
-   (start-union name-separator type-sequence end-union #'(lambda (a b c d) (list :union a c)))))
+   (pointer type #'(lambda (a b) (declare (ignore a)) (list :pointer b)))
+   (start-array type end-array #'(lambda (a b c) (declare (ignore c)) (list :array a b)))
+   (start-struct end-struct #'(lambda (a b) (declare (ignore b)) (list :struct a)))
+   (start-union end-union #'(lambda (a b) (declare (ignore b)) (list :union a)))
+   (start-struct name-separator end-struct #'(lambda (a b c) (declare (ignore b c)) (list :struct a)))
+   (start-struct name-separator type-sequence end-struct #'(lambda (a b c d) (declare (ignore b d)) (list :struct a c)))
+   (start-union name-separator type-sequence end-union #'(lambda (a b c d) (declare (ignore b d)) (list :union a c)))))
 
 (defun parse-objc-typestr (str)
   (parse-with-lexer (typestr-lexer str) *objc-type-parser*))

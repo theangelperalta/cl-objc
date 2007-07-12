@@ -23,10 +23,10 @@
 
 (build-objc-msg-send)
 
-(defmethod method-return-type ((method objc-method))
+(defun method-return-type (method)
   (caddar (objc-types:parse-objc-typestr (method-type-signature method))))
 
-(defmethod method-argument-types ((method objc-method))
+(defun method-argument-types (method)
   (mapcar #'caddr (cdddr (objc-types:parse-objc-typestr (method-type-signature method)))))
 
 (defun objc-foreign-type-size (type)
@@ -35,7 +35,7 @@
      (reduce #'+ (mapcar #'objc-foreign-type-size (caddr type))))
     (t (foreign-type-size type))))
 
-(defmethod method-type-size ((method objc-method))
+(defun method-type-size (method)
   (objc-foreign-type-size (method-return-type method)))
 
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest rest)
