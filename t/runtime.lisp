@@ -16,5 +16,5 @@
        for type in type-signatures
        for encoded-type in encoded
        do
-	 (is (car-equal (cons type (objc-types:parse-objc-typestr type)) (cons encoded-type (parse-objc-typestr encoded-type)))))))
+	 (is (car-equal (cons (objc-types:parse-objc-typestr type) type) (cons (parse-objc-typestr encoded-type) encoded-type))))))
 
