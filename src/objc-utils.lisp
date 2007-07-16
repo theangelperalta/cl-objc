@@ -46,3 +46,8 @@ element of `lst1` and as (2*n)-th element the n-th element of
 	   (lambda (e1 e2) 
 	     (declare (ignore e1 e2)) 
 	     (setf foo (not foo))))))
+
+
+(defmacro awhen (test then)
+  `(let ((it ,test))
+     (when it ,then)))

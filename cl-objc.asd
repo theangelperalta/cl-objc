@@ -16,6 +16,7 @@
 				       (:file "objc-utils" :depends-on ("package"))
 				       (:file "objc-cffi" :depends-on ("package" "objc-utils" "objc-types"))
 				       (:file "objc-msg-send" :depends-on ("package" "objc-utils" "objc-types" "objc-cffi"))
+				       (:file "objc-methods" :depends-on ("package" "objc-types" "objc-cffi" "objc-utils"))
 				       (:file "objc-types" :depends-on ("package")))))
     :depends-on (:cffi :yacc))
 

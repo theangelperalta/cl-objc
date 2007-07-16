@@ -146,7 +146,7 @@
 (defun encode-type (type)
   (cond 
     ((and (listp type) (eq :align (car type))) (format nil "~a~d" (encode-type (third type)) (second type)))
-    ((lookup-type-char type))
+    ((lookup-type-char type) (format nil "~a~d" (lookup-type-char type) (cffi:foreign-type-size type)))
     ((eq :bitfield (car type)) (format nil "b~d" (second type)))
     ((eq :union (car type)) (format nil "(~a=~{~a~})" (second type) (mapcar #'encode-type (caddr type))))
     ((eq :struct (car type)) (format nil "{~a=~{~a~}}" (second type) (mapcar #'encode-type (caddr type))))

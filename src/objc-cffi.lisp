@@ -443,6 +443,9 @@
                        :id id))
       objc-nil-object))
 
+(defmethod translate-to-foreign ((obj objc-object) (type objc-id))
+  (slot-value obj 'id))
+
 (defmethod translate-to-foreign ((class objc-class) (type objc-id))
   (slot-value class 'class-ptr))
 

@@ -18,3 +18,32 @@
        do
 	 (is (car-equal (cons (objc-types:parse-objc-typestr type) type) (cons (parse-objc-typestr encoded-type) encoded-type))))))
 
+(test adding-instance-method-with-arg
+  (objc-cffi:add-objc-method  ("add:" "NSNumber" :return-type :int) (y)  
+    (declare (ignore sel))
+		    (+ (untyped-objc-msg-send self "intValue") 
+		       (untyped-objc-msg-send y "intValue")))
+  (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
+	(y (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 2)))
+    (is (= (typed-objc-msg-send (x "add:") objc-id y) 3))))
+
+(test adding-instance-method 
+  (objc-cffi:add-objc-method  ("double" "NSNumber" :return-type :int) () 
+    (declare (ignore sel))
+    (* 2 (untyped-objc-msg-send self "intValue")))
+  (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1)))
+    (is (= (typed-objc-msg-send (x "double")) 2))))
+
+(test adding-class-method
+  (objc-cffi:add-objc-method ("magicNumber" "NSNumber" :return-type :int :class-method t)
+		   ()
+		   1980)
+  (is (= 1980 (untyped-objc-msg-send (objc-get-class "NSNumber") "magicNumber"))))
+
+(test adding-instance-method-returning-object
+  (objc-cffi:add-objc-method  ("add:" "NSNumber") 
+		    ((y :int)) 
+		    (+ (untyped-objc-msg-send self "intValue") y))
+  (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
+	(y 2))
+    (is (= (typed-objc-msg-send ((typed-objc-msg-send (x "add:") y) "intValue")) 3))))
