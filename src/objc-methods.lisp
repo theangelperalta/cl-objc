@@ -12,30 +12,33 @@
 
 (defun unregister-method (class-name selector-name)
   (awhen (gethash (cons selector-name class-name) *method-list-added*)
-      (class-remove-methods (objc-get-class class-name) it)))
+    (warn "Removing method ~a on class ~a (~s)" selector-name class-name it)
+    (class-remove-methods (objc-get-class class-name) it)))
 
-(defun register-method (class-name selector-name types callback)
-  (let* ((selector (sel-register-name selector-name))
+(defun register-method (class-name selector-name types callback class-method)
+  (let* ((class (objc-get-class class-name))
+	 (selector (sel-register-name selector-name))
+	 (types (foreign-string-alloc types))
 	 (method-list (foreign-alloc 'objc-method-list))
 	 (method (foreign-slot-pointer method-list 'objc-method-list 'method_list)))
+    
+    (unregister-method class-name selector-name)
 
-    (setf (mem-aref method 'objc-method 1) (null-pointer))
-
-    (setf (foreign-slot-value method 'objc-method 'method_name) selector
-	  (foreign-slot-value method 'objc-method 'method_types) (cffi:foreign-string-alloc types)
-	  (foreign-slot-value method 'objc-method 'method_imp) callback)
     (setf 
      (foreign-slot-value method-list 'objc-method-list 'method_count) 1)
-    
-    (when (gethash (cons class-name selector-name) *method-list-added*)
-	(unregister-method class-name selector-name))
-    (class-add-methods (objc-get-class class-name) method-list)
+
+    (setf (foreign-slot-value method 'objc-method 'method_name) selector
+	  (foreign-slot-value method 'objc-method 'method_types) types
+	  (foreign-slot-value method 'objc-method 'method_imp) callback)
+
+    (if class-method
+	(class-add-methods (slot-value class 'isa) method-list)
+	(class-add-methods class method-list))
     (setf (gethash (cons selector-name class-name) *method-list-added*) method-list)
-    (values (class-get-instance-method (objc-get-class class-name)  selector) method-list)))
+    (values (class-get-instance-method class  selector) method-list method)))
 
 (defmacro add-objc-method ((selector-name class-name &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
-  (declare (ignore class-method))
   (let* ((callback (gensym (format nil "~A-CALLBACK-" (remove #\: selector-name))))
 	 (type-list (append (list 'objc-id 'objc-sel) 
 			    (mapcar (lambda (type) 
@@ -54,5 +57,6 @@
 	 ,@body)
        (register-method ,class-name 
 			,selector-name
-			(objc-types:encode-types (append (list ,return-type) ',type-list))
-			(callback ,callback)))))
+			(objc-types:encode-types (append (list ',return-type) ',type-list) t)
+			(callback ,callback)
+			,class-method))))

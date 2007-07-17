@@ -48,6 +48,7 @@ element of `lst1` and as (2*n)-th element the n-th element of
 	     (setf foo (not foo))))))
 
 
-(defmacro awhen (test then)
+(defmacro awhen (test &body then)
   `(let ((it ,test))
-     (when it ,then)))
+     (when it 
+       ,@then)))
