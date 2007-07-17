@@ -2,6 +2,8 @@
 
 (defparameter *old-readtable* nil)
 (defparameter *objc-readtable* nil)
+(defparameter *accept-untyped-call* t
+  "If nil, methods have to be invoked with input type parameters.")
 
 (defun end-selector-char-p (char)
   (member char '(#\Space #\])))
@@ -73,8 +75,9 @@ The args will be read with the lisp readtable.
 (defun restore-readtable ()
   (setf *readtable* *old-readtable*))
 
-(defun activate-objc-reader-macro ()
+(defun activate-objc-reader-macro (&optional (typed-params nil))
   (setf *old-readtable* (copy-readtable))
+  (setf *accept-untyped-call* typed-params)
   (set-macro-character #\[ #'objc-read-left-square-bracket)
   (set-macro-character #\] #'objc-read-right-square-bracket)
   (unless (get-macro-character #\@)
