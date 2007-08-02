@@ -13,20 +13,29 @@
 
 (defun eat-separators (stream)
   (loop 
-     for char = (read-char stream t nil t)
-     while (separator-char-p char)
-     finally (unread-char char stream)))
+     for char = (read-char stream nil nil t)
+     while (and char (separator-char-p char))
+     finally (when char (unread-char char stream))))
 
-(defun read-selector (stream)
-  (with-output-to-string (out)
-    (loop 
-       for char = (read-char stream t nil t)
-       until (end-selector-char-p char)
-       do (princ char out)
-       finally (unread-char char stream))))
+(defun read-selector-part (stream)
+  "Read a part of a selector. Returns 'eof if can't find any
+selector."
+  (eat-separators stream)
+  (let ((string
+	 (with-output-to-string (out)
+	   (loop 
+	      for char = (read-char stream t nil t)
+	      when (not char) return nil
+	      until (end-selector-char-p char)
+	      do (princ char out)
+	      finally (unread-char char stream)))))
+    (if (zerop (length string))
+	'eof
+	string)))
 
 (defun objc-read-right-square-bracket (stream char)
-  (declare (ignore stream char)))
+  (declare (ignore stream char))
+  'eof)
 
 (defmacro with-old-readtable (&body body)
   `(let ((*readtable* *old-readtable*))
@@ -45,6 +54,44 @@
   (eval (with-old-readtable 
 	  (read stream t nil t))))
 
+(defun read-arg-and-type (stream)
+  "Returns a list with a cffi type and an argument for foreign
+  funcall.
+
+If the type is unspecified, the argument is present and
+*accept-untyped-call* is nil it signals an error.
+
+If *accept-untyped-call* is t and the type is not present returns
+a list with just the argument.
+
+If both the argument and the type are not present returns a list
+with the symbol 'eof."
+  (eat-separators stream)
+  (with-old-readtable
+    (let ((ret (let ((type-or-arg (read stream nil 'eof)))
+		 (if (cffi-type-p type-or-arg)
+		     (list type-or-arg (read stream nil 'eof))
+		     (list type-or-arg)))))
+      (cond 
+	((and (not *accept-untyped-call*)
+	      (= 1 (length ret)) 
+	      (not (eq (car ret) 'eof))) (error "Params specified without correct CFFI type (~s)" ret))
+	(t ret)))))
+
+(defun read-args-and-selector (stream)
+  (do* ((selector-part (read-selector-part stream) (read-selector-part stream))
+	(arg/type (read-arg-and-type stream) (append arg/type (read-arg-and-type stream)))
+	(typed t)
+	(selector selector-part (if (not (eq 'eof selector-part)) 
+				    (concatenate 'string selector selector-part)
+				    selector))) 
+      ((or (eq selector-part 'eof)
+	   (eq (car arg/type) 'eof)) (list (remove 'eof arg/type) selector typed))
+    (when (or (and (= 2 (length arg/type))
+		   (eq 'eof (second arg/type)))
+	      (= 1 (length arg/type)))
+      (setf typed nil))))
+
 (defun objc-read-left-square-bracket (stream char)
   "Read an objc form: [ receiver selector args*]. 
 
@@ -62,22 +109,24 @@ The args will be read with the lisp readtable.
 "
   (declare (ignore char))
   (with-objc-readtable 
-    (let ((id (read stream t nil t))
-	  (selector (prog2 (eat-separators stream) (read-selector stream))))
-      (let ((args (with-old-readtable 
-		    (read-delimited-list #\] stream t)))
-	    (receiver (or 
+    (let ((id (read stream t nil t)))
+      (let ((receiver (or 
 		       (and (symbolp id) `(objc-get-class ,(symbol-name id))) 
 		       id)))
-	`(typed-objc-msg-send (,receiver ,selector) ,@args)))))
+	(destructuring-bind (args selector typed) 
+	    (read-args-and-selector stream)
+	  (if typed
+	      `(typed-objc-msg-send (,receiver ,selector) ,@args)
+	      `(untyped-objc-msg-send ,receiver ,selector ,@args)))))))
 
 
 (defun restore-readtable ()
   (setf *readtable* *old-readtable*))
 
-(defun activate-objc-reader-macro (&optional (typed-params nil))
+(defun activate-objc-reader-macro (&optional (accept-untyped-call nil))
+  "If accept-untyped-call is nil method should be invoked with input type parameters"
   (setf *old-readtable* (copy-readtable))
-  (setf *accept-untyped-call* typed-params)
+  (setf *accept-untyped-call* accept-untyped-call)
   (set-macro-character #\[ #'objc-read-left-square-bracket)
   (set-macro-character #\] #'objc-read-right-square-bracket)
   (unless (get-macro-character #\@)
@@ -88,3 +137,5 @@ The args will be read with the lisp readtable.
 				  (unread-char char stream)
 				  (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSString") "alloc")) "initWithUTF8String:") :string (read stream t nil t))))
   (setf *objc-readtable* (copy-readtable)))
+
+    

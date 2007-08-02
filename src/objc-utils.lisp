@@ -39,16 +39,17 @@
   "Merge two lists in one having as (2*n-1)-th element the n-th
 element of `lst1` and as (2*n)-th element the n-th element of
 `lst2`"
-  (merge 'list 
-	 lst1 
-	 lst2 
-	 (let ((foo t)) 
-	   (lambda (e1 e2) 
-	     (declare (ignore e1 e2)) 
-	     (setf foo (not foo))))))
+ (loop 
+    for var1 in lst1
+    for var2 in lst2
+    nconcing (list var1 var2)))
 
 
 (defmacro awhen (test &body then)
   `(let ((it ,test))
      (when it 
        ,@then)))
+
+(defun cffi-type-p (symbol)
+  (member symbol 
+	  (loop for key being the hash-key of cffi::*type-parsers* collecting key)))

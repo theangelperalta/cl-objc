@@ -62,7 +62,7 @@ value usign NSNumber#intValue"
 
 (test untyped-light-struct-returning-values "Test with method returning and passing a light struct value"
       (let ((range (cffi:foreign-alloc 'nsrange))
-	    (intval 4))
+	    (intval (mod (random (get-universal-time)) 1000)))
 	(setf (cffi:foreign-slot-value range 'nsrange 'length) intval)
 	(let ((value-with-range (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRange:" range)))
 	  (is (= intval (cffi:foreign-slot-value (untyped-objc-msg-send value-with-range "rangeValue") 'nsrange 'length))))))
