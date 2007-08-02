@@ -55,27 +55,29 @@ value usign NSNumber#intValue"
 				      "intValue")))))
 
 (test untyped-float-arguments "Test passing a single float argument with NSNumber#numberWithFloat:"
-      (let ((num (float 1.3)))
+      (let ((num (float (random 1.3))))
 	(is (= num
 	       (untyped-objc-msg-send (untyped-objc-msg-send (objc-get-class "NSNumber") "numberWithFloat:" num)
 				      "floatValue")))))
 
-(test untyped-light-struct-returning-values "Test with method returning light struct value"
+(test untyped-light-struct-returning-values "Test with method returning and passing a light struct value"
       (let ((range (cffi:foreign-alloc 'nsrange))
 	    (intval 4))
 	(setf (cffi:foreign-slot-value range 'nsrange 'length) intval)
 	(let ((value-with-range (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRange:" range)))
 	  (is (= intval (cffi:foreign-slot-value (untyped-objc-msg-send value-with-range "rangeValue") 'nsrange 'length))))))
 
-(test untyped-big-struct-returning-values "Test with method returning big struct value"
+(test untyped-big-struct-returning-values "Test with method returning and passing as input a big struct value"
       (cffi:with-foreign-pointer (rect (cffi:foreign-type-size 'nsrect))
-	(let ((floatval 4.0d0))
+	(let ((floatval (random 4.0d0)))
 	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'nsrect 'size) 'nssize 'width) floatval)
 	  (let ((value-with-rect (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRect:" rect)))
-	    (is (= floatval (cffi:foreign-slot-value (cffi:foreign-slot-value (untyped-objc-msg-send value-with-rect "rectValue" rect) 'nsrect 'size) 'nssize 'width)))))))
+	    (is (= floatval (cffi:foreign-slot-value (objc-struct-slot-value (untyped-objc-msg-send value-with-rect "rectValue") 'nsrect 'size) 'nssize 'width)))))))
 
 (test untyped-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
+      (error "This test makes sbcl crash because passing struct
+      by value is not yet fully supported by cffi")
   (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 10))
     (cffi:with-foreign-pointer (range (cffi:foreign-type-size 'nsrange))
       (setf (cffi:foreign-slot-value range 'nsrange 'location) 1

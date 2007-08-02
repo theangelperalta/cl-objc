@@ -38,6 +38,14 @@
 (defun method-type-size (method)
   (objc-foreign-type-size (method-return-type method)))
 
+(defun objc-struct-slot-value (ptr type slot-name)
+  (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name))
+
+(defun set-objc-struct-slot-value (ptr type slot-name newval)
+  (setf (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name) newval))
+
+(defsetf objc-struct-slot-value set-objc-struct-slot-value)
+
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest rest)
   (with-gensyms (gsel gid  gclass gmethod greceiver greturn-type)
     `(let* ((,gsel ,sel)

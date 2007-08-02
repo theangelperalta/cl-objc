@@ -13,7 +13,9 @@
 		     (objc-cffi::class-name (objc-get-class "NSPlaceholderNumber")))))
 
 (test typed-length "Test getting an unsigned integer return value of a method using NSString#length"
-      (is (= 3 (typed-objc-msg-send ((create-new-string "foo") "length")))))
+      (let ((string "foo"))
+	(is (= (length string) 
+	       (typed-objc-msg-send ((create-new-string string) "length"))))))
 
 (test typed-characterAtIndex "Test getting a char return value and
 passing a param to of a method using NSString#characterAtIndex:"
@@ -33,7 +35,7 @@ NSString#UTF8String"
 
 (test typed-float-return "Test getting a float return value usign
 NSNumber#floatValue"
-      (let ((num (float 1.3)))
+      (let ((num (float (random 1.3))))
 	(is (= num
 	       (typed-objc-msg-send 
 		((typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithDouble:") :double (float num 1.0d0))
@@ -41,7 +43,7 @@ NSNumber#floatValue"
 
 (test typed-double-return "Test getting a double float return value
 usign NSNumber#doubleValue"
-      (let ((num (float 1.3d0)))
+      (let ((num (float (random 1.3d0))))
 	(is (= num
 	       (typed-objc-msg-send 
 		((typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithDouble:") :double num)
@@ -55,30 +57,36 @@ value usign NSNumber#intValue"
 				     "intValue"))))))
 
 (test typed-float-arguments "Test passing a single float argument with NSNumber#numberWithFloat:"
-      (let ((num (float 1.3)))
+      (let ((num (float (random 1.3))))
 	(is (= num
 	       (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithFloat:") :float num)
 				     "floatValue"))))))
 
-(test typed-light-struct-returning-values "Test with method returning light struct value"
+(test typed-light-struct-returning-values 
+"Test with method returning light struct value. Test also passing
+a light struct as input parameter"
       (let ((range (cffi:foreign-alloc 'nsrange))
-	    (intval 4))
-	(setf (cffi:foreign-slot-value range 'nsrange 'length) intval)
+	    (intval (random (mod (get-universal-time) 1000))))
+	(setf (cffi:foreign-slot-value range 'nsrange 'location) intval)
 	(let ((value-with-range (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRange:") nsrange range)))
-	  (is (= intval (cffi:foreign-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'length))))))
+	  (is (= intval (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'location))))))
 
-(test typed-big-struct-returning-values "Test with method returning big struct value"
+(test typed-big-struct-returning-values 
+"Test with method returning big struct value. Test also passing a
+big struct as input parameter"
       (cffi:with-foreign-pointer (rect (cffi:foreign-type-size 'nsrect))
-	(let ((floatval 4.0d0))
+	(let ((floatval (random 4.0d0)))
 	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'nsrect 'size) 'nssize 'width) floatval)
 	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") nsrect rect)))
-	    (is (= floatval (cffi:foreign-slot-value (cffi:foreign-slot-value (typed-objc-msg-send (value-with-rect "rectValue" rect)) 'nsrect 'size) 'nssize 'width)))))))
+	    (is (= floatval (cffi:foreign-slot-value (cffi:foreign-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'nsrect 'size) 'nssize 'width)))))))
 
 (test typed-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
-  (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 10))
-    (cffi:with-foreign-pointer (range (cffi:foreign-type-size 'nsrange))
-      (setf (cffi:foreign-slot-value range 'nsrange 'location) 1
-	    (cffi:foreign-slot-value range 'nsrange 'length) 2)
-      (typed-objc-msg-send ((create-new-string "foobarbazbaz") "getCharacters:range:") (:pointer :unsigned-short) buffer nsrange range)
-      (is (= (char-code #\o) (cffi:mem-aref buffer :unsigned-short 0))))))
+      (error "This test makes sbcl crash because passing struct
+      by value is not yet fully supported by cffi")
+      (let ((buffer (cffi:foreign-alloc :unsigned-short :count 3)))
+	(let ((range (cffi:foreign-alloc 'nsrange)))
+	  (setf (cffi:foreign-slot-value range 'nsrange 'location) 1
+		(cffi:foreign-slot-value range 'nsrange 'length) 2)
+	  (typed-objc-msg-send ((create-new-string "foobarbazbaz") "getCharacters:range:") nsrange range :string buffer)
+	  (is (= (char-code #\o) (cffi:mem-aref buffer :unsigned-short 0))))))
