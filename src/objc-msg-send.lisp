@@ -61,26 +61,32 @@
 		    (objc-msg-send ,greceiver ,gsel ,@rest)
 		    ;; (null-pointer) is just to avoid a compile time warning
 		    (objc-msg-send-stret (or ,stret (null-pointer)) ,greceiver ,gsel ,@rest))) 
-	       (t 
+	       ((member ,greturn-type ',(allowed-objc-types)) 
 		(ecase ,greturn-type
 		  ,@(mapcar (lambda (type)
 			      `(,type (,(make-objc-msg-send-symbol type) ,greceiver ,gsel ,@rest)))
-			    (allowed-objc-types))))))
-	   (progn
-	     (warn "ObjC method ~a not found. Calling it anyway" ,gsel)
-	     (objc-msg-send ,greceiver ,gsel ,@rest))))))
+			    (allowed-objc-types))))
+	       (t (error "Unknown return type ~s" ,greturn-type))))
+	   (error "ObjC method ~a not found" ,gsel)))))
 
-(defun canocalize-objc-struct-name (name)
+(defun canonicalize-objc-struct-name (name)
   (let ((struct-name
-	 (intern (if (char-equal (aref name 0) #\_) 
-		     (subseq name 1)
-		     name))))
-    (if (gethash struct-name cffi::*type-parsers*)
-	struct-name
+	 (if (char-equal (aref name 0) #\_) 
+	     (subseq name 1)
+	     name))
+	(cffi-types (loop for key being the hash-key of cffi::*type-parsers* collecting key)))
+    (or (find struct-name cffi-types :test (lambda (v1 v2) (string-equal v1 (string v2)))) 
 	(error "There is no struct named ~s in the package ~a" struct-name (package-name *package*)))))
 
+(defun extract-struct-name (input-type)
+  (if (and
+       (listp input-type)
+       (eq :struct (car input-type)))
+      (canonicalize-objc-struct-name (second input-type))
+      input-type))
+
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
-  (with-gensyms (greceiver gselector gclass gmethod greturn-type gargument-types)
+  (with-gensyms (greceiver gselector gclass gmethod greturn-type gargument-types gargs-var)
     `(let* ((,greceiver ,receiver)
 	    (,gselector ,selector)
 	    (,gclass (class-name (etypecase ,greceiver
@@ -90,14 +96,16 @@
 			(objc-class (class-get-class-method ,gclass ,gselector))
 			(objc-object (class-get-instance-method ,gclass ,gselector))))
 	    (,greturn-type (method-return-type ,gmethod))
-	    (,gargument-types (method-argument-types ,gmethod)))
+	    (,gargument-types (mapcar #'extract-struct-name (method-argument-types ,gmethod)))
+	    (,gargs-var (mapcar (lambda (arg) (declare (ignore arg)) (gensym)) (list ,@args))))
        (if (and (listp ,greturn-type) (eq (car ,greturn-type) :struct)) ; is return type a struct?
 	   (funcall 
 	    (compile nil
-		     `(lambda ()
-			(let ((ret (foreign-alloc (canocalize-objc-struct-name (cadr ,,greturn-type)))))
-			  (typed-objc-msg-send (,,greceiver ,,gselector ret) ,@(interpose ,gargument-types ',args))))))
+		     `(lambda ,,gargs-var
+			(let ((ret (foreign-alloc (canonicalize-objc-struct-name (cadr ',,greturn-type)))))
+			  (typed-objc-msg-send (,,greceiver ,,gselector ret) ,@(interpose ,gargument-types ,gargs-var))))) ,@args)
 	   (funcall 
-	    (compile nil 
-		     `(lambda () 
-			(typed-objc-msg-send (,,greceiver ,,gselector) ,@(interpose ,gargument-types ',args)))))))))
+	    (compile nil
+		     `(lambda ,,gargs-var 
+			(typed-objc-msg-send (,,greceiver ,,gselector) ,@(interpose ,gargument-types ,gargs-var))))
+	    ,@args)))))
