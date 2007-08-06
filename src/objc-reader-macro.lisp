@@ -68,9 +68,9 @@ If both the argument and the type are not present returns a list
 with the symbol 'eof."
   (eat-separators stream)
   (with-old-readtable
-    (let ((ret (let ((type-or-arg (read stream nil 'eof)))
+    (let ((ret (let ((type-or-arg (read stream nil 'eof t)))
 		 (if (cffi-type-p type-or-arg)
-		     (list type-or-arg (read stream nil 'eof))
+		     (list type-or-arg (read stream nil 'eof t))
 		     (list type-or-arg)))))
       (cond 
 	((and (not *accept-untyped-call*)
