@@ -7,7 +7,7 @@
 
 (defsystem cl-objc
     :name "CL-OBJC"
-    :author "Geoff Cant"
+    :author "Geoff Cant, Luigi Panzeri"
     :version "0.0.3"
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:module :src

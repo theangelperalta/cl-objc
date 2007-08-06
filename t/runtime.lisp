@@ -37,6 +37,7 @@
 (test adding-class-method
   (objc-cffi:add-objc-method ("magicNumber" "NSNumber" :return-type :int :class-method t)
 		   ()
+    (declare (ignore sel self))
 		   1980)
   (is (= 1980 (untyped-objc-msg-send (objc-get-class "NSNumber") "magicNumber"))))
 

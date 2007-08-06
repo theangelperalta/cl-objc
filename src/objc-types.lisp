@@ -13,7 +13,7 @@
     (#\Q :unsigned-long-long)
     (#\f :float)
     (#\d :double)
-    (#\B objc-cffi:objc-bool)
+    (#\B :boolean)
     (#\v :void)
     (#\* :string)
     (#\@ objc-cffi:objc-id)

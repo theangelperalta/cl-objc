@@ -12,24 +12,23 @@
 
 (defun unregister-method (class-name selector-name)
   (awhen (gethash (cons selector-name class-name) *method-list-added*)
-    (warn "Removing method ~a on class ~a (~s)" selector-name class-name it)
     (class-remove-methods (objc-get-class class-name) it)))
 
 (defun register-method (class-name selector-name types callback class-method)
   (let* ((class (objc-get-class class-name))
 	 (selector (sel-register-name selector-name))
 	 (types (foreign-string-alloc types))
-	 (method-list (foreign-alloc 'objc-method-list))
-	 (method (foreign-slot-pointer method-list 'objc-method-list 'method_list)))
+	 (method-list (foreign-alloc 'objc-method-list-cstruct))
+	 (method (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)))
     
     (unregister-method class-name selector-name)
 
     (setf 
-     (foreign-slot-value method-list 'objc-method-list 'method_count) 1)
+     (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
 
-    (setf (foreign-slot-value method 'objc-method 'method_name) selector
-	  (foreign-slot-value method 'objc-method 'method_types) types
-	  (foreign-slot-value method 'objc-method 'method_imp) callback)
+    (setf (foreign-slot-value method 'objc-method-cstruct 'method_name) selector
+	  (foreign-slot-value method 'objc-method-cstruct 'method_types) types
+	  (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
 
     (if class-method
 	(class-add-methods (slot-value class 'isa) method-list)

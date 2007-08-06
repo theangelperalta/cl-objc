@@ -50,6 +50,7 @@ and this notice are preserved.
 What is CL-ObjC?
 Aims
 Supported Architectures
+Requirements
 Limits
 How and where to get it?
 Installation (asdf, asdf-install)

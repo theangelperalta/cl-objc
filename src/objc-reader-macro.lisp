@@ -137,5 +137,3 @@ The args will be read with the lisp readtable.
 				  (unread-char char stream)
 				  (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSString") "alloc")) "initWithUTF8String:") :string (read stream t nil t))))
   (setf *objc-readtable* (copy-readtable)))
-
-    
