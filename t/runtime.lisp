@@ -44,6 +44,7 @@
 (test adding-instance-method-returning-object
   (objc-cffi:add-objc-method  ("add:" "NSNumber") 
 		    ((y :int)) 
+    (declare (ignore self))
     (untyped-objc-msg-send (objc-get-class "NSNumber") "numberWithInt:" 
 			   (+ (untyped-objc-msg-send self "intValue") y)))
   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))

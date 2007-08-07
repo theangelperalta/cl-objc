@@ -9,6 +9,6 @@
   (invoke (invoke 'nsstring :alloc) :init-with-utf8-string string))
 
 (cffi:defcstruct nsrange (location :unsigned-int) (length :unsigned-int))
-(cffi:defcstruct nssize (width :double) (height :double))
-(cffi:defcstruct nspoint (x :double) (y :double))
+(cffi:defcstruct nssize (width :float) (height :float))
+(cffi:defcstruct nspoint (x :float) (y :float))
 (cffi:defcstruct nsrect (origin nspoint) (size nssize))

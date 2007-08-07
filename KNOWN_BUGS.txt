@@ -1,2 +1,2 @@
-* Methods with big struct as a params or returning values don't work
+* passing structs by value is not fully supported (see the tests)
 

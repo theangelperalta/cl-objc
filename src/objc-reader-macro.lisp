@@ -76,6 +76,12 @@ with the symbol 'eof."
 	((and (not *accept-untyped-call*)
 	      (= 1 (length ret)) 
 	      (not (eq (car ret) 'eof))) (error "Params specified without correct CFFI type (~s)" ret))
+	((and *accept-untyped-call*
+	      (eq (car ret) ']) (list 'eof))) ; the params are read
+					      ; using the old
+					      ; readtable so we need
+					      ; to convert the ] into
+					      ; 'eof
 	(t ret)))))
 
 (defun read-args-and-selector (stream)

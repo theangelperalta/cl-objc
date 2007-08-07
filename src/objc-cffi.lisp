@@ -124,14 +124,6 @@
   (:documentation
    "Objective C objc_method pointer"))
 
-(defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
-  (class objc-class-pointer)
-  (sel objc-sel))
-
-(defcfun ("class_getClassMethod" class-get-class-method) objc-method-pointer
-  (class objc-class-pointer)
-  (sel objc-sel))
-
 (defcfun ("method_getNumberOfArguments" method-get-number-of-arguments) :unsigned-int
   (method objc-method-pointer))
 
@@ -172,10 +164,6 @@
   (:simple-parser objc-method-list-pointer)
   (:documentation
    "Objective C objc_method_list pointer"))
-
-(defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
-  (class-ptr objc-class-pointer)
-  (iterator :pointer))
 
 ;;; Type Translators
 (defmethod translate-from-foreign (mlist-ptr (type objc-method-list-type))
@@ -388,6 +376,18 @@
   (class objc-class-pointer)
   (variable-name :string))
 
+(defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
+  (class objc-class-pointer)
+  (sel objc-sel))
+
+(defcfun ("class_getClassMethod" class-get-class-method) objc-method-pointer
+  (class objc-class-pointer)
+  (sel objc-sel))
+
+(defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
+  (class-ptr objc-class-pointer)
+  (iterator :pointer))
+
 ;;; Type Translators
 (defmethod translate-from-foreign (class-ptr (type objc-class-type))
   (if (not (null-pointer-p class-ptr))
@@ -410,7 +410,7 @@
 
 (defmethod translate-to-foreign ((class objc-class) (type objc-class-type))
   (slot-value class 'class-ptr))
-;;; This is still not optimal - I really want to avoid the pointer -> objc-class conversion on return from objc-get-class.
+
 (defmethod translate-to-foreign ((class-name string) (type objc-class-type))
   (slot-value (objc-get-class class-name) 'class-ptr))
 

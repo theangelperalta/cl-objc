@@ -68,19 +68,14 @@ value usign NSNumber#intValue"
 	  (is (= intval (cffi:foreign-slot-value (untyped-objc-msg-send value-with-range "rangeValue") 'nsrange 'length))))))
 
 (test untyped-big-struct-returning-values "Test with method returning and passing as input a big struct value"
-      (cffi:with-foreign-pointer (rect (cffi:foreign-type-size 'nsrect))
-	(let ((floatval (random 4.0d0)))
+      (cffi:with-foreign-object (rect 'nsrect)
+	(let ((floatval (random 4.0)))
 	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'nsrect 'size) 'nssize 'width) floatval)
 	  (let ((value-with-rect (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRect:" rect)))
 	    (is (= floatval (cffi:foreign-slot-value (objc-struct-slot-value (untyped-objc-msg-send value-with-rect "rectValue") 'nsrect 'size) 'nssize 'width)))))))
 
 (test untyped-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
-      (error "This test makes sbcl crash because passing struct
-      by value is not yet fully supported by cffi")
-  (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 10))
-    (cffi:with-foreign-pointer (range (cffi:foreign-type-size 'nsrange))
-      (setf (cffi:foreign-slot-value range 'nsrange 'location) 1
-	    (cffi:foreign-slot-value range 'nsrange 'length) 2)
-      (untyped-objc-msg-send (create-new-string "foobarbazbaz") "getCharacters:range:" buffer range)
-      (is (= (char-code #\o) (cffi:mem-aref buffer :unsigned-short 0))))))
+  (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 3))
+    (untyped-objc-msg-send (create-new-string "foo") "getCharacters:" buffer)
+    (is (= (char-code #\f) (cffi:mem-aref buffer :unsigned-short 0)))))

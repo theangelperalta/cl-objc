@@ -66,27 +66,25 @@ value usign NSNumber#intValue"
 "Test with method returning light struct value. Test also passing
 a light struct as input parameter"
       (let ((range (cffi:foreign-alloc 'nsrange))
-	    (intval (random (mod (get-universal-time) 1000))))
-	(setf (cffi:foreign-slot-value range 'nsrange 'location) intval)
+	    (intval1 (random (mod (get-universal-time) 1000)))
+	    (intval2 (random (mod (get-universal-time) 1000))))
+	(setf (cffi:foreign-slot-value range 'nsrange 'location) intval1
+	      (cffi:foreign-slot-value range 'nsrange 'length) intval2)
 	(let ((value-with-range (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRange:") nsrange range)))
-	  (is (= intval (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'location))))))
+	  (is (= intval1 (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'location)))
+	  (is (= intval2 (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'length))))))
 
 (test typed-big-struct-returning-values 
 "Test with method returning big struct value. Test also passing a
 big struct as input parameter"
-      (cffi:with-foreign-pointer (rect (cffi:foreign-type-size 'nsrect))
-	(let ((floatval (random 4.0d0)))
+      (cffi:with-foreign-object (rect 'nsrect)
+	(let ((floatval (random 4.0)))
 	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'nsrect 'size) 'nssize 'width) floatval)
 	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") nsrect rect)))
-	    (is (= floatval (cffi:foreign-slot-value (cffi:foreign-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'nsrect 'size) 'nssize 'width)))))))
+	    (is (= floatval (cffi:foreign-slot-value (objc-struct-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'nsrect 'size) 'nssize 'width)))))))
 
 (test typed-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
-      (error "This test makes sbcl crash because passing struct
-      by value is not yet fully supported by cffi")
-      (let ((buffer (cffi:foreign-alloc :unsigned-short :count 3)))
-	(let ((range (cffi:foreign-alloc 'nsrange)))
-	  (setf (cffi:foreign-slot-value range 'nsrange 'location) 1
-		(cffi:foreign-slot-value range 'nsrange 'length) 2)
-	  (typed-objc-msg-send ((create-new-string "foobarbazbaz") "getCharacters:range:") nsrange range :string buffer)
-	  (is (= (char-code #\o) (cffi:mem-aref buffer :unsigned-short 0))))))
+      (let ((buffer (cffi:foreign-alloc :unsigned-short :count 4)))
+	(typed-objc-msg-send ((create-new-string "foo") "getCharacters:") :pointer buffer)
+	(is (= (char-code #\f) (cffi:mem-aref buffer :unsigned-short 0)))))
