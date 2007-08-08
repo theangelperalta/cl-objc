@@ -32,19 +32,6 @@
 	 4))
   (restore-readtable))
 
-(test typed-structure-params
-  (activate-objc-reader-macro nil)
-  (error "Fixme: find a good test for input structure
-  parameters readed by objc reader")
-  (restore-readtable))
-
-(test typed-structure-params-and-return
-  (activate-objc-reader-macro nil)
-  (error "Fixme: find a good test for output structure
-  parameters readed by objc reader")
-  (restore-readtable))
-
-
 ;;  _   _       _                         _ 
 ;; | | | |_ __ | |_ _   _ _ __   ___   __| |
 ;; | | | | '_ \| __| | | | '_ \ / _ \ / _` |
@@ -80,16 +67,4 @@
   (activate-objc-reader-macro t)
   (is (= (eval (read-from-string "[[[NSString alloc] initWithUTF8String: \"ciao\"] length]"))
 	 4))
-  (restore-readtable))
-
-(test untyped-structure-params
-  (activate-objc-reader-macro t)
-  (error "Fixme: find a good test for input structure
-  parameters readed by objc reader")
-  (restore-readtable))
-
-(test untyped-structure-params-and-return
-  (activate-objc-reader-macro t)
-  (error "Fixme: find a good test for output structure
-  parameters readed by objc reader")
   (restore-readtable))

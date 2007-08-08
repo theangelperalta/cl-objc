@@ -2,6 +2,8 @@
 
 (defparameter *old-readtable* nil)
 (defparameter *objc-readtable* nil)
+(defparameter *objc-argument-readtable* nil
+  "The readtable used to read arguments of messages")
 (defparameter *accept-untyped-call* t
   "If nil, methods have to be invoked with input type parameters.")
 
@@ -37,8 +39,8 @@ selector."
   (declare (ignore stream char))
   'eof)
 
-(defmacro with-old-readtable (&body body)
-  `(let ((*readtable* *old-readtable*))
+(defmacro with-argument-readtable (&body body)
+  `(let ((*readtable* *objc-argument-readtable*))
      ,@body))
 
 (defmacro with-objc-readtable (&body body)
@@ -67,21 +69,20 @@ a list with just the argument.
 If both the argument and the type are not present returns a list
 with the symbol 'eof."
   (eat-separators stream)
-  (with-old-readtable
+  (with-argument-readtable
     (let ((ret (let ((type-or-arg (read stream nil 'eof t)))
 		 (if (cffi-type-p type-or-arg)
 		     (list type-or-arg (read stream nil 'eof t))
 		     (list type-or-arg)))))
       (cond 
-	((and (not *accept-untyped-call*)
-	      (= 1 (length ret)) 
-	      (not (eq (car ret) 'eof))) (error "Params specified without correct CFFI type (~s)" ret))
-	((and *accept-untyped-call*
-	      (eq (car ret) ']) (list 'eof))) ; the params are read
-					      ; using the old
+	((eq (car ret) (intern "]")) (list 'eof))       ; using the old
 					      ; readtable so we need
 					      ; to convert the ] into
 					      ; 'eof
+
+	((and (not *accept-untyped-call*)
+	      (= 1 (length ret)) 
+	      (not (eq (car ret) 'eof))) (error "Params specified without correct CFFI type: ~s" ret)) ; the params are read
 	(t ret)))))
 
 (defun read-args-and-selector (stream)
@@ -131,9 +132,8 @@ The args will be read with the lisp readtable.
 
 (defun activate-objc-reader-macro (&optional (accept-untyped-call nil))
   "If accept-untyped-call is nil method should be invoked with input type parameters"
-  (setf *old-readtable* (copy-readtable))
-  (setf *accept-untyped-call* accept-untyped-call)
-  (set-macro-character #\[ #'objc-read-left-square-bracket)
+  (setf *old-readtable* (copy-readtable)
+	*accept-untyped-call* accept-untyped-call)
   (set-macro-character #\] #'objc-read-right-square-bracket)
   (unless (get-macro-character #\@)
     (make-dispatch-macro-character #\@))
@@ -142,4 +142,6 @@ The args will be read with the lisp readtable.
 				  (declare (ignore n))
 				  (unread-char char stream)
 				  (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSString") "alloc")) "initWithUTF8String:") :string (read stream t nil t))))
+  (setf *objc-argument-readtable* (copy-readtable))
+  (set-macro-character #\[ #'objc-read-left-square-bracket)
   (setf *objc-readtable* (copy-readtable)))
