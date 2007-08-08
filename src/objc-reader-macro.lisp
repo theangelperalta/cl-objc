@@ -43,6 +43,10 @@ selector."
   `(let ((*readtable* *objc-argument-readtable*))
      ,@body))
 
+(defmacro with-old-readtable (&body body)
+  `(let ((*readtable* *objc-old-readtable*))
+     ,@body))
+
 (defmacro with-objc-readtable (&body body)
   `(let ((*readtable* *objc-readtable*))
      (setf (readtable-case *readtable*) :preserve)
