@@ -53,3 +53,18 @@ element of `lst1` and as (2*n)-th element the n-th element of
 (defun cffi-type-p (symbol)
   (member symbol 
 	  (loop for key being the hash-key of cffi::*type-parsers* collecting key)))
+
+(defun split-string (string item &key (test-fn #'char-equal))
+  (let ((ret)
+	(part))
+    (loop
+       for el across string
+       for test = (funcall test-fn el item) 
+       do 
+       (cond
+	 ((not test) (setf part (if part 
+				    (format nil "~a~c" part el)
+				    (format nil "~c" el))))
+	 (test (setf ret (append ret (list part))) (setf part nil))))
+    (when part (setf ret (append ret (list part))))
+    ret))

@@ -1,42 +1,46 @@
 (defpackage "OBJC-CFFI"
   (:use "COMMON-LISP" "CFFI")
   (:export 
+
    "GET-CLASS-LIST" 
    "GET-CLASS-METHODS" 
+   "OBJC-GET-CLASS"
    "CLASS-IVARS" 
    "PRIVATE-IVAR" 
    "CLASS-HAS-PUBLIC-IVARS"
-   "OBJC-SELECTOR" 
-   "OBJC-CLASS" 
-   "OBJC-METHOD" 
-   "OBJC-IVAR" 
-   "OBJC-OBJECT" 
-   "OBJ-CLASS" 
    "SUPER-CLASSES"
    "CLASS-GET-INSTANCE-METHOD" 
    "CLASS-GET-CLASS-METHOD" 
+
+   "SEL-NAME"
+
    "METHOD-TYPE-SIGNATURE"
-   "OBJC-ID"
-   "OBJC-SEL"
-   "OBJC-CLASS-POINTER" ; why exporting a cffi pointer?
-   "OBJC-MSG-SEND"      ; maybe we don't need to export this call
-   "OBJC-MSG-SEND-STRET" ; the same as objc-msg-send
-   "OBJC-GET-CLASS"
+   "METHOD-SELECTOR"
+
    "TYPED-OBJC-MSG-SEND" 
    "UNTYPED-OBJC-MSG-SEND" 
+
    "ADD-OBJC-METHOD" 
+
    "CFFI-TYPE-P"
    "OBJC-STRUCT-SLOT-VALUE"))
 
 (defpackage "CL-OBJC"
-  (:use "COMMON-LISP" "CFFI"))
+  (:use "COMMON-LISP" "CFFI")
+  (:export "INVOKE"
+	   "SYMBOLS-TO-OBJC-SELECTOR"
+	   "OBJC-SELECTOR-TO-SYMBOLS"))
 
 (defpackage "OBJC-TYPES"
   (:use "COMMON-LISP" "YACC")
-  (:export "PARSE-OBJC-TYPESTR" "LEX-TYPESTR" "*OBJC-TYPE-PARSER*" "TYPESTR-LEXER"
-           "OBJC-UNKNOWN-TYPE" "TYPEMAP" "ENCODE-TYPES" "ENCODE-TYPE"))
+  (:export "PARSE-OBJC-TYPESTR" 
+           "OBJC-UNKNOWN-TYPE" 
+	   "TYPEMAP" 
+	   "ENCODE-TYPES" 
+	   "ENCODE-TYPE"))
 
 (defpackage "OBJC-READER"
   (:use "COMMON-LISP" "OBJC-CFFI")
-  (:export "ACTIVATE-OBJC-READER-MACRO" "RESTORE-READTABLE"
+  (:export "ACTIVATE-OBJC-READER-MACRO" 
+	   "RESTORE-READTABLE"
 	   "*ACCEPT-UNTYPED-CALL*"))

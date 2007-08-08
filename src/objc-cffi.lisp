@@ -79,7 +79,7 @@
 
 ;;; CLOS definitions
 (defclass objc-method ()
-  ((name :initarg :name)
+  ((name :initarg :name :accessor method-selector)
    (types :initarg :types :accessor method-type-signature)
    (imp :initarg :imp)
    (objc-method-ptr :initarg :ptr :accessor method-ptr)))

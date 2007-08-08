@@ -27,7 +27,8 @@
 				     (:file "typed" :depends-on ("suite" "utils"))
 				     (:file "untyped" :depends-on ("suite" "utils"))
 				     (:file "reader" :depends-on ("suite"))
-				     (:file "runtime" :depends-on ("suite")))))
+				     (:file "runtime" :depends-on ("suite"))
+				     (:file "lisp-objc" :depends-on ("suite" "utils")))))
   :depends-on (:cl-objc :FiveAM))
 
 ;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)

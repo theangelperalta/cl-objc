@@ -1,7 +1,14 @@
 ;; Test suite for the lisp-like interface to objc
 (in-package "CL-OBJC-TEST")
 
-(in-suite :lisp-objc-msg-send)
+(in-suite :lisp-objc)
+
+(test symbols-selector-transformation
+  (let ((selectors (mapcar #'sel-name 
+			   (mapcar #'method-selector
+				   (mapcan #'get-class-methods (get-class-list))))))
+    (dolist (selector selectors)
+      (is (string-equal selector (symbols-to-objc-selector (objc-selector-to-symbols selector)))))))
 
 (test lisp-instantiation "Test instantiation of ObjC object"
       (is (eq (class-of  (invoke 'nsstring :alloc))
