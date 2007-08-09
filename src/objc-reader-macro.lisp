@@ -44,7 +44,7 @@ selector."
      ,@body))
 
 (defmacro with-old-readtable (&body body)
-  `(let ((*readtable* *objc-old-readtable*))
+  `(let ((*readtable* *old-readtable*))
      ,@body))
 
 (defmacro with-objc-readtable (&body body)

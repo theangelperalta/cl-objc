@@ -6,7 +6,7 @@
 			"initWithUTF8String:") :string string))
 
 (defun create-nsstring (string)
-  (invoke (invoke 'nsstring :alloc) :init-with-utf8-string string))
+  (invoke (invoke 'ns-string alloc) :init-with-u-t-f8-string string))
 
 (cffi:defcstruct nsrange (location :unsigned-int) (length :unsigned-int))
 (cffi:defcstruct nssize (width :float) (height :float))

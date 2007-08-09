@@ -17,7 +17,8 @@
 				       (:file "objc-cffi" :depends-on ("package" "objc-utils" "objc-types"))
 				       (:file "objc-msg-send" :depends-on ("package" "objc-utils" "objc-types" "objc-cffi"))
 				       (:file "objc-methods" :depends-on ("package" "objc-types" "objc-cffi" "objc-utils"))
-				       (:file "objc-types" :depends-on ("package")))))
+				       (:file "objc-types" :depends-on ("package"))
+				       (:file "objc-lisp" :depends-on ("package" "objc-utils" "objc-cffi")))))
     :depends-on (:cffi :yacc))
 
 (defsystem  cl-objc.test

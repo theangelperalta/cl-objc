@@ -68,3 +68,18 @@ element of `lst1` and as (2*n)-th element the n-th element of
 	 (test (setf ret (append ret (list part))) (setf part nil))))
     (when part (setf ret (append ret (list part))))
     ret))
+
+(defun simple-replace-string (old new string)
+  (loop
+     with changed = t
+     while changed
+     do (setf string 
+	      (let ((match (search old string :test #'equal)))
+		(if match 
+		    (prog1
+			(format nil "~a~a~a" (subseq string 0 match) new (subseq string (+ match (length old))))
+		      (setf changed t))
+		    (prog1 
+			string
+		      (setf changed nil)))))
+       finally (return string)))
