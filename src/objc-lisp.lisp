@@ -132,3 +132,23 @@
 	    (objc-cffi:untyped-objc-msg-send (if (symbolp ,greceiver)  
 						 (objc-cffi:objc-get-class (symbol-to-objc-class-name ,greceiver)) 
 						 ,greceiver) ,(symbols-to-objc-selector selector) ,@args)))))))
+
+(defmacro slet-macrolet-forms (types &body body)
+  (if types
+      `(macrolet ,(mapcar 
+		   (lambda (slot-name)
+		     `(,(intern (format nil "~a-~a" (car types) slot-name)) (ptr) 
+			`(objc-cffi:objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
+		   (cffi:foreign-slot-names (car types)))
+	 (slet-macrolet-forms ,(cdr types) ,@body))
+      `(progn
+	 ,@body)))
+
+(defmacro slet (bindings &body body)
+  `(let ,(mapcar 
+	  (lambda (binding)
+	    (let ((name (car binding))
+		  (type (cadr binding))
+		  (value (caddr binding)))
+	      `(,name (or ,value (foreign-alloc ',type))))) bindings)
+     (slet-macrolet-forms ,(mapcar #'cadr bindings) ,@body)))

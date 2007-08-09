@@ -67,17 +67,17 @@ value usign NSNumber#intValue"
 "Test with method returning light struct value. Test also passing
 a light struct as input parameter"
       (let ((intval (random (mod (get-universal-time) 1000))))
-	(slet ((range 'ns-range))
-	      (setf (location range) intval)
+	(slet ((range nsrange))
+	      (setf (nsrange-location range) intval)
 	      (let ((value-with-range (invoke 'ns-value :value-with-range range)))
-		(is (= intval (location (invoke value-with-range range-value))))))))
+		(is (= intval (nsrange-location (invoke value-with-range range-value))))))))
 
 (test lisp-big-struct-returning-values 
   "Test with method returning big struct value. Test also passing a
 big struct as input parameter"
-  (slet ((rect 'nsrect))
-	(let ((floatval (random 4.0d0)))
-	  (slet ((size (size rect)))
-		(setf (width size) floatval)
+  (slet ((rect nsrect))
+	(let ((floatval (random 4.0)))
+	  (slet ((size nssize (nsrect-size rect)))
+		(setf (nssize-width size) floatval)
 		(let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
-		  (is (= floatval (width (size (invoke value-with-rect 'rect-value) 'nsrect 'size)))))))))
+		  (is (= floatval (nssize-width (nsrect-size (invoke value-with-rect rect-value))))))))))

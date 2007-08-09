@@ -33,6 +33,7 @@
 (defpackage "CL-OBJC"
   (:use "COMMON-LISP" "CFFI")
   (:export "INVOKE"
+	   "SLET"
 	   "SYMBOLS-TO-OBJC-SELECTOR"
 	   "OBJC-SELECTOR-TO-SYMBOLS"
 	   "SYMBOL-TO-OBJC-CLASS-NAME"
