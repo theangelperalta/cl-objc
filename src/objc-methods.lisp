@@ -42,7 +42,7 @@
 	 (type-list (append (list 'objc-id 'objc-sel) 
 			    (mapcar (lambda (type) 
 				      (if (listp type) 
-					  (second type) 
+					  (or (second type) 'objc-id) 
 					  'objc-id)) 
 				     argument-list)))
 	 (var-list (append (list (intern "SELF") (intern "SEL")) 

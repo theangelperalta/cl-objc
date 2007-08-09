@@ -152,3 +152,27 @@
 		  (value (caddr binding)))
 	      `(,name (or ,value (foreign-alloc ',type))))) bindings)
      (slet-macrolet-forms ,(mapcar #'cadr bindings) ,@body)))
+
+(defun ensure-list (el)
+  (if (listp el)
+      el
+      (list el)))
+
+(defun lookup-same-symbol-name (item list)
+  (cadr (find (symbol-name item) list :key (lambda (el) (symbol-name (car el))) :test #'string-equal)))
+
+(defmacro define-objc-method (name 
+			      (&key (return-type 'objc-cffi:objc-id) (class-method nil)) 
+			      (&rest argument-list) 
+			      &body body)
+  `(objc-cffi:add-objc-method (,(symbols-to-objc-selector (ensure-list name))
+				,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
+								(error "You have to specify the `self` argument and the related type")))
+				:return-type ,return-type
+				:class-method ,class-method)
+       (,@(or (remove "self" 
+		      (remove "sel" argument-list :key (lambda (el) (symbol-name (car el))) :test #'string-equal) 
+		      :test #'string-equal 
+		      :key (lambda (el) (symbol-name (car el))))
+	      ()))
+     ,@body))

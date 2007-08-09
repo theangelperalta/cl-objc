@@ -81,3 +81,33 @@ big struct as input parameter"
 		(setf (nssize-width size) floatval)
 		(let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
 		  (is (= floatval (nssize-width (nsrect-size (invoke value-with-rect rect-value))))))))))
+
+(test lisp-adding-instance-method-with-arg
+  (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  
+    (declare (ignore sel))
+    (+ (invoke self int-value) (invoke y int-value)))
+  (let ((x (invoke 'ns-number :number-with-int :int 1))
+	(y (invoke 'ns-number :number-with-int 2)))
+    (is (= (invoke x :lisp-add objc-id y) 3))))
+
+(test lisp-adding-instance-method 
+  (define-objc-method lisp-double (:return-type :int) ((self ns-number)) 
+    (declare (ignore sel))
+    (* 2 (untyped-objc-msg-send self "intValue")))
+  (let ((x (invoke 'ns-number :number-with-int :int 1)))
+    (is (= (invoke x lisp-double) 2))))
+
+(test lisp-adding-class-method
+  (define-objc-method lisp-magic-number (:return-type :int :class-method t)
+		   ((self ns-number))
+    (declare (ignore sel self))
+		   1980)
+  (is (= 1980 (invoke 'ns-number lisp-magic-number))))
+
+(test lisp-adding-instance-method-returning-object
+  (define-objc-method :lisp-add2 () ((self ns-number) (y :int)) 
+    (declare (ignore sel))
+    (invoke 'ns-number :number-with-int (+ (coerce  (invoke self int-value) 'number) y)))
+  (let ((x (invoke 'ns-number :number-with-int :int 1))
+	(y 2))
+    (is (= (invoke (invoke x :lisp-add2 y) int-value)  3))))
