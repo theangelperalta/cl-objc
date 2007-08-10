@@ -11,15 +11,14 @@
     :version "0.0.3"
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:module :src
-			  :components ((:file "package")
-				       (:file "objc-reader-macro" :depends-on ("package" "objc-cffi" "objc-msg-send"))
-				       (:file "objc-utils" :depends-on ("package"))
-				       (:file "objc-cffi" :depends-on ("package" "objc-utils" "objc-types"))
-				       (:file "objc-msg-send" :depends-on ("package" "objc-utils" "objc-types" "objc-cffi"))
-				       (:file "objc-methods" :depends-on ("package" "objc-types" "objc-cffi" "objc-utils"))
-				       (:file "objc-classes" :depends-on ("package" "objc-types" "objc-cffi" "objc-utils"))
-				       (:file "objc-types" :depends-on ("package"))
-				       (:file "objc-lisp" :depends-on ("package" "objc-utils" "objc-cffi")))))
+			  :components ((:file "packages")
+				       (:file "reader-macro" :depends-on ("packages" "cffi" "msg-send"))
+				       (:file "utils" :depends-on ("packages"))
+				       (:file "cffi" :depends-on ("packages" "utils" "objc-types"))
+				       (:file "msg-send" :depends-on ("packages" "utils" "objc-types" "cffi"))
+				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils"))
+				       (:file "objc-types" :depends-on ("packages"))
+				       (:file "objc-lisp" :depends-on ("packages" "utils" "cffi")))))
     :depends-on (:cffi :yacc))
 
 (defsystem  cl-objc.test
