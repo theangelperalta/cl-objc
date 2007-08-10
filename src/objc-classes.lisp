@@ -47,7 +47,7 @@
 			      methodLists cache protocols) 
 			 meta-class objc-class-cstruct)
       (setf isa (convert-to-foreign (metaclass root-class) 'objc-class-pointer)
-	    super_class (convert-to-foreign super-class 'objc-class-pointer)
+	    super_class (convert-to-foreign (metaclass super-class) 'objc-class-pointer)
 	    name class-name
 	    version 0
 	    info :meta
@@ -61,3 +61,13 @@
 	    protocols (null-pointer)))
     (objc-add-class new-class)
     (objc-get-class class-name)))
+
+(defun make-ivar (name type)
+  (let ((ret (foreign-alloc 'objc-ivar-cstruct)))
+    (convert-from-foreign  
+     (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)
+       (setf ivar_name name
+	     ivar_type (objc-types:encode-types (if (listp type) type (list type)))
+	     ivar_offset (foreign-type-size type))
+       ret)
+     'objc-ivar-pointer)))
