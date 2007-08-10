@@ -50,3 +50,25 @@
   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
 	(y 2))
     (is (= (typed-objc-msg-send ((typed-objc-msg-send (x "add:") :int y) "intValue")) 3))))
+
+(defun temp-class-name (&optional (prefix "NSCLObjCTest"))
+  (symbol-name (gensym prefix)))
+
+(test adding-class-to-nsobject-hierarchy
+  (let* ((super-class-name "NSNumber")
+	 (super-class (objc-get-class super-class-name))
+	 (class-name (temp-class-name))
+	 (class (add-objc-class class-name super-class)))
+    (is (not (eq objc-nil-class class)))
+    (is (string-equal class-name (class-name class)))
+    (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))
+
+(test adding-class-and-creating-instances
+  (let* ((super-class-name "NSNumber")
+	 (super-class (objc-get-class super-class-name))
+	 (class-name (temp-class-name))
+	 (class (add-objc-class class-name super-class))
+	 (instance (invoke class alloc)))
+    (is (not (eq objc-nil-object instance)))
+    (is (string-equal class-name (class-name class)))
+    (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))

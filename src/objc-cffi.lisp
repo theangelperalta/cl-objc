@@ -191,7 +191,7 @@
 (defclass objc-ivar ()
   ((name :initarg :name)
    (type :initarg :type)
-   (offset :initarg :offset)
+   (offset :initarg :offset :accessor ivar-offset)
    (ivar-ptr :initarg :ptr)))
 
 ;;; printer
@@ -238,6 +238,9 @@
                        :ptr ivar-ptr))
       nil))
 
+(defmethod translate-to-foreign ((self objc-ivar) (type objc-ivar-type))
+  (slot-value self 'ivar-ptr))
+
 ;;; Instance Variable List
 
 ;;; CFFI definitions
@@ -255,16 +258,28 @@
 ;;; Type Translators
 (defmethod translate-from-foreign (ilist-ptr (type objc-ivar-list-type))
   (if (not (null-pointer-p ilist-ptr))
-      (with-foreign-slots ((ivar_count) ilist-ptr objc-ivar-list-cstruct)
+      (with-foreign-slots ((ivar_count ivar_list) ilist-ptr objc-ivar-list-cstruct)
         (loop for ivar-idx from 0 below ivar_count
            for ivar-ptr = (mem-aref (foreign-slot-pointer ilist-ptr 'objc-ivar-list-cstruct 'ivar_list) 'objc-ivar-cstruct ivar-idx)
            collect (convert-from-foreign ivar-ptr 'objc-ivar-pointer)))
       nil))
 
-;;; utilities
-(defun class-ivars (class)
-  (convert-from-foreign (slot-value class 'ivars) 'objc-ivar-list-pointer))
+(defmethod translate-to-foreign ((var-list list) (type objc-ivar-list-type))
+  (let ((ret (foreign-alloc 'objc-ivar-list-cstruct))
+	(length (length var-list)))
+    (setf (foreign-slot-value ret 'objc-ivar-list-cstruct 'ivar_count) length
+	  (foreign-slot-value ret 'objc-ivar-list-cstruct 'ivar_list) (foreign-alloc 'objc-ivar-cstruct :count length))
+    (loop 
+       for ivar-idx below length
+       for ivar-ptr = (foreign-slot-pointer ret 'objc-ivar-list-cstruct 'ivar_list) then (inc-pointer ivar-ptr (foreign-type-size 'objc-ivar-cstruct))
+       for var in var-list
+       do (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar-cstruct)
+	    (setf ivar_name (slot-value var 'name)
+		  ivar_type (slot-value var 'type)
+		  ivar_offset (slot-value var 'offset))))
+    ret))
 
+;;; utilities
 (defun private-ivar (ivar-name)
   (string= "_" ivar-name :end2 1))
 
@@ -279,19 +294,19 @@
 
 ;;; CLOS definitions
 (defclass objc-class ()
-  ((isa :initarg :isa)
+  ((isa :initarg :isa :accessor metaclass)
    (super-class :initarg :super-class :accessor super-class)
    (name :initarg :name :accessor class-name)
    (version :initarg :version)
    (info :initarg :info)
-   (instance-size :initarg :instance-size)
-   (ivars :initarg :ivars)
+   (instance-size :initarg :instance-size :accessor instance-size)
+   (ivars :initarg :ivars :accessor class-ivars)
    (method-lists :initarg :method-lists)
    (cache :initarg :cache)
    (protocols :initarg :protocols)
    (class-ptr :initarg :ptr)))
 
-(defparameter nil-class
+(defparameter objc-nil-class
   (let ((n (null-pointer)))
     (make-instance 'objc-class
                    :isa n :super-class n :name "Nil" :version 0
@@ -368,6 +383,9 @@
 	(cache :pointer)
 	(protocols :pointer))
 
+(defcfun ("objc_getClass" objc-get-class) objc-class-pointer
+  (name :string))
+
 (defcfun ("objc_getClassList" objc-get-class-list) :int
   (buffer :pointer)
   (bufferLen :int))
@@ -407,7 +425,7 @@
 		       :cache cache 
 		       :protocols protocols
 		       :ptr class-ptr))
-      nil-class))
+      objc-nil-class))
 
 (defmethod shared-initialize :after ((self objc-class) slot-names &key isa super-class &allow-other-keys)
   (when isa
@@ -428,9 +446,9 @@
 
 (defmethod super-classes ((class objc-class))
   (cons class
-        (let ((super-class-ptr (slot-value class 'super-class)))
-          (if (not (null-pointer-p super-class-ptr))
-              (super-classes (convert-from-foreign super-class-ptr 'objc-class-pointer))))))
+        (let ((super-class (super-class class)))
+          (when (not (eq objc-nil-class super-class))
+              (super-classes super-class)))))
 
 ;;; utilities
 (defun get-class-list ()
@@ -450,7 +468,7 @@
    (id :initarg :id)))
 
 (defvar objc-nil-object
-  (make-instance 'objc-object :isa (null-pointer) :id (null-pointer))
+  (make-instance 'objc-object :isa objc-nil-class :id (null-pointer))
   "The Objective C Object/instance nil")
 
 ;;; printer
@@ -471,9 +489,6 @@
   (:simple-parser objc-id)
   (:documentation
    "Objective C id - pointer to an objc_object struct"))
-
-(defcfun ("objc_getClass" objc-get-class) objc-class-pointer
-  (name :string))
 
 (defcfun ("object_setInstanceVariable" object-set-instance-variable) objc-ivar-pointer
   (id objc-id)

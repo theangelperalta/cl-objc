@@ -1,3 +1,5 @@
+;;;; Adding Objective-C methods at runtime
+
 (in-package "OBJC-CFFI")
 
 (defcfun ("class_addMethods" class-add-methods) :void 
