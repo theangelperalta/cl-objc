@@ -18,7 +18,7 @@
 				       (:file "msg-send" :depends-on ("packages" "utils" "objc-types" "cffi"))
 				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils"))
 				       (:file "objc-types" :depends-on ("packages"))
-				       (:file "objc-lisp" :depends-on ("packages" "utils" "cffi")))))
+				       (:file "lisp-interface" :depends-on ("packages" "utils" "cffi")))))
     :depends-on (:cffi :yacc))
 
 (defsystem  cl-objc.test
