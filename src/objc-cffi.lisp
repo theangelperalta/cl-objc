@@ -304,7 +304,7 @@
   (print-unreadable-object (class stream)
     (with-slots (name info) class
       (format stream "ObjC-~@[Meta~1*~]Class ~A"
-              (member :META info)
+	      (member :META info)
               name))))
 
 ;;; describer
@@ -396,17 +396,22 @@
                                 ivars methodlists
                                 cache protocols)
                            class-ptr objc-class-cstruct)
-        (make-instance 'objc-class
-                       :isa isa ; FIXME: i d like to convert it
-		       :super-class (convert-from-foreign super_class 'objc-class-pointer) 
+	(make-instance 'objc-class
+		       :isa (unless (pointer-eq isa class-ptr) 
+			      (convert-from-foreign isa 'objc-class-pointer))
+		       :super-class super_class 
 		       :name name
-                       :version version :info info :instance-size instance_size
-                       :ivars (convert-from-foreign ivars 'objc-ivar-list-pointer) 
+		       :version version :info info :instance-size instance_size
+		       :ivars (convert-from-foreign ivars 'objc-ivar-list-pointer) 
 		       :method-lists methodlists ; FIXME: i d like to convert it
-                       :cache cache 
+		       :cache cache 
 		       :protocols protocols
-                       :ptr class-ptr))
-      objc-nil-object))
+		       :ptr class-ptr))
+      nil-class))
+
+(defmethod shared-initialize :after ((self objc-class) slot-names &key isa super-class &allow-other-keys)
+  (when isa
+    (setf (slot-value self 'super-class) (convert-from-foreign super-class 'objc-class-pointer))))
 
 (defmethod translate-to-foreign ((class objc-class) (type objc-class-type))
   (slot-value class 'class-ptr))

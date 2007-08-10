@@ -50,4 +50,3 @@
   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
 	(y 2))
     (is (= (typed-objc-msg-send ((typed-objc-msg-send (x "add:") :int y) "intValue")) 3))))
-
