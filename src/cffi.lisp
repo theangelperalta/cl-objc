@@ -189,8 +189,8 @@
 
 ;;; CLOS definitions
 (defclass objc-ivar ()
-  ((name :initarg :name)
-   (type :initarg :type)
+  ((name :initarg :name :accessor ivar-name)
+   (type :initarg :type :accessor ivar-type)
    (offset :initarg :offset :accessor ivar-offset)
    (ivar-ptr :initarg :ptr)))
 
