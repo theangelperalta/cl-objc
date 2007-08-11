@@ -150,7 +150,7 @@
 	    (let ((name (car binding))
 		  (type (cadr binding))
 		  (value (caddr binding)))
-	      `(,name (or ,value (foreign-alloc ',type))))) bindings)
+	      `(,name (or ,value (cffi:foreign-alloc ',type))))) bindings)
      (slet-macrolet-forms ,(mapcar #'cadr bindings) ,@body)))
 
 (defun ensure-list (el)

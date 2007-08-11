@@ -38,7 +38,7 @@
    "SIMPLE-REPLACE-STRING"))
 
 (defpackage "CL-OBJC"
-  (:use "COMMON-LISP" "CFFI")
+  (:use "COMMON-LISP" "OBJC-CFFI")
   (:export "INVOKE"
 	   "SLET"
 	   "DEFINE-OBJC-METHOD"
