@@ -10,11 +10,23 @@
   (class objc-class-pointer) 
   (method-list objc-method-list-pointer))
 
-(defparameter *method-list-added* (make-hash-table :test #'equal))
-
-(defun unregister-method (class-name selector-name)
-  (awhen (gethash (cons selector-name class-name) *method-list-added*)
-    (class-remove-methods (objc-get-class class-name) it)))
+(defun unregister-method (class selector class-method)
+  (let* ((method-list (foreign-alloc 'objc-method-list-cstruct))
+	 (method (convert-to-foreign 
+		  (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)
+		  'objc-method-list-pointer))
+	 (old-method (convert-to-foreign 
+		      (if class-method
+			  (class-get-class-method class selector)
+			  (class-get-instance-method class selector))
+		      'objc-method-pointer)))
+    (when old-method
+      (with-foreign-slots ((method_name method_types method_imp) method objc-method-cstruct)
+	(setf (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1
+	      method_name selector 
+	      method_types (foreign-slot-value old-method 'objc-method-cstruct 'method_types)
+	      method_imp (foreign-slot-value old-method 'objc-method-cstruct 'method_imp)))
+      (class-remove-methods class method-list))))
 
 (defun register-method (class-name selector-name types callback class-method)
   (let* ((class (objc-get-class class-name))
@@ -23,7 +35,7 @@
 	 (method-list (foreign-alloc 'objc-method-list-cstruct))
 	 (method (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)))
     
-    (unregister-method class-name selector-name)
+    (unregister-method class-name selector-name class-method)
 
     (setf 
      (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
@@ -35,8 +47,7 @@
     (if class-method
 	(class-add-methods (slot-value class 'isa) method-list)
 	(class-add-methods class method-list))
-    (setf (gethash (cons selector-name class-name) *method-list-added*) method-list)
-    (values (class-get-instance-method class  selector) method-list method)))
+    (class-get-instance-method class  selector)))
 
 (defmacro add-objc-method ((selector-name class-name &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
