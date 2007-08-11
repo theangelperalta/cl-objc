@@ -93,56 +93,6 @@
 	       (t (error "Unknown return type ~s" ,greturn-type))))
 	   (error "ObjC method ~a not found" ,gsel)))))
 
-(defun canonicalize-objc-struct-name (name)
-  (let ((struct-name
-	 (if (char-equal (aref name 0) #\_) 
-	     (subseq name 1)
-	     name))
-	(cffi-types (loop for key being the hash-key of cffi::*type-parsers* collecting key)))
-    (or (find struct-name cffi-types :test (lambda (v1 v2) (string-equal v1 (string v2)))) 
-	(error "There is no struct named ~s in the package ~a" struct-name (package-name *package*)))))
-
-(defun extract-struct-name (input-type)
-  (if (and
-       (listp input-type)
-       (eq :struct (car input-type)))
-      (canonicalize-objc-struct-name (second input-type))
-      input-type))
-
-(defun struct-type-p (type)
-  (and (listp type) 
-       (eq (car type) :struct)))
-
-(defun big-struct-type-p (type)
-  (and (struct-type-p type)
-       (> (objc-foreign-type-size type) 8)))
-
-(defun small-struct-type-p (type)
-  (and (struct-type-p type)
-       (<= (objc-foreign-type-size type) 8)))
-
-(defun pack-struct-arguments-type (arguments-type)
-  "Returns a new list of types replacing in arguments-type the
-big struct types with the corresponding number of :int parameters"
-  (mapcan (lambda (type) 
-	    (cond 
-	      ((big-struct-type-p type)
-	       (loop for i below (ceiling (objc-foreign-type-size type) (foreign-type-size :int)) collecting :int))
-	      ((small-struct-type-p type) (list (extract-struct-name type)))
-	      (t (list type))))
-	  arguments-type))
-
-(defun pack-struct-arguments-val (arguments method)
-  (loop
-     for var in arguments
-     for type in (method-argument-types method)
-     when (big-struct-type-p type) 
-     nconc (loop 
-	      for index below (ceiling (objc-foreign-type-size type) (foreign-type-size :int))
-	      collect `(mem-aref ,var :int ,index))
-     when (not (big-struct-type-p type) )
-     nconc (list var)))
-
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
   (with-gensyms (greceiver gselector gclass gmethod gargument-types gargs-var)
     `(let* ((,greceiver ,receiver)

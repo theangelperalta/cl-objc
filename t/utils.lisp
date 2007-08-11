@@ -8,7 +8,8 @@
 (defun create-nsstring (string)
   (invoke (invoke 'ns-string alloc) :init-with-u-t-f8-string string))
 
-(cffi:defcstruct nsrange (location :unsigned-int) (length :unsigned-int))
-(cffi:defcstruct nssize (width :float) (height :float))
-(cffi:defcstruct nspoint (x :float) (y :float))
-(cffi:defcstruct nsrect (origin nspoint) (size nssize))
+(define-objc-framework "Foundation"
+  (define-objc-struct (nsrange "_NSRange") (location :unsigned-int) (length :unsigned-int))
+  (define-objc-struct (nssize "_NSSize") (width :float) (height :float))
+  (define-objc-struct (nspoint "_NSPoint") (x :float) (y :float))
+  (define-objc-struct (nsrect "_NSRect") (origin nspoint) (size nssize)))

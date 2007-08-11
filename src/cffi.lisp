@@ -9,11 +9,7 @@
 (define-foreign-library libobjc
   (t (:default "libobjc")))
 
-(define-foreign-library foundation-framework
-  (t (:framework "Foundation")))
-
 (use-foreign-library libobjc)
-(use-foreign-library foundation-framework)
 
 ;;; The next section reports for every ObjC type:
 ;; 1) a Common Lisp class handling the type
@@ -58,6 +54,9 @@
   (sel objc-sel))
 
 (defcfun ("sel_registerName" sel-register-name) objc-sel
+  (str :string))
+
+(defcfun ("sel_getUid" sel-get-uid) objc-sel
   (str :string))
 
 ;;; Type Translators
