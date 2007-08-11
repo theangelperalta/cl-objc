@@ -24,7 +24,7 @@
   (fresh-line))
 
 (defun lisp-string-to-nsstring (string)
-  (invoke (invoke 'nsstring alloc) :init-with-utf8-string string))
+  (invoke (invoke 'ns-string alloc) :init-with-u-t-f8-string string))
 
 (defun lisp-hello-world ()
   (let ((app (invoke 'ns-application shared-application))
@@ -75,7 +75,7 @@
 	      (let ((bye (invoke (invoke 'ns-button alloc) :init-with-frame bye-rect)))
 		(invoke (invoke win content-view) :add-subview bye)
 		(invoke bye :set-bezel-style 4)
-		(invoke bye :set-action (selector :say-hello))
+		(invoke bye :set-action (selector :stop))
 		(invoke bye :set-enabled 1)
 		(invoke bye :set-title (lisp-string-to-nsstring "Goodbye!"))
 
