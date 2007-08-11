@@ -73,11 +73,16 @@
 (defun find-root-class (class)
   (car (last (super-classes class))))
 
+(define-condition objc-class-already-exists (error) 
+  ((class-name :initarg :class-name :reader objc-class-name))
+  (:report (lambda (condition stream)
+	     (format stream "A class named ~a already exists" (objc-class-name condition)))))
+
 (defun add-objc-class (class-name super-class &optional ivar-list)
   ;; ensure that a class with same name does not already exist
   (unless (eq (objc-lookup-class class-name)
 	      objc-nil-class)
-    (error "A class named ~a already exists" class-name))
+    (error 'objc-class-already-exists :class-name class-name))
 
   ;; ensure that the super-class exists
   (assert (not (eq objc-nil-class super-class)))
@@ -123,6 +128,17 @@
 	    protocols (null-pointer)))
     (objc-add-class new-class)
     (objc-get-class class-name)))
+
+(defun ensure-objc-class (class-name super-class &optional ivar-list)
+  (restart-case
+      (handler-bind
+	  ((objc-class-already-exists (lambda (c)
+					(invoke-restart 'use-the-same-class (objc-get-class (objc-class-name c))))))
+	(add-objc-class class-name super-class ivar-list))
+    (use-the-same-class (same-class) (prog2 
+					 (warn "Class named ~a already exists. Use the existing one." 
+					       (class-name same-class)) 
+					 same-class))))
 
 (defun make-ivar (name type)
   (let ((ret (foreign-alloc 'objc-ivar-cstruct)))
