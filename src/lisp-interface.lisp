@@ -176,3 +176,35 @@
 		      :key (lambda (el) (symbol-name (car el))))
 	      ()))
      ,@body))
+
+(defmacro ivars-macrolet-forms (vars class &body body)
+  (if vars
+      (let ((var-name (ivar-name (car vars)))
+	    (var-type (car (objc-types:parse-objc-typestr (ivar-type (car vars))))))
+	`(flet ((,(car (objc-selector-to-symbols var-name)) (obj)
+		  (let ((ref (cffi:foreign-alloc :pointer 
+						 :initial-element (cffi:foreign-alloc ',var-type)))) 
+		    (objc-cffi::object-get-instance-variable obj ,var-name ref) 
+		    (cffi:mem-ref (cffi:mem-ref ref :pointer) ',var-type))))
+	   (flet (((setf ,(car (objc-selector-to-symbols var-name))) (value obj)
+		    (let ((ref (cffi:foreign-alloc ',var-type)))
+		      (setf (cffi:mem-ref ref ,var-type) value)
+		      (objc-cffi::object-set-instance-variable obj ,var-name ref))))
+	     (ivars-macrolet-forms ,(cdr vars) ,class ,@body))))
+      `(progn
+	 ,@body)))
+
+(defmacro with-ivar-accessors (class &body body)
+  (let ((class (objc-get-class (symbol-to-objc-class-name class))))
+    `(ivars-macrolet-forms ,(objc-cffi:class-ivars class) ,class 
+	 ,@body)))
+
+(defmacro define-objc-class (name superclass (&rest ivars))
+  `(eval-when (:compile-toplevel)
+     (objc-cffi:add-objc-class ,(symbol-to-objc-class-name name)
+			       (objc-cffi:objc-get-class ,(symbol-to-objc-class-name superclass))
+			       (list ,@(mapcar (lambda (ivar-def)
+						 `(objc-cffi:make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
+								       (list ,@(ensure-list `,(cadr ivar-def))))) 
+					       ivars)))))
+
