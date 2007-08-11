@@ -111,3 +111,27 @@ big struct as input parameter"
   (let ((x (invoke 'ns-number :number-with-int :int 1))
 	(y 2))
     (is (= (invoke (invoke x :lisp-add2 y) int-value)  3))))
+
+
+(define-objc-class ns-test-1 ns-number 
+    ((counter :int)))
+
+(define-objc-method increment (:return-type :int) ((self ns-test-1))
+  (declare (ignore sel))
+  (with-ivar-accessors ns-test-1
+    (let ((old-val (counter self)))
+      (incf (counter self))
+      old-val)))
+
+(test lisp-adding-class-and-method-using-ivar
+  "Checking creation of class, instance method using instance
+  variables implementing a simple counter."
+  
+  (let ((x (invoke 'ns-test-1 alloc)))
+    (with-ivar-accessors ns-test-1
+      (setf (counter x) 0))
+    
+    (invoke x increment)
+    (invoke x increment)
+  
+    (is (= (with-ivar-accessors ns-test-1 (counter x)) 2))))
