@@ -44,7 +44,7 @@
 (test adding-instance-method-returning-object
   (objc-cffi:add-objc-method  ("add:" "NSNumber") 
 		    ((y :int)) 
-    (declare (ignore self))
+    (declare (ignore sel))
     (untyped-objc-msg-send (objc-get-class "NSNumber") "numberWithInt:" 
 			   (+ (untyped-objc-msg-send self "intValue") y)))
   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
@@ -79,7 +79,8 @@
 	   (var-names (mapcar #'symbol-name (mapcar #'gensym (loop for i upto var-count collecting "foo"))))
 	   (types (mapcar (lambda (foo) 
 			    (declare (ignore foo)) 
-			    (choose-randomly (remove :void (mapcar #'cadr objc-types:typemap)))) var-names))
+			    (choose-randomly  (remove-if (lambda (el) (member el '(:void objc-unknown-type))) 
+							 (mapcar #'cadr objc-types:typemap)))) var-names))
 	   (vars (mapcar #'make-ivar var-names types)))
       (is (equal types (mapcar #'car (mapcar #'objc-types:parse-objc-typestr (mapcar #'ivar-type vars)))))
       (is (equal var-names (mapcar #'ivar-name vars))))))
