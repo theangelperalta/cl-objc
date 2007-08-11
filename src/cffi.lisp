@@ -310,7 +310,7 @@
   (let ((n (null-pointer)))
     (make-instance 'objc-class
                    :isa n :super-class n :name "Nil" :version 0
-                   :info '(:class) :instance-size 0 :ivars n
+                   :info '(:class) :instance-size 0 :ivars nil
                    :method-lists n :cache n :protocols n
                    :ptr n)))
 
@@ -378,7 +378,7 @@
 	(version :long)
 	(info objc-class-flags)
 	(instance_size :long)
-	(ivars :pointer)
+	(ivars objc-ivar-list-pointer)
 	(methodLists :pointer)
 	(cache :pointer)
 	(protocols :pointer))
@@ -420,7 +420,7 @@
 		       :super-class super_class 
 		       :name name
 		       :version version :info info :instance-size instance_size
-		       :ivars (convert-from-foreign ivars 'objc-ivar-list-pointer) 
+		       :ivars ivars 
 		       :method-lists methodlists ; FIXME: i d like to convert it
 		       :cache cache 
 		       :protocols protocols
