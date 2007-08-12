@@ -232,7 +232,7 @@
       (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar-cstruct)
         (make-instance 'objc-ivar
                        :name ivar_name
-                       :type ivar_type
+                       :type (objc-types:parse-objc-typestr ivar_type)
                        :offset ivar_offset
                        :ptr ivar-ptr))
       nil))
@@ -273,9 +273,9 @@
        for ivar-ptr = (foreign-slot-pointer ret 'objc-ivar-list-cstruct 'ivar_list) then (inc-pointer ivar-ptr (foreign-type-size 'objc-ivar-cstruct))
        for var in var-list
        do (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar-cstruct)
-	    (setf ivar_name (slot-value var 'name)
-		  ivar_type (slot-value var 'type)
-		  ivar_offset (slot-value var 'offset))))
+	    (setf ivar_name (ivar-name var)
+		  ivar_type (objc-types:encode-types (ivar-type var))
+		  ivar_offset (ivar-offset var))))
     ret))
 
 (defmethod free-translated-object (method-list-ptr (type objc-ivar-list-type) param)
@@ -289,7 +289,7 @@
 (defun class-has-public-ivars (class)
   (loop 
      for ivar in (class-ivars class)
-     for ivar-name = (slot-value ivar 'name)
+     for ivar-name = (ivar-name ivar)
      when (not (private-ivar ivar-name))
      append (list class ivar-name)))
 

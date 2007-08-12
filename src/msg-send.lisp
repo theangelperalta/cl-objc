@@ -13,7 +13,7 @@
      (find-package "OBJC-CFFI"))))
 
 (defmacro %objc-msg-send (return-type id sel args)
-  (let ((gensyms (cffi::make-gensym-list (+ 2 (/ (length args) 2)))))
+  (let ((gensyms (loop repeat (+ 2 (/ (length args) 2)) collect (gensym))))
     (cffi::translate-objects gensyms 
 			     (append (list id sel) (odd-positioned-elements args))
 			     (append (list 'objc-id 'objc-sel) (even-positioned-elements args))

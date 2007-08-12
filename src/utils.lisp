@@ -123,7 +123,7 @@ element of `lst1` and as (2*n)-th element the n-th element of
 			  *package*
 			  (find-package "KEYWORD")))) 
 	    (mapcar #'replace-acronyms-1 
-		    (mapcar #'convert-selector-part (objc-cffi::split-string selector #\:))))))
+		    (mapcar #'convert-selector-part (split-string selector #\:))))))
 
 (defun symbols-to-objc-selector (selector)
   (flet ((convert-selector-part (part)
