@@ -278,6 +278,10 @@
 		  ivar_offset (slot-value var 'offset))))
     ret))
 
+(defmethod free-translated-object (method-list-ptr (type objc-ivar-list-type) param)
+  (declare (ignore param))
+  (foreign-free method-list-ptr))
+
 ;;; utilities
 (defun private-ivar (ivar-name)
   (string= "_" ivar-name :end2 1))
