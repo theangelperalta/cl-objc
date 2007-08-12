@@ -1,5 +1,71 @@
 (in-package :cl-objc)
 
+;;; Name translators
+(defparameter *acronyms* '("UTF"
+			   "FTP"))
+
+(defun replace-acronyms-1 (string)
+  (flet ((transform-acronym (acronym)
+	   (cons acronym
+		 (with-output-to-string (out)
+		   (loop 
+		      for char across acronym
+		      do (princ #\- out) (princ char out))))))
+    (let ((transformed-acronyms (mapcar #'transform-acronym *acronyms*)))
+      (dolist (replacement transformed-acronyms)
+	(setf string (simple-replace-string (cdr replacement) (car replacement) string)))
+      string)))
+
+(defun objc-selector-to-symbols (selector)
+  (flet ((convert-selector-part (selector-part)
+	   (if selector-part
+	       (with-output-to-string (out)
+		 (when (upper-case-p (elt selector-part 0))
+		   (princ #\- out))
+		 (princ 
+		  (loop 
+		     for char across (subseq selector-part 1) 
+		     with old-char = (elt selector-part 0)
+		     finally (return (char-upcase char))
+		     do
+		     (princ (char-upcase old-char) out)
+		     (when (upper-case-p char)
+		       (princ "-" out))
+		     (setf old-char char)) out))
+	       "*")))
+    (mapcar (lambda (name) 
+	      (intern name       
+		      (if (zerop (count #\: selector))
+			  *package*
+			  (find-package "KEYWORD")))) 
+	    (mapcar #'replace-acronyms-1 
+		    (mapcar #'convert-selector-part (split-string selector #\:))))))
+
+(defun symbols-to-objc-selector (selector)
+  (flet ((convert-selector-part (part)
+	   (if (string-equal part "*")
+	       ""
+	       (with-output-to-string (out)
+		 (loop 
+		    for char across part
+		    with old-char = #\a
+		    for test = (char-equal old-char #\-)
+		    when test do (princ (char-upcase char) out)
+		    when (and (not test) (not (char-equal #\- char))) do (princ (char-downcase char) out)
+		    do (setf old-char char))))))
+    (let ((string 
+	   (with-output-to-string (out)
+	     (let* ((parts (mapcar #'convert-selector-part (mapcar #'symbol-name selector))))
+	       (loop for el in parts
+		  do 
+		  (princ el out)
+		  (if (keywordp (car selector))
+		      (princ #\: out)))))))
+      (dolist (acronym *acronyms*) 
+	(setf string 
+	      (simple-replace-string (string-downcase acronym) (string-upcase acronym) string)))
+      string)))
+
 (defun selector (&rest symbols)
   (sel-get-uid (symbols-to-objc-selector symbols)))
 
@@ -14,7 +80,7 @@
 	       (selectors-and-args t)
 	     (when (not (keywordp selector-part)) 
 	       (return nil))
-	     (when (not (objc-cffi:cffi-type-p cffi-type)) 
+	     (when (not (cffi-type-p cffi-type)) 
 	       (return nil))))))
 
 (defun parse-invoke-arguments (selector-and-args)
@@ -26,7 +92,7 @@
 	 (case state
 	   (selector-part (setf selector (append selector (list el)) 
 				state 'type-or-arg))
-	   (type-or-arg (if (objc-cffi:cffi-type-p el)
+	   (type-or-arg (if (cffi-type-p el)
 			    (progn 
 			      (setf types-and-args (append types-and-args (list el))
 				    state 'arg))
@@ -45,18 +111,18 @@
       (cond 
 	((typed-invocation-p selector-and-args)
 	 `(let ((,greceiver ,receiver)) 
-	    (objc-cffi:typed-objc-msg-send ((if (symbolp ,greceiver) 
-						(objc-cffi:objc-get-class (symbol-to-objc-class-name ,greceiver)) 
-						,greceiver) 
-					    ,(symbols-to-objc-selector selector)) 
-					   ,@types-and-args)))
+	    (typed-objc-msg-send ((if (symbolp ,greceiver) 
+				      (objc-get-class (symbol-to-objc-class-name ,greceiver)) 
+				      ,greceiver) 
+				  ,(symbols-to-objc-selector selector)) 
+				 ,@types-and-args)))
 	((not (typed-invocation-p selector-and-args))
 	 `(let ((,greceiver ,receiver)) 
-	    (objc-cffi:untyped-objc-msg-send (if (symbolp ,greceiver)  
-						 (objc-cffi:objc-get-class (symbol-to-objc-class-name ,greceiver)) 
-						 ,greceiver) 
-					     ,(symbols-to-objc-selector selector) 
-					     ,@args)))))))
+	    (untyped-objc-msg-send (if (symbolp ,greceiver)  
+				       (objc-cffi:objc-get-class (symbol-to-objc-class-name ,greceiver)) 
+				       ,greceiver) 
+				   ,(symbols-to-objc-selector selector) 
+				   ,@args)))))))
 
 (defun slet-macrolet-forms (types)
   (when types
@@ -64,7 +130,7 @@
      (mapcar
       (lambda (slot-name)
 	`(,(intern (format nil "~a-~a" (car types) slot-name)) (ptr) 
-	   `(objc-cffi:objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
+	   `(objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
       (cffi:foreign-slot-names (car types)))
      (slet-macrolet-forms (cdr types)))))
 
@@ -85,23 +151,15 @@
     `(progn
        ,@body)))
 
-(defun ensure-list (el)
-  (if (listp el)
-      el
-      (list el)))
-
-(defun lookup-same-symbol-name (item list)
-  (cadr (find (symbol-name item) list :key (lambda (el) (symbol-name (car el))) :test #'string-equal)))
-
 (defmacro define-objc-method (name 
-			      (&key (return-type 'objc-cffi:objc-id) (class-method nil)) 
+			      (&key (return-type 'objc-id) (class-method nil)) 
 			      (&rest argument-list) 
 			      &body body)
-  `(objc-cffi:add-objc-method (,(symbols-to-objc-selector (ensure-list name))
-				,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
-								(error "You have to specify the `self` argument and the related type")))
-				:return-type ,return-type
-				:class-method ,class-method)
+  `(add-objc-method (,(symbols-to-objc-selector (ensure-list name))
+		      ,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
+						      (error "You have to specify the `self` argument and the related type")))
+		      :return-type ,return-type
+		      :class-method ,class-method)
        (,@(or (remove "self" 
 		      (remove "sel" argument-list :key (lambda (el) (symbol-name (car el))) :test #'string-equal) 
 		      :test #'string-equal 
@@ -112,30 +170,30 @@
 (defmacro ivars-macrolet-forms (vars class &body body)
   (if vars
       (let ((var-name (ivar-name (car vars)))
-	    (var-type (car (objc-types:parse-objc-typestr (ivar-type (car vars))))))
+	    (var-type (car (ivar-type (car vars)))))
 	`(flet ((,(car (objc-selector-to-symbols var-name)) (obj)
 		  (let ((ref (cffi:foreign-alloc :pointer 
 						 :initial-element (cffi:foreign-alloc ',var-type)))) 
-		    (objc-cffi::object-get-instance-variable obj ,var-name ref) 
+		    (object-get-instance-variable obj ,var-name ref) 
 		    (cffi:mem-ref (cffi:mem-ref ref :pointer) ',var-type))))
 	   (flet (((setf ,(car (objc-selector-to-symbols var-name))) (value obj)
 		    (let ((ref (cffi:foreign-alloc ',var-type)))
 		      (setf (cffi:mem-ref ref ,var-type) value)
-		      (objc-cffi::object-set-instance-variable obj ,var-name ref))))
+		      (object-set-instance-variable obj ,var-name ref))))
 	     (ivars-macrolet-forms ,(cdr vars) ,class ,@body))))
       `(progn
 	 ,@body)))
 
 (defmacro with-ivar-accessors (class &body body)
   (let ((class (objc-get-class (symbol-to-objc-class-name class))))
-    `(ivars-macrolet-forms ,(objc-cffi:class-ivars class) ,class 
+    `(ivars-macrolet-forms ,(class-ivars class) ,class 
 	 ,@body)))
 
 (defmacro define-objc-class (name superclass (&rest ivars))
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (ensure-objc-class ,(symbol-to-objc-class-name name)
-			       (objc-cffi:objc-get-class ,(symbol-to-objc-class-name superclass))
-			       (list ,@(mapcar (lambda (ivar-def)
-						 `(objc-cffi:make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
-								       (list ,@(ensure-list `,(cadr ivar-def))))) 
-					       ivars)))))
+			(objc-get-class ,(symbol-to-objc-class-name superclass))
+			(list ,@(mapcar (lambda (ivar-def)
+					  `(make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
+						      (list ,@(ensure-list `,(cadr ivar-def))))) 
+					ivars)))))

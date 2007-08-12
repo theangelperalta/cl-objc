@@ -73,7 +73,7 @@
     (is (string-equal class-name (class-name class)))
     (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))
 
-(test adding-class-with-ivars
+(test making-ivars
   (flet ((choose-randomly (list) (nth (random (length list)) list)))
     (let* ((var-count 5)
 	   (var-names (mapcar #'symbol-name (mapcar #'gensym (loop for i upto var-count collecting "foo"))))
@@ -82,5 +82,5 @@
 			    (choose-randomly  (remove-if (lambda (el) (member el '(:void objc-unknown-type))) 
 							 (mapcar #'cadr objc-types:typemap)))) var-names))
 	   (vars (mapcar #'make-ivar var-names types)))
-      (is (equal types (mapcar #'car (mapcar #'objc-types:parse-objc-typestr (mapcar #'ivar-type vars)))))
+      (is (equal types (mapcar #'car (mapcar #'ivar-type vars))))
       (is (equal var-names (mapcar #'ivar-name vars))))))

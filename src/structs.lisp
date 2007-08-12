@@ -1,5 +1,24 @@
 (in-package :objc-cffi)
 
+;; Name translators
+
+(defun symbol-to-objc-class-name (symbol)
+  (let ((ret (cl-objc:symbols-to-objc-selector (list symbol))))
+    (cond 
+      ((string-equal "ns" (subseq ret 0 2))
+       (concatenate 'string (string-upcase (subseq ret 0 2)) (subseq ret 2)))
+      ((string-equal "_ns" (subseq ret 0 3))
+       (concatenate 'string (string-upcase (subseq ret 0 3)) (subseq ret 3)))
+      (t ret))))
+
+(defun objc-class-name-to-symbol (name)
+  (cond 
+    ((string-equal "ns" (subseq name 0 2))
+     (intern (concatenate 'string "NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 2)))))))
+    ((string-equal "_ns" (subseq name 0 3))
+     (intern (concatenate 'string "_NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 3)))))))
+    (t (car (cl-objc:objc-selector-to-symbols name)))))
+
 (defparameter *objc-struct-db* nil)
 (defparameter *registered-structs* nil)
 

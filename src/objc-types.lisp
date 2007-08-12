@@ -46,8 +46,10 @@
   (with-input-from-string (s typestr)
     (loop for idx-char = (read-char s nil nil)
        while (not (null idx-char))
-       collecting
-	 (prog2
+       with skipping = nil
+       when (eql idx-char #\") do (setf skipping (not skipping))
+       when (and (not skipping) (not (eql idx-char #\"))) collect
+	 (progn
 	     ; skip the const type qualifier
 	     (when (eql #\r idx-char) (setf idx-char (read-char s nil nil))) 
 	     (cond ((char-to-methodcode idx-char) (list 'methodcode (char-to-methodcode idx-char)))
@@ -61,8 +63,8 @@
 		   ((eql #\= idx-char) (list 'name-separator nil))
 		   ((eql #\) idx-char) (list 'end-union nil))
 		   ((eql #\} idx-char) (list 'end-struct nil))
-		   ((eql #\] idx-char) (list 'end-array nil))))
-         )))
+		   ((eql #\] idx-char) (list 'end-array nil))
+		   (t (error "Unknow code char ~c" idx-char)))))))
 
 (defun typestr-lexer (typestr)
   (let ((tokens (lex-typestr typestr)))

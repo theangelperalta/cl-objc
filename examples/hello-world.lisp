@@ -26,6 +26,8 @@
 (defun lisp-string-to-nsstring (string)
   (invoke (invoke 'ns-string alloc) :init-with-u-t-f8-string string))
 
+(defun make-rect ())
+
 (defun lisp-hello-world ()
   (let ((app (invoke 'ns-application shared-application))
 	(delegate (invoke (invoke 'app-delegate alloc) init)))

@@ -204,11 +204,9 @@
 (defmethod describe-object ((ivar objc-ivar) stream)
   (with-slots (name type offset ivar-ptr) ivar
     (format stream "~&~S is an Objective C instance variable of type ~S.~
-                      ~%Type ~A~
                       ~%Offset ~D~
                       ~%*objc_ivar ~A~%"
             ivar
-            (or (objc-typechar-to-type type) type)
             type
             offset
             ivar-ptr)))
@@ -283,14 +281,14 @@
   (foreign-free method-list-ptr))
 
 ;;; utilities
-(defun private-ivar (ivar-name)
+(defun private-ivar-p (ivar-name)
   (string= "_" ivar-name :end2 1))
 
 (defun class-has-public-ivars (class)
   (loop 
      for ivar in (class-ivars class)
      for ivar-name = (ivar-name ivar)
-     when (not (private-ivar ivar-name))
+     when (not (private-ivar-p ivar-name))
      append (list class ivar-name)))
 
 ;;; Classes
@@ -375,7 +373,11 @@
    "Objective C objc_class pointer"))
 
 (defcstruct objc-class-cstruct
-	(isa :pointer)
+	(isa :pointer) ;  we don't use the cffi translation facility
+		       ;  for isa and super_class to avoid an infinite
+		       ;  loop in translation. We translate these
+		       ;  values in the shared-initialize :after
+		       ;  method of the related CLOS object
 	(super_class :pointer)
 	(name :string)
 	(version :long)
@@ -430,6 +432,7 @@
 		       :ptr class-ptr))
       objc-nil-class))
 
+;; See the objc-class-cstruct definition to know about the aim of this method 
 (defmethod shared-initialize :after ((self objc-class) slot-names &key isa super-class &allow-other-keys)
   (when isa
     (setf (slot-value self 'super-class) (convert-from-foreign super-class 'objc-class-pointer))))
@@ -530,6 +533,8 @@
   (slot-value obj 'id))
 
 (defmethod translate-to-foreign ((class objc-class) (type objc-object-type))
+  "Translation of a class object into an objc-object for message
+calling"
   (slot-value class 'class-ptr))
 
 ;;; Utilities

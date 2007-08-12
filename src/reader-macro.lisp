@@ -130,6 +130,13 @@ The args will be read with the lisp readtable.
 	      `(typed-objc-msg-send (,receiver ,selector) ,@args)
 	      `(untyped-objc-msg-send ,receiver ,selector ,@args)))))))
 
+(defun read-at-sign (stream char n)
+  (declare (ignore n))
+  (unread-char char stream)
+  (typed-objc-msg-send 
+   ((typed-objc-msg-send ((objc-get-class "NSString") "alloc")) 
+    "initWithUTF8String:") 
+   :string (read stream t nil t)))
 
 (defun restore-readtable ()
   (setf *readtable* *old-readtable*))
@@ -141,11 +148,7 @@ The args will be read with the lisp readtable.
   (set-macro-character #\] #'objc-read-right-square-bracket)
   (unless (get-macro-character #\@)
     (make-dispatch-macro-character #\@))
-  (set-dispatch-macro-character #\@ #\" 
-				(lambda (stream char n)
-				  (declare (ignore n))
-				  (unread-char char stream)
-				  (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSString") "alloc")) "initWithUTF8String:") :string (read stream t nil t))))
+  (set-dispatch-macro-character #\@ #\" #'read-at-sign)
   (setf *objc-argument-readtable* (copy-readtable))
   (set-macro-character #\[ #'objc-read-left-square-bracket)
   (setf *objc-readtable* (copy-readtable)))

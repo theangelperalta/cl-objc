@@ -151,8 +151,8 @@
 					(invoke-restart 'use-the-same-class (objc-get-class (objc-class-name c))))))
 	(add-objc-class class-name super-class ivar-list))
     (use-the-same-class (same-class) (prog2 
-					 (warn "Class named ~a already exists. Use the existing one." 
-					       (class-name same-class)) 
+					 (format *error-output* "Class named ~a already exists. Use the existing one.~%" 
+						 (class-name same-class)) 
 					 same-class))))
 
 (defun make-ivar (name type)
