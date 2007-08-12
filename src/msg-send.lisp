@@ -4,22 +4,35 @@
 ;; e.g. char-objc-msg-send, unsigned-int-objc-msg-send, etc.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun allowed-objc-types ()
-    (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
+  (defun allowed-simple-return-types ()
+     (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
 
   (defun make-objc-msg-send-symbol (type)
     (intern 
      (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
      (find-package "OBJC-CFFI"))))
 
+(defmacro %objc-msg-send (return-type id sel args)
+  (let ((gensyms (cffi::make-gensym-list (+ 2 (/ (length args) 2)))))
+    (cffi::translate-objects gensyms 
+			     (append (list id sel) (odd-positioned-elements args))
+			     (append (list 'objc-id 'objc-sel) (even-positioned-elements args))
+			     return-type
+			     `(cffi-sys:%foreign-funcall "objc_msgSend" 
+							 ,(append (list :pointer (first gensyms)
+									:pointer (second gensyms))
+								  (interpose (mapcar #'cffi::canonicalize-foreign-type 
+									      (even-positioned-elements args))
+									     (cddr gensyms))
+								  (list (cffi::canonicalize-foreign-type return-type)))
+							 :library :default :calling-convention :cdecl))))
+
 (defmacro build-objc-msg-send ()
   `(progn
      ,@(mapcar (lambda (type)
-		 `(cffi:defcfun ("objc_msgSend" ,(make-objc-msg-send-symbol type) :cconv :objc) ,type
-		   (id objc-id)
-		   (sel objc-sel)
-		   &rest))
-	       (allowed-objc-types))))
+		 `(defmacro ,(make-objc-msg-send-symbol type) (id sel args)
+		    `(%objc-msg-send ,',type ,id ,sel ,args)))
+	       (allowed-simple-return-types))))
 
 (build-objc-msg-send)
 
@@ -55,61 +68,59 @@
     (cons (car list) (even-positioned-elements (cddr list)))))
 
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest rest)
-  (with-gensyms (gsel gid  gclass gmethod greceiver greturn-type)
-    `(let* ((,gsel ,sel)
-	    (,gid ,id)
-	    (,gclass (class-name (etypecase ,gid
-				   (objc-object (slot-value ,gid 'isa))
-				   (objc-class ,gid))))
-	    (,gmethod (etypecase ,gid
-			(objc-class (class-get-class-method ,gclass ,gsel))
-			(objc-object (class-get-instance-method ,gclass ,gsel))))
-	    (,greceiver (etypecase ,gid
-			  (objc-class ,gid)
-			  (objc-object (slot-value ,gid 'id)))))
-       (if ,gmethod
-	   (let ((,greturn-type (method-return-type ,gmethod)))
-	     (cond
-	       ;; Floats as return value
-	       ((eq ,greturn-type :float)  (objc-msg-send-sfpret ,greceiver ,gsel ,@rest))
-	       ((eq ,greturn-type :double) (objc-msg-send-fpret ,greceiver ,gsel ,@rest))
+  (with-gensyms (gsel gid gmethod greturn-type)
+    (let ((varargs (loop for i below (/ (length rest) 2) collecting (gensym))))
+      `(let* ((,gsel ,sel)
+	      (,gid ,id)
+	      (,gmethod (etypecase ,gid
+			  (objc-class (class-get-class-method ,gid ,gsel))
+			  (objc-object (class-get-instance-method (obj-class ,gid) ,gsel)))))
+	 (if ,gmethod
+	     (let ((,greturn-type (method-return-type ,gmethod)))
+	       (cond
+		 ;; Floats as return value
+		 ((eq ,greturn-type :float)  (objc-msg-send-sfpret ,gid ,gsel ,@rest))
+		 ((eq ,greturn-type :double) (objc-msg-send-fpret ,gid ,gsel ,@rest))
 
-	       ;; big struct as params case
-	       ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
-		     (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
-			    ',(even-positioned-elements rest)))
-		(untyped-objc-msg-send ,greceiver ,gsel ,@(odd-positioned-elements rest)))
+		 ;; big struct passed by value as argument
+		 ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
+		       (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
+			      ',(even-positioned-elements rest)))
+		  (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements rest)))
 
-	       ;; big structs as return value case
-	       ((big-struct-type-p ,greturn-type) 
-		(objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,greceiver ,gsel ,@rest))
-	       ((small-struct-type-p ,greturn-type)
-		(objc-msg-send ,greceiver ,gsel ,@rest)) 
-	       ((member ,greturn-type ',(allowed-objc-types)) 
-		(ecase ,greturn-type
-		  ,@(mapcar (lambda (type)
-			      `(,type (,(make-objc-msg-send-symbol type) ,greceiver ,gsel ,@rest)))
-			    (allowed-objc-types))))
-	       (t (error "Unknown return type ~s" ,greturn-type))))
-	   (error "ObjC method ~a not found" ,gsel)))))
+		 ;; big struct as return value passed by value
+		 ((big-struct-type-p ,greturn-type) 
+		  (objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,gid ,gsel ,@rest))
+		 ((small-struct-type-p ,greturn-type)
+		  (objc-msg-send ,gid ,gsel ,@rest)) 
+
+		 ;; general case
+		 ((member ,greturn-type ',(allowed-simple-return-types)) 
+		  (funcall 
+		   (compile nil
+			    `(lambda ,',varargs
+			       (,(make-objc-msg-send-symbol ,greturn-type) 
+				 ,,gid 
+				 ,,gsel 
+				 ,(interpose (even-positioned-elements ',rest)
+					      ',varargs))))
+		   ,@(odd-positioned-elements rest)))
+		 (t (error "Unknown return type ~s" ,greturn-type))))
+	     (error "ObjC method ~a not found" ,gsel))))))
 
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
-  (with-gensyms (greceiver gselector gclass gmethod gargument-types gargs-var)
+  (with-gensyms (greceiver gselector gmethod gargs-var)
     `(let* ((,greceiver ,receiver)
 	    (,gselector ,selector)
-	    (,gclass (class-name (etypecase ,greceiver
-				   (objc-object (slot-value ,greceiver 'isa))
-				   (objc-class ,greceiver))))
 	    (,gmethod (etypecase ,greceiver
-			(objc-class (class-get-class-method ,gclass ,gselector))
-			(objc-object (class-get-instance-method ,gclass ,gselector))))
-	    (,gargument-types  (method-argument-types ,gmethod))
+			(objc-class (class-get-class-method ,greceiver ,gselector))
+			(objc-object (class-get-instance-method (obj-class ,greceiver) ,gselector))))
 	    (,gargs-var (mapcar (lambda (arg) (declare (ignore arg)) (gensym)) (list ,@args))))
        (funcall
 	(compile nil
 		 `(lambda ,,gargs-var 
 		    (typed-objc-msg-send (,,greceiver ,,gselector) 
 					 ,@(interpose 
-					    (pack-struct-arguments-type ,gargument-types) 
+					    (pack-struct-arguments-type (method-argument-types ,gmethod)) 
 					    (pack-struct-arguments-val ,gargs-var ,gmethod)))))
 	,@args))))
