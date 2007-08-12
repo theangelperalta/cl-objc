@@ -75,12 +75,12 @@ a light struct as input parameter"
 (test lisp-big-struct-returning-values 
   "Test with method returning big struct value. Test also passing a
 big struct as input parameter"
-  (slet ((rect nsrect))
-	(let ((floatval (random 4.0)))
-	  (slet ((size nssize (nsrect-size rect)))
-		(setf (nssize-width size) floatval)
-		(let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
-		  (is (= floatval (nssize-width (nsrect-size (invoke value-with-rect rect-value))))))))))
+  (slet* ((rect nsrect)
+	  (size nssize (nsrect-size rect)))
+    (let ((floatval (random 4.0)))
+      (setf (nssize-width size) floatval)
+      (let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
+	(is (= floatval (nssize-width (nsrect-size (invoke value-with-rect rect-value)))))))))
 
 (test lisp-adding-instance-method-with-arg
   (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  

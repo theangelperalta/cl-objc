@@ -52,6 +52,7 @@
 (defpackage "CL-OBJC"
   (:use "COMMON-LISP" "OBJC-CFFI")
   (:export "INVOKE"
+	   "SLET*"
 	   "SLET"
 	   "DEFINE-OBJC-METHOD"
 	   "DEFINE-OBJC-CLASS"

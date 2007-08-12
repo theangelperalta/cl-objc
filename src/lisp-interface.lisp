@@ -58,16 +58,15 @@
 					     ,(symbols-to-objc-selector selector) 
 					     ,@args)))))))
 
-(defmacro slet-macrolet-forms (types &body body)
-  (if types
-      `(macrolet ,(mapcar 
-		   (lambda (slot-name)
-		     `(,(intern (format nil "~a-~a" (car types) slot-name)) (ptr) 
-			`(objc-cffi:objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
-		   (cffi:foreign-slot-names (car types)))
-	 (slet-macrolet-forms ,(cdr types) ,@body))
-      `(progn
-	 ,@body)))
+(defun slet-macrolet-forms (types)
+  (when types
+    (append 
+     (mapcar
+      (lambda (slot-name)
+	`(,(intern (format nil "~a-~a" (car types) slot-name)) (ptr) 
+	   `(objc-cffi:objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
+      (cffi:foreign-slot-names (car types)))
+     (slet-macrolet-forms (cdr types)))))
 
 (defmacro slet (bindings &body body)
   `(let ,(mapcar 
@@ -76,7 +75,15 @@
 		  (type (cadr binding))
 		  (value (caddr binding)))
 	      `(,name (or ,value (cffi:foreign-alloc ',type))))) bindings)
-     (slet-macrolet-forms ,(mapcar #'cadr bindings) ,@body)))
+     (macrolet ,(slet-macrolet-forms (mapcar #'cadr bindings)) 
+       ,@body)))
+
+(defmacro slet* (bindings &body body)
+  (if bindings
+    `(slet (,(car bindings))
+       (slet* ,(cdr bindings) ,@body))
+    `(progn
+       ,@body)))
 
 (defun ensure-list (el)
   (if (listp el)
