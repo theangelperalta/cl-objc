@@ -11,6 +11,8 @@
   (method-list objc-method-list-pointer))
 
 (defun unregister-method (class selector class-method)
+  (assert (not (eq (convert-from-foreign (convert-to-foreign class 'objc-class-pointer) 'objc-class-pointer) 
+		   objc-nil-class)))
   (let* ((method-list (foreign-alloc 'objc-method-list-cstruct))
 	 (method (convert-to-foreign 
 		  (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)
@@ -28,28 +30,29 @@
 	      method_imp (foreign-slot-value old-method 'objc-method-cstruct 'method_imp)))
       (class-remove-methods class method-list))))
 
-(defun register-method (class-name selector-name types callback class-method)
-  (let* ((class (objc-get-class class-name))
-	 (selector (sel-register-name selector-name))
-	 (types (foreign-string-alloc types))
-	 (method-list (foreign-alloc 'objc-method-list-cstruct))
-	 (method (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)))
+(defun register-method (class selector-name types callback class-method)
+  (let ((class (convert-from-foreign (convert-to-foreign class 'objc-class-pointer) 'objc-class-pointer)))
+    (assert (not (eq class objc-nil-class)))
+    (let* ((selector (sel-register-name selector-name))
+	   (types (foreign-string-alloc types))
+	   (method-list (foreign-alloc 'objc-method-list-cstruct))
+	   (method (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)))
     
-    (unregister-method class-name selector-name class-method)
+      (unregister-method class selector-name class-method)
 
-    (setf 
-     (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
+      (setf 
+       (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
 
-    (setf (foreign-slot-value method 'objc-method-cstruct 'method_name) selector
-	  (foreign-slot-value method 'objc-method-cstruct 'method_types) types
-	  (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
+      (setf (foreign-slot-value method 'objc-method-cstruct 'method_name) selector
+	    (foreign-slot-value method 'objc-method-cstruct 'method_types) types
+	    (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
 
-    (if class-method
-	(class-add-methods (slot-value class 'isa) method-list)
-	(class-add-methods class method-list))
-    (class-get-instance-method class  selector)))
+      (if class-method
+	  (class-add-methods (metaclass class) method-list)
+	  (class-add-methods class method-list))
+      (class-get-instance-method class  selector))))
 
-(defmacro add-objc-method ((selector-name class-name &key (return-type 'objc-id) (class-method nil))
+(defmacro add-objc-method ((selector-name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
   (let* ((callback (gensym (format nil "~A-CALLBACK-" (remove #\: selector-name))))
 	 (type-list (append (list 'objc-id 'objc-sel) 
@@ -67,7 +70,7 @@
     `(progn 
        (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
 	 ,@body)
-       (register-method ,class-name 
+       (register-method ,class
 			,selector-name
 			(objc-types:encode-types (append (list ',return-type) ',type-list) t)
 			(callback ,callback)
@@ -96,7 +99,8 @@
     (error 'objc-class-already-exists :class-name class-name))
 
   ;; ensure that the super-class exists
-  (assert (not (eq objc-nil-class super-class)))
+  (assert (not (eq objc-nil-class 
+		   (convert-from-foreign (convert-to-foreign super-class 'objc-class-pointer) 'objc-class-pointer))))
 
   ;; setup of the new class
   (let* ((root-class (find-root-class super-class))
