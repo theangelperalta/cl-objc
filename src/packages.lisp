@@ -95,4 +95,5 @@
 
 (defpackage "CL-OBJC-EXAMPLES"
   (:use "COMMON-LISP" "CL-OBJC" "OBJC-CFFI" "OBJC-READER")
-  (:export "LISP-HELLO-WORLD"))
+  (:export "LISP-HELLO-WORLD"
+	   "CONVERTER"))

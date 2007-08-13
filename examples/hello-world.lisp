@@ -79,7 +79,3 @@ to be on the main thread."
       (invoke win display)
       (invoke win order-front-regardless)
       (invoke app run))))
-
-(defun run-in-server ()
-  (swank:create-server :port 5555 :dont-close t)
-  (lisp-hello-world))

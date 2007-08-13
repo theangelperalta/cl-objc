@@ -36,7 +36,8 @@
 
 (defsystem cl-objc.examples
   :components ((:module :examples
-			:components ((:file "hello-world"))))
+			:components ((:file "hello-world")
+				     (:file "converter"))))
   :depends-on (:cl-objc :swank))
 
 ;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)
