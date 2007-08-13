@@ -574,6 +574,14 @@
 	:unbound	    
 	(mem-ref ret type))))
 
+(defun set-ivar (obj ivar-name value)
+  (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
+	 (type (if (not (listp (car (ivar-type var))))
+		   (car (ivar-type var))
+		   :pointer))
+	 (ret (foreign-alloc type :initial-element value)))
+    (object-set-instance-variable obj ivar-name ret)))
+
 ;;; Type Translators
 (defmethod translate-from-foreign (id (type objc-object-type))
   (if (not (null-pointer-p id))

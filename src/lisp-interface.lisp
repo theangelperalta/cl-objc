@@ -171,13 +171,11 @@
 
 (defmacro ivars-macrolet-forms (vars class &body body)
   (if vars
-      (let ((var-name (ivar-name (car vars)))
-	    (var-type (car (ivar-type (car vars)))))
+      (let ((var-name (ivar-name (car vars))))
 	`(flet ((,(car (objc-selector-to-symbols var-name)) (obj)
 		  (get-ivar obj ,var-name)))
 	   (flet (((setf ,(car (objc-selector-to-symbols var-name))) (value obj)
-		    (let ((ref (cffi:foreign-alloc ',var-type :initial-element value)))
-		      (object-set-instance-variable obj ,var-name ref))))
+		    (set-ivar obj ,var-name value)))
 	     (ivars-macrolet-forms ,(cdr vars) ,class ,@body))))
       `(progn
 	 ,@body)))
