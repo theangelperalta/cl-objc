@@ -37,6 +37,8 @@
     rect))
 
 (defun lisp-hello-world ()
+  "Warning: run it with create-server. NSApplication object needs
+to be on the main thread."
   (let ((app (invoke 'ns-application shared-application))
 	(delegate (invoke (invoke 'app-delegate alloc) init)))
     (invoke *nsapp* :set-delegate delegate)
@@ -77,3 +79,7 @@
 	      (invoke win display)
 	      (invoke win order-front-regardless)
 	      (invoke app run))))))))
+
+(defun run-in-server ()
+  (swank:create-server :port 5555 :dont-close t)
+  (lisp-hello-world))

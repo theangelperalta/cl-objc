@@ -291,7 +291,7 @@
      when (not (private-ivar-p ivar-name))
      append (list class ivar-name)))
 
-;;; Classes
+;;; Classes and Protocols
 
 ;;; CLOS definitions
 (defclass objc-class ()
@@ -304,7 +304,7 @@
    (ivars :initarg :ivars :accessor class-ivars)
    (method-lists :initarg :method-lists)
    (cache :initarg :cache)
-   (protocols :initarg :protocols)
+   (protocols :initarg :protocols :accessor protocols)
    (class-ptr :initarg :ptr)))
 
 (defparameter objc-nil-class
@@ -312,7 +312,8 @@
     (make-instance 'objc-class
                    :isa n :super-class n :name "Nil" :version 0
                    :info '(:class) :instance-size 0 :ivars nil
-                   :method-lists n :cache n :protocols n
+                   :method-lists n :cache n 
+		   :protocols n ; FIXME: should be nil
                    :ptr n)))
 
 ;;; printer
@@ -372,6 +373,13 @@
   (:documentation
    "Objective C objc_class pointer"))
 
+(define-foreign-type objc-protocol-list-type ()
+  ()
+  (:actual-type :pointer)
+  (:simple-parser objc-protocol-list-pointer)
+  (:documentation
+   "Objective C objc-protocol-list type - pointer to an objc_protocol_list struct"))
+
 (defcstruct objc-class-cstruct
 	(isa :pointer) ;  we don't use the cffi translation facility
 		       ;  for isa and super_class to avoid an infinite
@@ -386,7 +394,13 @@
 	(ivars objc-ivar-list-pointer)
 	(methodLists :pointer)
 	(cache :pointer)
+;; FIXME: should be objc-protocol-list-pointer
 	(protocols :pointer))
+
+(defcstruct objc-protocol-list-cstruct
+  (next :pointer)
+  (count :int)
+  (protocols :pointer))
 
 (defcfun ("objc_getClass" objc-get-class) objc-class-pointer
   (name :string))
@@ -445,6 +459,28 @@
 
 (defmethod translate-to-foreign (pointer (type objc-class-type))
   pointer)
+
+(defmethod translate-from-foreign (protocol-list-ptr (type objc-protocol-list-type))
+  (loop 
+     for ptr = protocol-list-ptr then (foreign-slot-value ptr 'objc-protocol-list-cstruct 'next)
+     until (null-pointer-p ptr)
+     nconc (loop 
+	      for idx below (foreign-slot-value ptr 'objc-protocol-list-cstruct 'count) 
+	      for protocol-ptr = (foreign-slot-value ptr 'objc-protocol-list-cstruct 'protocols) then (inc-pointer protocol-ptr (foreign-type-size 'objc-class-cstruct))
+	      collecting (mem-ref protocol-ptr 'objc-class-pointer))))
+
+(defmethod translate-to-foreign ((protocol-list list) (type objc-protocol-list-type))
+  (let ((ret (foreign-alloc 'objc-protocol-list-cstruct))
+	(length (length protocol-list)))
+    (setf (foreign-slot-value ret 'objc-protocol-list-cstruct 'count) length
+	  (foreign-slot-value ret 'objc-protocol-list-cstruct 'protocols) (foreign-alloc 'objc-class-cstruct :count length)
+	  (foreign-slot-value ret 'objc-protocol-list-cstruct 'next) (null-pointer))
+    (loop 
+       for idx below length
+       for protocol-ptr = (foreign-slot-pointer ret 'objc-protocol-list-cstruct 'list) then (inc-pointer protocol-ptr (foreign-type-size 'objc-class-cstruct))
+       for protocol in protocol-list
+       do (setf (mem-aref protocol-ptr :pointer idx) (slot-value protocol 'class-ptr)))
+    ret))
 
 (defgeneric super-classes (item)
   (:documentation "Get the Super Classes of an Objc Object or of a

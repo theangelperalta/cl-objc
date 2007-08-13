@@ -175,10 +175,11 @@
 		  (let ((ref (cffi:foreign-alloc :pointer 
 						 :initial-element (cffi:foreign-alloc ',var-type)))) 
 		    (object-get-instance-variable obj ,var-name ref) 
-		    (cffi:mem-ref (cffi:mem-ref ref :pointer) ',var-type))))
+		    (unless (cffi:null-pointer-p (cffi:mem-ref ref :pointer))
+		      (cffi:mem-ref (cffi:mem-ref ref :pointer) ',var-type)))))
 	   (flet (((setf ,(car (objc-selector-to-symbols var-name))) (value obj)
 		    (let ((ref (cffi:foreign-alloc ',var-type)))
-		      (setf (cffi:mem-ref ref ,var-type) value)
+		      (setf (cffi:mem-ref ref ',var-type) value)
 		      (object-set-instance-variable obj ,var-name ref))))
 	     (ivars-macrolet-forms ,(cdr vars) ,class ,@body))))
       `(progn

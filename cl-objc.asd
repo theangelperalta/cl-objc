@@ -37,7 +37,7 @@
 (defsystem cl-objc.examples
   :components ((:module :examples
 			:components ((:file "hello-world"))))
-  :depends-on (:cl-objc))
+  :depends-on (:cl-objc :swank))
 
 ;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system 'cl-objc))))
