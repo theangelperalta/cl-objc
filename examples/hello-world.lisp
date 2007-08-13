@@ -40,45 +40,45 @@
   "Warning: run it with create-server. NSApplication object needs
 to be on the main thread."
   (let ((app (invoke 'ns-application shared-application))
-	(delegate (invoke (invoke 'app-delegate alloc) init)))
-    (invoke *nsapp* :set-delegate delegate)
-    (let ((win (invoke 'ns-window alloc))
-	  (frame (make-rect 200 300 250 100))
-	  (button-rect (make-rect 10 10 80 80))
-	  (bye-rect (make-rect 100 10 80 80)))
-      (invoke win :init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)
-      (invoke win :set-title (lisp-string-to-nsstring "Hello World"))
-      (invoke win :set-level 3)
-
-      (let ((hel (invoke (invoke 'ns-button alloc) :init-with-frame button-rect)))
-	(invoke (invoke win content-view) :add-subview hel)
-	(invoke hel :set-bezel-style 4)
-	(invoke hel :set-title (lisp-string-to-nsstring "Hello"))
-	(invoke hel :set-target (invoke app delegate))
-	(invoke hel :set-action (selector :say-hello))
-
-	(let ((beep (invoke 'ns-sound alloc)))
-	  (invoke beep 
-		  :init-with-contents-of-file (lisp-string-to-nsstring "/System/Library/Sounds/Tink.Aiff")
-		  :by-reference 1)
-	  (invoke hel :set-sound beep)
-
-	  (let ((bye (invoke (invoke 'ns-button alloc) :init-with-frame bye-rect)))
-	    (invoke (invoke win content-view) :add-subview bye)
-	    (invoke bye :set-bezel-style 4)
-	    (invoke bye :set-action (selector :stop))
-	    (invoke bye :set-enabled 1)
-	    (invoke bye :set-title (lisp-string-to-nsstring "Goodbye!"))
-
-	    (let ((adios (invoke 'ns-sound alloc)))
-	      (invoke adios 
+	(frame (make-rect 200 300 250 100))
+	(button-rect (make-rect 10 10 80 80))
+	(bye-rect (make-rect 100 10 80 80)))
+    (objc-let ((delegate 'app-delegate init)
+	       (win 'ns-window)
+	       (hel 'ns-button :init-with-frame button-rect)
+	       (beep 'ns-sound 
+		     :init-with-contents-of-file (lisp-string-to-nsstring "/System/Library/Sounds/Tink.Aiff")
+		     :by-reference 1)
+	       (bye 'ns-button :init-with-frame bye-rect)
+	       (adios 'ns-sound
 		      :init-with-contents-of-file (lisp-string-to-nsstring "/System/Library/Sounds/Basso.aiff" )
-		      :by-reference 1)
-	      (invoke bye :set-sound adios)
+		      :by-reference 1))
+      (invoke *nsapp* :set-delegate delegate)
+					; setting up window
+      (with-object win
+	(:init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)
+	(:set-title (lisp-string-to-nsstring "Hello World"))
+	(:set-level 3))
+					; setting up hello button
+      (invoke (invoke win content-view) :add-subview hel)    
+      (with-object hel
+	(:set-bezel-style 4)
+	(:set-title (lisp-string-to-nsstring "Hello"))
+	(:set-target (invoke app delegate))
+	(:set-action (selector :say-hello))
+	(:set-sound beep))
+					; setting up bye button
+      (invoke (invoke win content-view) :add-subview bye)
+      (with-object bye
+	(:set-bezel-style 4)
+	(:set-action (selector :stop))
+	(:set-enabled 1)
+	(:set-title (lisp-string-to-nsstring "Goodbye!"))
+	(:set-sound adios))
 		  
-	      (invoke win display)
-	      (invoke win order-front-regardless)
-	      (invoke app run))))))))
+      (invoke win display)
+      (invoke win order-front-regardless)
+      (invoke app run))))
 
 (defun run-in-server ()
   (swank:create-server :port 5555 :dont-close t)

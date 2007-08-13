@@ -117,9 +117,7 @@
 	    info :class
 	    instance_size (+ (instance-size (metaclass super-class)) (reduce #'+ (mapcar #'ivar-offset ivar-list)))
 	    ivars (convert-to-foreign ivar-list 'objc-ivar-list-pointer)
-	    methodLists (prog1 
-			    (foreign-alloc :pointer :initial-element (make-pointer #xffffffff)) 
-			  (foreign-alloc 'objc-method-list-cstruct))
+	    methodLists (foreign-alloc :pointer :initial-element (make-pointer #xffffffff)) 
 	    cache (null-pointer)
 	    protocols (null-pointer)))
 
@@ -135,10 +133,7 @@
 	    info :meta
 	    instance_size (instance-size (metaclass super-class))
 	    ivars (null-pointer)
-	    methodLists (prog1 
-			    (foreign-alloc :pointer :initial-element (make-pointer #xffffffff))
-			  (foreign-alloc 'objc-method-list-cstruct))
-
+	    methodLists (foreign-alloc :pointer :initial-element (make-pointer #xffffffff))
 	    cache (null-pointer)
 	    protocols (null-pointer)))
     (objc-add-class new-class)

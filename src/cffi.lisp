@@ -278,6 +278,7 @@
 
 (defmethod free-translated-object (method-list-ptr (type objc-ivar-list-type) param)
   (declare (ignore param))
+  (foreign-free (foreign-slot-value method-list-ptr 'objc-ivar-list-cstruct 'ivar_list))
   (foreign-free method-list-ptr))
 
 ;;; utilities

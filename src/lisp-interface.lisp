@@ -198,3 +198,17 @@
 					  `(make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
 						      (list ,@(ensure-list `,(cadr ivar-def))))) 
 					ivars)))))
+
+(defmacro objc-let (bindings &body body)
+  `(let ,(mapcar (lambda (binding)
+		   (if  (cddr binding)
+			`(,(first binding) (invoke (invoke ,(second binding) alloc) ,@(cddr binding)))
+			`(,(first binding) (invoke ,(second binding) alloc))))
+		 bindings)
+     ,@body))
+
+(defmacro with-object (obj &body actions)
+  `(progn 
+     ,@(mapcar (lambda (action)
+		 `(invoke ,obj ,@action))
+	       actions)))

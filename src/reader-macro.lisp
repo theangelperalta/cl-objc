@@ -151,4 +151,5 @@ The args will be read with the lisp readtable.
   (set-dispatch-macro-character #\@ #\" #'read-at-sign)
   (setf *objc-argument-readtable* (copy-readtable))
   (set-macro-character #\[ #'objc-read-left-square-bracket)
+  (set-macro-character #\, #'objc-read-comma)
   (setf *objc-readtable* (copy-readtable)))
