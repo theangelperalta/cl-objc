@@ -135,3 +135,23 @@ big struct as input parameter"
     (invoke x increment)
   
     (is (= (with-ivar-accessors ns-test-1 (counter x)) 2))))
+
+(define-objc-class test-super-1 ns-object
+  ((var1 :int)
+   (var2 objc-id)
+   (var3 :string)))
+
+(define-objc-class test-derived-1 test-super-1
+  ((var4 :float)
+   (var5 :int)
+   (var6 objc-id)))
+
+(test lisp-subclassing-and-more-ivars
+  (objc-let ((x 'test-derived-1)
+	     (s 'ns-string :init-with-u-t-f8-string "foo"))
+    (with-ivar-accessors test-derived-1
+      (setf (var6 x) s
+	    (var4 x) 2.0))
+    (with-ivar-accessors test-derived-1
+      (is (string-equal (invoke (var6 x) utf8-string) "foo"))
+      (is (= (var4 x) 2.0)))))

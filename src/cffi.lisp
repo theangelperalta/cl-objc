@@ -514,6 +514,9 @@
   (make-instance 'objc-object :isa objc-nil-class :id (null-pointer))
   "The Objective C Object/instance nil")
 
+(defun objc-nil-object-p (obj)
+  (eq obj objc-nil-object))
+
 ;;; printer
 (defmethod print-object ((obj objc-object) stream)
   (print-unreadable-object (obj stream)
@@ -552,10 +555,24 @@
 (defmethod describe-object ((obj objc-object) stream)
   (with-slots (isa id) obj
     (format stream "~&~S is an Objective C object at ~8,'0X.~
-                      ~%Class ~A~%"
+                      ~%Class ~A~%Instance variables:~%~{~a: ~s~%~}"
             obj
             id
-            isa)))
+            isa
+	    (mapcan (lambda (var) 
+		      (list (ivar-name var) (get-ivar obj (ivar-name var))))
+		    (class-ivars isa)))))
+
+(defun get-ivar (obj ivar-name)
+  (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
+	 (type (if (not (listp (car (ivar-type var))))
+		   (car (ivar-type var))
+		   :pointer))
+	 (ret (foreign-alloc :pointer :initial-element (foreign-alloc type))))
+    (object-get-instance-variable obj ivar-name ret)
+    (if (null-pointer-p (mem-ref ret :pointer))
+	:unbound	    
+	(mem-ref ret type))))
 
 ;;; Type Translators
 (defmethod translate-from-foreign (id (type objc-object-type))
@@ -578,26 +595,3 @@ calling"
 (defmethod super-classes ((obj objc-object))
   (let ((class (obj-class obj)))
     (super-classes class)))
-
-;;; Method calls
-
-(defcfun ("objc_msgSend" objc-msg-send) :pointer
-  (id objc-id)
-  (sel objc-sel)
-  &rest)
-
-(defcfun ("objc_msgSend_stret" objc-msg-send-stret) :pointer
-  (stret :pointer)
-  (id objc-id)
-  (sel objc-sel)
-  &rest)
-
-(cffi:defcfun ("objc_msgSend_fpret" objc-msg-send-fpret) :double
-  (id objc-id)
-  (sel objc-sel)
-  &rest)
-
-(cffi:defcfun ("objc_msgSend_fpret" objc-msg-send-sfpret) :float
-  (id objc-id)
-  (sel objc-sel)
-  &rest)

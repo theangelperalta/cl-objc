@@ -105,17 +105,28 @@
   ;; setup of the new class
   (let* ((root-class (find-root-class super-class))
 	 (new-class (foreign-alloc 'objc-class-cstruct))
-	 (meta-class (foreign-alloc 'objc-class-cstruct)))
+	 (meta-class (foreign-alloc 'objc-class-cstruct))
+	 (instance-size (instance-size super-class)))
     (with-foreign-slots ((isa super_class name version 
 			      info instance_size ivars 
 			      methodLists cache protocols) 
 			 new-class objc-class-cstruct)
+      ;; adjust ivar-offset
+      (loop
+	 for ivar in ivar-list
+	 with increment = nil
+	 for offset = instance-size then (+ offset increment)
+	 do 
+	   (setf increment (ivar-offset ivar))
+	   (incf instance-size increment)
+	   (setf (ivar-offset ivar) offset))
+
       (setf isa meta-class
 	    super_class (convert-to-foreign super-class 'objc-class-pointer)
 	    name class-name
 	    version 0
 	    info :class
-	    instance_size (+ (instance-size (metaclass super-class)) (reduce #'+ (mapcar #'ivar-offset ivar-list)))
+	    instance_size instance-size
 	    ivars (convert-to-foreign ivar-list 'objc-ivar-list-pointer)
 	    methodLists (foreign-alloc :pointer :initial-element (make-pointer #xffffffff)) 
 	    cache (null-pointer)
@@ -156,6 +167,9 @@
      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)
        (setf ivar_name name
 	     ivar_type (objc-types:encode-types (if (listp type) type (list type)))
+	     ; we initialize the offset with the type size of the
+	     ; variable. This should be adjusted of course during
+	     ; class creation
 	     ivar_offset (foreign-type-size type))
        ret)
      'objc-ivar-pointer)))

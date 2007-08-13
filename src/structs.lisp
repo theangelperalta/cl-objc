@@ -4,12 +4,13 @@
 
 (defun symbol-to-objc-class-name (symbol)
   (let ((ret (cl-objc:symbols-to-objc-selector (list symbol))))
-    (cond 
-      ((string-equal "ns" (subseq ret 0 2))
-       (concatenate 'string (string-upcase (subseq ret 0 2)) (subseq ret 2)))
-      ((string-equal "_ns" (subseq ret 0 3))
-       (concatenate 'string (string-upcase (subseq ret 0 3)) (subseq ret 3)))
-      (t ret))))
+    (let ((ret (concatenate 'string (string-upcase (subseq ret 0 1)) (subseq ret 1))))
+      (cond 
+	((string-equal "ns" (subseq ret 0 2))
+	 (concatenate 'string (string-upcase (subseq ret 0 2)) (subseq ret 2)))
+	((string-equal "_ns" (subseq ret 0 3))
+	 (concatenate 'string (string-upcase (subseq ret 0 3)) (subseq ret 3)))
+	(t ret)))))
 
 (defun objc-class-name-to-symbol (name)
   (cond 

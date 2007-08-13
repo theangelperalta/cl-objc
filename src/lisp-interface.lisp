@@ -22,16 +22,18 @@
 	       (with-output-to-string (out)
 		 (when (upper-case-p (elt selector-part 0))
 		   (princ #\- out))
-		 (princ 
-		  (loop 
-		     for char across (subseq selector-part 1) 
-		     with old-char = (elt selector-part 0)
-		     finally (return (char-upcase char))
-		     do
-		     (princ (char-upcase old-char) out)
-		     (when (upper-case-p char)
-		       (princ "-" out))
-		     (setf old-char char)) out))
+		 (princ
+		  (if (= 1 (length selector-part))
+		      (string-upcase selector-part)
+		      (loop 
+			 for char across (subseq selector-part 1) 
+			 with old-char = (elt selector-part 0)
+			 finally (return (char-upcase char))
+			 do
+			 (princ (char-upcase old-char) out)
+			 (when (upper-case-p char)
+			   (princ "-" out))
+			 (setf old-char char))) out))
 	       "*")))
     (mapcar (lambda (name) 
 	      (intern name       
@@ -172,14 +174,9 @@
       (let ((var-name (ivar-name (car vars)))
 	    (var-type (car (ivar-type (car vars)))))
 	`(flet ((,(car (objc-selector-to-symbols var-name)) (obj)
-		  (let ((ref (cffi:foreign-alloc :pointer 
-						 :initial-element (cffi:foreign-alloc ',var-type)))) 
-		    (object-get-instance-variable obj ,var-name ref) 
-		    (unless (cffi:null-pointer-p (cffi:mem-ref ref :pointer))
-		      (cffi:mem-ref (cffi:mem-ref ref :pointer) ',var-type)))))
+		  (get-ivar obj ,var-name)))
 	   (flet (((setf ,(car (objc-selector-to-symbols var-name))) (value obj)
-		    (let ((ref (cffi:foreign-alloc ',var-type)))
-		      (setf (cffi:mem-ref ref ',var-type) value)
+		    (let ((ref (cffi:foreign-alloc ',var-type :initial-element value)))
 		      (object-set-instance-variable obj ,var-name ref))))
 	     (ivars-macrolet-forms ,(cdr vars) ,class ,@body))))
       `(progn
@@ -196,7 +193,7 @@
 			(objc-get-class ,(symbol-to-objc-class-name superclass))
 			(list ,@(mapcar (lambda (ivar-def)
 					  `(make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
-						      (list ,@(ensure-list `,(cadr ivar-def))))) 
+						      ',(ensure-list (cadr ivar-def)))) 
 					ivars)))))
 
 (defmacro objc-let (bindings &body body)

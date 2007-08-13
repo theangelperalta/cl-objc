@@ -1,5 +1,29 @@
 (in-package "OBJC-CFFI")
 
+;;; Method calls
+
+(defcfun ("objc_msgSend" objc-msg-send) :pointer
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(cffi:defcfun ("objc_msgSend_fpret" objc-msg-send-fpret) :double
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(cffi:defcfun ("objc_msgSend_fpret" objc-msg-send-sfpret) :float
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+(defcfun ("objc_msgSend_stret" objc-msg-send-stret) :pointer
+  (stret :pointer)
+  (id objc-id)
+  (sel objc-sel)
+  &rest)
+
+
 ;; Building foreign function declarations for each objc primitive type
 ;; e.g. char-objc-msg-send, unsigned-int-objc-msg-send, etc.
 
@@ -18,7 +42,9 @@
 			     (append (list id sel) (odd-positioned-elements args))
 			     (append (list 'objc-id 'objc-sel) (even-positioned-elements args))
 			     return-type
-			     `(cffi-sys:%foreign-funcall "objc_msgSend" 
+			     `(cffi-sys:%foreign-funcall ,(if (member return-type '(:float :double))
+							      "objc_msgSend_fpret"
+							      "objc_msgSend") 
 							 ,(append (list :pointer (first gensyms)
 									:pointer (second gensyms))
 								  (interpose (mapcar #'cffi::canonicalize-foreign-type 
@@ -78,10 +104,6 @@
 	 (if ,gmethod
 	     (let ((,greturn-type (method-return-type ,gmethod)))
 	       (cond
-		 ;; Floats as return value
-		 ((eq ,greturn-type :float)  (objc-msg-send-sfpret ,gid ,gsel ,@rest))
-		 ((eq ,greturn-type :double) (objc-msg-send-fpret ,gid ,gsel ,@rest))
-
 		 ;; big struct passed by value as argument
 		 ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
 		       (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
