@@ -570,17 +570,18 @@
 		   :pointer))
 	 (ret (foreign-alloc :pointer :initial-element (foreign-alloc type))))
     (object-get-instance-variable obj ivar-name ret)
-    (if (null-pointer-p (mem-ref ret :pointer))
-	:unbound	    
-	(mem-ref ret type))))
+    (cond
+      ((null-pointer-p ret) :unbound)
+      ((not (eq (cffi::canonicalize-foreign-type type) :pointer)) (mem-ref (mem-ref ret :pointer) type))
+      (t (mem-ref ret type)))))
 
 (defun set-ivar (obj ivar-name value)
   (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))
 		   :pointer))
-	 (ret (foreign-alloc type :initial-element value)))
-    (object-set-instance-variable obj ivar-name ret)))
+	 (value-ptr (if (eq (cffi::canonicalize-foreign-type type) :pointer) value (foreign-alloc type :initial-element value))))
+    (object-set-instance-variable obj ivar-name (convert-to-foreign value-ptr type))))
 
 ;;; Type Translators
 (defmethod translate-from-foreign (id (type objc-object-type))
