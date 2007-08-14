@@ -240,7 +240,6 @@ like URL into u-r-l.
 
 A selector name is translated in a list of symbols or a single symbol. 
 
-@example
 @table @code
 @item [NSObject alloc]
 (invoke 'ns-object alloc)
@@ -249,7 +248,6 @@ A selector name is translated in a list of symbols or a single symbol.
 @item [NSNumber numberWithInt: 3]
 (invoke 'ns-number :number-with-int 3)
 @end table
-@end example
 
 @section The Currency Converter Example
 This section concerns the construction of a Cocoa application using an
