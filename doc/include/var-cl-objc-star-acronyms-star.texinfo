@@ -1,0 +1,5 @@
+@anchor{Variable cl-objc:*acronyms*}
+@defvr {Variable} cl-objc:*acronyms*
+@vindex cl-objc:*acronyms*
+Acronyms used in name translators
+@end defvr

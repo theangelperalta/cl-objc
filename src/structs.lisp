@@ -3,6 +3,7 @@
 ;; Name translators
 
 (defun symbol-to-objc-class-name (symbol)
+  "The inverse of OBJC-CLASS-NAME-TO-SYMBOL."
   (let ((ret (cl-objc:symbols-to-objc-selector (list symbol))))
     (let ((ret (concatenate 'string (string-upcase (subseq ret 0 1)) (subseq ret 1))))
       (cond 
@@ -13,6 +14,7 @@
 	(t ret)))))
 
 (defun objc-class-name-to-symbol (name)
+  "Returns a symbol that can be used in CL-Objc to identify the class named `NAME`."
   (cond 
     ((string-equal "ns" (subseq name 0 2))
      (intern (concatenate 'string "NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 2)))))))
@@ -31,7 +33,7 @@
 				  (and (listp el) (eq (car el) :struct))) 
 				(mapcar #'caddr 
 					(mapcan #'objc-types:parse-objc-typestr 
-						(mapcar #'method-type-signature (mapcan #'get-class-methods (get-class-list)))))))
+						(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list)))))))
 	 :key #'car
 	 :test #'string-equal)))
 
@@ -110,9 +112,20 @@ big struct types with the corresponding number of :int parameters"
       (push (cons objc-name lisp-name) *registered-structs*)))
 
 (defmacro define-objc-struct (name-and-objc-options &body doc-and-slots)
-  "name-and-objc-options can be specified in one of the
-  followings format (e.g. for the NSRect struct): 
-ns-rect (ns-rect 16) (ns-rect \"_NSRect\") ((ns-rect 16) \"_NSRect\")"
+  "Wrapper for CFFI:DEFCSTRUCT allowing struct to be used as
+  type. `doc-and-slots` will be passed directly to
+  CFFI:DEFCSTRUCT while `name-and-objc-options` can be specified
+  in one of the followings format (e.g. for the NSRect struct):
+  ns-rect 
+  (ns-rect 16) 
+  (ns-rect \"_NSRect\") 
+  ((ns-rect 16)  \"_NSRect\"),
+
+where _NSRect is the struct name used in ObjC methods, and
+ns-rect is the lisp name of the struct. If you don't specify the
+former the method will try to guess it automatically, but an
+error will be raised if the trial fails.
+"
   (destructuring-bind (name-and-options objc-name lisp-name)
       (parse-objc-struct-name-options name-and-objc-options)
     (let ((private-name (concatenate 'string "_" objc-name)))
@@ -125,3 +138,12 @@ ns-rect (ns-rect 16) (ns-rect \"_NSRect\") ((ns-rect 16) \"_NSRect\")"
        (objc-cffi::register-struct-name ,objc-name ',lisp-name)
        (cffi:defcstruct ,name-and-options
 	 ,@doc-and-slots))))
+
+(defun objc-struct-slot-value (ptr type slot-name)
+  "Return the value of `SLOT-NAME` in the ObjC Structure `TYPE` at `PTR`."
+  (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name))
+
+(defun set-objc-struct-slot-value (ptr type slot-name newval)
+  (setf (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name) newval))
+
+(defsetf objc-struct-slot-value set-objc-struct-slot-value)

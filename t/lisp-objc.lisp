@@ -6,7 +6,7 @@
 (test symbols-selector-transformation
   (let ((selectors (mapcar #'sel-name 
 			   (mapcar #'method-selector
-				   (mapcan #'get-class-methods (get-class-list))))))
+				   (mapcan #'get-instance-methods (get-class-list))))))
     (dolist (selector selectors)
       (is (equal selector (symbols-to-objc-selector (objc-selector-to-symbols selector)))))))
 
@@ -84,7 +84,6 @@ big struct as input parameter"
 
 (test lisp-adding-instance-method-with-arg
   (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  
-    (declare (ignore sel))
     (+ (invoke self int-value) (invoke y int-value)))
   (let ((x (invoke 'ns-number :number-with-int :int 1))
 	(y (invoke 'ns-number :number-with-int 2)))
@@ -92,7 +91,6 @@ big struct as input parameter"
 
 (test lisp-adding-instance-method 
   (define-objc-method lisp-double (:return-type :int) ((self ns-number)) 
-    (declare (ignore sel))
     (* 2 (untyped-objc-msg-send self "intValue")))
   (let ((x (invoke 'ns-number :number-with-int :int 1)))
     (is (= (invoke x lisp-double) 2))))
@@ -100,13 +98,11 @@ big struct as input parameter"
 (test lisp-adding-class-method
   (define-objc-method lisp-magic-number (:return-type :int :class-method t)
 		   ((self ns-number))
-    (declare (ignore sel self))
 		   1980)
   (is (= 1980 (invoke 'ns-number lisp-magic-number))))
 
 (test lisp-adding-instance-method-returning-object
   (define-objc-method :lisp-add2 () ((self ns-number) (y :int)) 
-    (declare (ignore sel))
     (invoke 'ns-number :number-with-int (+ (coerce  (invoke self int-value) 'number) y)))
   (let ((x (invoke 'ns-number :number-with-int :int 1))
 	(y 2))
@@ -117,7 +113,6 @@ big struct as input parameter"
     ((counter :int)))
 
 (define-objc-method increment (:return-type :int) ((self ns-test-1))
-  (declare (ignore sel))
   (with-ivar-accessors ns-test-1
     (let ((old-val (counter self)))
       (incf (counter self))

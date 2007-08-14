@@ -1,0 +1,5 @@
+@anchor{Function objc-types:encode-types}
+@deffn {Function} objc-types:encode-types types &optional align
+@findex objc-types:encode-types
+Encode a type list to a method type signature
+@end deffn

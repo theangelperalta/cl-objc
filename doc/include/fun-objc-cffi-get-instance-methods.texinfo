@@ -1,0 +1,5 @@
+@anchor{Function objc-cffi:get-instance-methods}
+@deffn {Function} objc-cffi:get-instance-methods class
+@findex objc-cffi:get-instance-methods
+Returns all the instance methods of `CLASS`
+@end deffn

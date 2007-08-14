@@ -1,0 +1,6 @@
+@anchor{Function objc-reader:restore-readtable}
+@deffn {Function} objc-reader:restore-readtable
+@findex objc-reader:restore-readtable
+Restore the readtable being present before the call of
+@code{activate-objc-reader-macro}.
+@end deffn

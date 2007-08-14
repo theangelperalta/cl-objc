@@ -1,0 +1,5 @@
+@anchor{Function objc-cffi:get-class-list}
+@deffn {Function} objc-cffi:get-class-list
+@findex objc-cffi:get-class-list
+Returns the list of all the Objective Class available
+@end deffn

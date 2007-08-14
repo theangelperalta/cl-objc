@@ -1,0 +1,18 @@
+@anchor{Macro cl-objc:invoke}
+@deffn {Macro} cl-objc:invoke receiver &rest selector-and-args
+@findex cl-objc:invoke
+Call an Objective @code{c} message to `RECEIVER`.
+
+`RECEIVER` can be an Objective @code{c} object or class. For the sake of
+convenience if `RECEIVER` is a symbol it will be mapped to an
+Objective @code{c} class through the @code{objc-class-name-to-symbol} translator.
+
+`SELECTOR-AND-ARGS` has the form @{selector-part [cffi-type] value@}*.
+
+@code{e}.g.
+ (invoke 'ns-number alloc)
+ (invoke 'ns-value :value-with-number 3)
+ (invoke 'ns-number :number-with-int :int 4)
+ (invoke (invoke 'ns-windo alloc) :init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)
+ (invoke win :init-with-content-rect frame :style-mask :int 15 :backing :int 2 :defer 0)
+@end deffn

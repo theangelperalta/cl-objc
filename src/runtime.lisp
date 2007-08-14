@@ -48,13 +48,31 @@
 	    (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
 
       (if class-method
-	  (class-add-methods (metaclass class) method-list)
-	  (class-add-methods class method-list))
-      (class-get-instance-method class  selector))))
+	  (progn
+	    (class-add-methods (metaclass class) method-list)
+	    (class-get-instance-method (metaclass class) selector))
+	  (progn 
+	    (class-add-methods class method-list)
+	    (class-get-instance-method class  selector))))))
 
-(defmacro add-objc-method ((selector-name class &key (return-type 'objc-id) (class-method nil))
+(defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
-  (let* ((callback (gensym (format nil "~A-CALLBACK-" (remove #\: selector-name))))
+  "Add an Objective C method to `CLASS` returning the CFFI
+`RETURN-TYPE` and binding it to a selector with `NAME`.
+If `CLASS-METHOD` is true then a class method will be added to `CLASS`.
+
+`ARGUMENT-LIST` is a list of list with two elements. The first
+one is the name of the argument, while the second is its CFFI
+type. 
+
+In `BODY` are also bound the symbols `SELF` pointing to the
+receiver of the message and `SEL` pointing to the selector.
+
+If a method binded to `SEL` is already present in `CLASS` it
+installs the new definition discarding the previous one.
+
+Return a new Objective C Method object." 
+  (let* ((callback (gensym (format nil "~A-CALLBACK-" (remove #\: name))))
 	 (type-list (append (list 'objc-id 'objc-sel) 
 			    (mapcar (lambda (type) 
 				      (if (listp type) 
@@ -67,14 +85,22 @@
 					 (first arg) 
 					 arg)) 
 				    argument-list))))
-    `(progn 
-       (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
-	 ,@body)
-       (register-method ,class
-			,selector-name
-			(objc-types:encode-types (append (list ',return-type) ',type-list) t)
-			(callback ,callback)
-			,class-method))))
+    (let ((has-declare))
+      `(progn 
+	 (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
+	   ,(when (and (listp (first body)) (eq (car (first body)) 'cl:declare))
+		  (setf has-declare t)
+		  (first body))
+	   ,(intern "SELF")		; to avoid warning
+	   ,(intern "SEL")		; to avoid warning
+	   ,(if has-declare
+		`(progn ,@(cdr body))
+		`(progn ,@body)))
+	 (register-method ,class
+			  ,name
+			  (objc-types:encode-types (append (list ',return-type) ',type-list) t)
+			  (callback ,callback)
+			  ,class-method)))))
 
 ;;;; Adding Objective-C classes at runtime
 
@@ -93,6 +119,13 @@
 	     (format stream "A class named ~a already exists" (objc-class-name condition)))))
 
 (defun add-objc-class (class-name super-class &optional ivar-list)
+  "Adds and returns a new Objective C class `CLASS-NAME` deriving from `SUPER-CLASS`.
+
+`IVAR-LIST` is a list of instance variable object that will be
+added to the new class.
+
+If a class with the same name already exists the method raise an
+error of type OBJC-CLASS-ALREADY-EXISTS."
   ;; ensure that a class with same name does not already exist
   (unless (eq (objc-lookup-class class-name)
 	      objc-nil-class)
@@ -100,7 +133,8 @@
 
   ;; ensure that the super-class exists
   (assert (not (eq objc-nil-class 
-		   (convert-from-foreign (convert-to-foreign super-class 'objc-class-pointer) 'objc-class-pointer))))
+		   (convert-from-foreign (convert-to-foreign super-class 'objc-class-pointer) 
+					 'objc-class-pointer))))
 
   ;; setup of the new class
   (let* ((root-class (find-root-class super-class))
@@ -151,6 +185,8 @@
     (objc-get-class class-name)))
 
 (defun ensure-objc-class (class-name super-class &optional ivar-list)
+  "Like add-objc-class but if a class with the same name already
+exists it just returns without adding the new class definition"
   (restart-case
       (handler-bind
 	  ((objc-class-already-exists (lambda (c)
@@ -162,6 +198,7 @@
 					 same-class))))
 
 (defun make-ivar (name type)
+  "Returns a new instance variable object named `NAME` of `TYPE`"
   (let ((ret (foreign-alloc 'objc-ivar-cstruct)))
     (convert-from-foreign  
      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)

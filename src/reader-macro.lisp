@@ -139,10 +139,15 @@ The args will be read with the lisp readtable.
    :string (read stream t nil t)))
 
 (defun restore-readtable ()
+  "Restore the readtable being present before the call of
+ACTIVATE-OBJC-READER-MACRO."
   (setf *readtable* *old-readtable*))
 
 (defun activate-objc-reader-macro (&optional (accept-untyped-call nil))
-  "If accept-untyped-call is nil method should be invoked with input type parameters"
+  "Installs a the Objective C readtable. If accept-untyped-call
+is nil method has to be invoked with input type parameters. It
+saves the current readtable to be later restored with
+RESTORE-READTABLE"
   (setf *old-readtable* (copy-readtable)
 	*accept-untyped-call* accept-untyped-call)
   (set-macro-character #\] #'objc-read-right-square-bracket)

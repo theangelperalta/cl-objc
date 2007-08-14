@@ -1,0 +1,17 @@
+@anchor{Macro cl-objc:slet}
+@deffn {Macro} cl-objc:slet bindings &body body
+@findex cl-objc:slet
+slet and slet* create new variable bindings to Objective @code{c}
+structs and execute a series of forms in `BODY` that use these
+bindings. slet performs the bindings in parallel and slet* does
+them sequentially.
+
+`BINDINGS` has the form: ((var struct-type [init-form])*).
+
+`VAR` will be binded to `INIT-FORM` if present otherwise to a new
+allocated struct of type `struct-type` (translated by
+OBJC-CLASS-NAME-TO-SYMBOL).
+
+In body accessories of the form (`struct-name`-`slot-name`
+struct-obj) will be bound as utilities.
+@end deffn

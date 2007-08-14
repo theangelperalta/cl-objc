@@ -77,14 +77,6 @@
 (defun method-return-type-size (method)
   (objc-foreign-type-size (method-return-type method)))
 
-(defun objc-struct-slot-value (ptr type slot-name)
-  (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name))
-
-(defun set-objc-struct-slot-value (ptr type slot-name newval)
-  (setf (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name) newval))
-
-(defsetf objc-struct-slot-value set-objc-struct-slot-value)
-
 (defun odd-positioned-elements (list)
   (when (> (length list) 1)
     (cons (cadr list) (odd-positioned-elements (cddr list)))))
@@ -93,9 +85,23 @@
   (when (> (length list) 1)
     (cons (car list) (even-positioned-elements (cddr list)))))
 
-(defmacro typed-objc-msg-send ((id sel &optional stret) &rest rest)
+(defmacro typed-objc-msg-send ((id sel &optional stret) &rest args-and-types)
+  "Send the message binded to selector `SEL` to the object `ID`
+returning the value of the Objective C call.
+
+`ARGS-AND-TYPES` is a list of pairs. The first element of a pair
+is the CFFI type and the second is the value of the argument
+passed to the method.
+
+If the method return type is an Objective C struct you can pass a
+pointer to a an allocated struct that will retain the value
+returned, otherwise a new struct will be allocated.
+
+If `ID` is an Objective C class object it will call the class
+method binded to `SEL`.
+"
   (with-gensyms (gsel gid gmethod greturn-type)
-    (let ((varargs (loop for i below (/ (length rest) 2) collecting (gensym))))
+    (let ((varargs (loop for i below (/ (length args-and-types) 2) collecting (gensym))))
       `(let* ((,gsel ,sel)
 	      (,gid ,id)
 	      (,gmethod (etypecase ,gid
@@ -107,14 +113,14 @@
 		 ;; big struct passed by value as argument
 		 ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
 		       (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
-			      ',(even-positioned-elements rest)))
-		  (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements rest)))
+			      ',(even-positioned-elements args-and-types)))
+		  (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
 
 		 ;; big struct as return value passed by value
 		 ((big-struct-type-p ,greturn-type) 
-		  (objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,gid ,gsel ,@rest))
+		  (objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,gid ,gsel ,@args-and-types))
 		 ((small-struct-type-p ,greturn-type)
-		  (objc-msg-send ,gid ,gsel ,@rest)) 
+		  (objc-msg-send ,gid ,gsel ,@args-and-types)) 
 
 		 ;; general case
 		 ((member ,greturn-type ',(allowed-simple-return-types)) 
@@ -124,13 +130,19 @@
 			       (,(make-objc-msg-send-symbol ,greturn-type) 
 				 ,,gid 
 				 ,,gsel 
-				 ,(interpose (even-positioned-elements ',rest)
+				 ,(interpose (even-positioned-elements ',args-and-types)
 					      ',varargs))))
-		   ,@(odd-positioned-elements rest)))
+		   ,@(odd-positioned-elements args-and-types)))
 		 (t (error "Unknown return type ~s" ,greturn-type))))
 	     (error "ObjC method ~a not found" ,gsel))))))
 
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
+  "Send the message binded to `SELECTOR` to `RECEIVER` returning
+the value of the Objective C call with `ARGS`.
+
+This method invokes typed-objc-msg-send calculating the types of
+`ARGS` at runtime.
+"
   (with-gensyms (greceiver gselector gmethod gargs-var)
     `(let* ((,greceiver ,receiver)
 	    (,gselector ,selector)

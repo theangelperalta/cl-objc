@@ -1,0 +1,6 @@
+@anchor{Function objc-cffi:get-ivar}
+@deffn {Function} objc-cffi:get-ivar obj ivar-name
+@findex objc-cffi:get-ivar
+Returns the value of instance variable named `IVAR-NAME` of
+Objective @code{c} object `obj`
+@end deffn

@@ -1,0 +1,5 @@
+@anchor{Function objc-cffi:class-has-public-ivars}
+@deffn {Function} objc-cffi:class-has-public-ivars class
+@findex objc-cffi:class-has-public-ivars
+Returns the public vars of `CLASS`
+@end deffn

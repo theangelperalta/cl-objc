@@ -13,13 +13,13 @@
 
 (define-objc-method :application-did-finish-launching (:return-type :void) 
     ((self app-delegate) (a-notification objc-id))
-  (declare (ignore a-notification sel self))
+  (declare (ignore a-notification))
   (format t "Hello, World!~%")
   (fresh-line))
 
 (define-objc-method :say-hello (:return-type :void) 
     ((self app-delegate) (a-notification objc-id))
-  (declare (ignore a-notification sel self))
+  (declare (ignore a-notification))
   (format t "Hello again, World!~%")
   (fresh-line))
 

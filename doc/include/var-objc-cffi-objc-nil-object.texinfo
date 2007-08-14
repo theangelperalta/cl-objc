@@ -1,0 +1,5 @@
+@anchor{Variable objc-cffi:objc-nil-object}
+@defvr {Variable} objc-cffi:objc-nil-object
+@vindex objc-cffi:objc-nil-object
+The Objective @code{c} Object instance nil
+@end defvr

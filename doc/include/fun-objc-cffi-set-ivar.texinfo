@@ -1,0 +1,6 @@
+@anchor{Function objc-cffi:set-ivar}
+@deffn {Function} objc-cffi:set-ivar obj ivar-name value
+@findex objc-cffi:set-ivar
+Set the value of instance variable named `IVAR-NAME` of
+Objective @code{c} object `OBJ` with `VALUE`
+@end deffn

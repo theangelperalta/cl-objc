@@ -21,7 +21,9 @@
 
 ;;; CLOS definitions
 (defclass objc-selector ()
-  ((name :initarg :name :accessor sel-name)
+  ((name :initarg :name 
+	 :accessor sel-name 
+	 :documentation "Returns the name of the specified selector object")
    (uid :initarg :uid)))
 
 ;;; printer
@@ -45,7 +47,7 @@
   ()
   (:actual-type :pointer)
   (:simple-parser objc-sel)
-  (:documentation "Objective C SEL"))
+  (:documentation "Objective C SEL type"))
 
 (defcfun ("sel_isMapped" sel-is-mapped) :boolean
   (sel objc-sel))
@@ -56,8 +58,13 @@
 (defcfun ("sel_registerName" sel-register-name) objc-sel
   (str :string))
 
-(defcfun ("sel_getUid" sel-get-uid) objc-sel
+(defcfun ("sel_getUid" %sel-get-uid) objc-sel
   (str :string))
+
+;; defun needed for docstring. See objc-get-class
+(defun sel-get-uid (name)
+  "Returns the selector named `NAME`."
+  (%sel-get-uid name))
 
 ;;; Type Translators
 (defmethod translate-from-foreign (uid (type objc-selector-type))
@@ -78,8 +85,14 @@
 
 ;;; CLOS definitions
 (defclass objc-method ()
-  ((name :initarg :name :accessor method-selector)
-   (types :initarg :types :accessor method-type-signature)
+  ((name :initarg :name 
+	 :accessor method-selector
+	 :documentation "Returns the selector binded to the
+	 specified method")
+   (types :initarg :types 
+	  :accessor method-type-signature
+	  :documentation "Returns a string with the Objective C
+	  method type signature")
    (imp :initarg :imp)
    (objc-method-ptr :initarg :ptr :accessor method-ptr)))
 
@@ -177,19 +190,30 @@
       nil))
 
 ;;; utilities
-(defun get-class-methods (class)
+(defun get-instance-methods (class)
+  "Returns all the instance methods of `CLASS`"
   (with-foreign-object (itr :pointer)
     (setf (mem-ref itr :int) 0)
     (loop for mlist = (class-next-method-list class itr)
        while mlist
        append mlist)))
 
+(defun get-class-methods (class)
+  "Returns all the class methods of `CLASS`"
+  (get-instance-methods (metaclass class)))
+
 ;;; Instance variables
 
 ;;; CLOS definitions
 (defclass objc-ivar ()
-  ((name :initarg :name :accessor ivar-name)
-   (type :initarg :type :accessor ivar-type)
+  ((name :initarg :name 
+	 :accessor ivar-name
+	 :documentation "Returns a string with the name of the
+	 specified instance variable")
+   (type :initarg :type 
+	 :accessor ivar-type
+	 :documentation "Returns a list with the type
+	 specification of an instance variable")
    (offset :initarg :offset :accessor ivar-offset)
    (ivar-ptr :initarg :ptr)))
 
@@ -282,27 +306,29 @@
   (foreign-free method-list-ptr))
 
 ;;; utilities
-(defun private-ivar-p (ivar-name)
-  (string= "_" ivar-name :end2 1))
+(defun private-ivar-p (ivar)
+  "Returns TRUE if the instance variable is private."
+  (string= "_" (ivar-name ivar) :end2 1))
 
 (defun class-has-public-ivars (class)
-  (loop 
-     for ivar in (class-ivars class)
-     for ivar-name = (ivar-name ivar)
-     when (not (private-ivar-p ivar-name))
-     append (list class ivar-name)))
+  "Returns the public vars of `CLASS`"
+  (remove-if-not #'private-ivar-p (class-ivars class)))
 
 ;;; Classes and Protocols
 
 ;;; CLOS definitions
 (defclass objc-class ()
-  ((isa :initarg :isa :accessor metaclass)
+  ((isa :initarg :isa 
+	:accessor metaclass
+	:documentation "Returns the metaclass of class")
    (super-class :initarg :super-class :accessor super-class)
    (name :initarg :name :accessor class-name)
    (version :initarg :version)
    (info :initarg :info)
    (instance-size :initarg :instance-size :accessor instance-size)
-   (ivars :initarg :ivars :accessor class-ivars)
+   (ivars :initarg :ivars 
+	  :accessor class-ivars 
+	  :documentation "Returns the instance variables of class")
    (method-lists :initarg :method-lists)
    (cache :initarg :cache)
    (protocols :initarg :protocols :accessor protocols)
@@ -315,7 +341,8 @@
                    :info '(:class) :instance-size 0 :ivars nil
                    :method-lists n :cache n 
 		   :protocols n ; FIXME: should be nil
-                   :ptr n)))
+                   :ptr n))
+  "The Objective C Class nil")
 
 ;;; printer
 (defmethod print-object ((class objc-class) stream)
@@ -372,7 +399,7 @@
   (:actual-type :pointer)
   (:simple-parser objc-class-pointer)
   (:documentation
-   "Objective C objc_class pointer"))
+   "Objective C Class - pointer to an objc_class struct"))
 
 (define-foreign-type objc-protocol-list-type ()
   ()
@@ -403,8 +430,15 @@
   (count :int)
   (protocols :pointer))
 
-(defcfun ("objc_getClass" objc-get-class) objc-class-pointer
+(defcfun ("objc_getClass" %objc-get-class) objc-class-pointer
+  "Prova"
   (name :string))
+
+;; defined just to have a documentation string for the function as
+;; CFFI doesn't support docstring of defcfun
+(defun objc-get-class (class-name)
+  "Returns the Objective Class named `CLASS-NAME`"
+  (%objc-get-class class-name))
 
 (defcfun ("objc_getClassList" objc-get-class-list) :int
   (buffer :pointer)
@@ -414,13 +448,23 @@
   (class objc-class-pointer)
   (variable-name :string))
 
-(defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
+(defcfun ("class_getInstanceMethod" %class-get-instance-method) objc-method-pointer
   (class objc-class-pointer)
   (sel objc-sel))
 
-(defcfun ("class_getClassMethod" class-get-class-method) objc-method-pointer
+;; defun needed for docstring. See objc-get-class
+(defun class-get-instance-method (class sel)
+  "Return the instance method of `CLASS` binded to `SEL`"
+  (%class-get-instance-method class sel))
+
+(defcfun ("class_getClassMethod" %class-get-class-method) objc-method-pointer
   (class objc-class-pointer)
   (sel objc-sel))
+
+;; defun needed for docstring. See objc-get-class
+(defun class-get-class-method (class sel)
+  "Return the class method binded of `CLASS` to `SEL`"
+  (%class-get-class-method class sel))
 
 (defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
   (class-ptr objc-class-pointer)
@@ -495,6 +539,7 @@
 
 ;;; utilities
 (defun get-class-list ()
+  "Returns the list of all the Objective Class available"
   (let ((class-count (objc-get-class-list (null-pointer) 0)))
     (with-foreign-object (class-ptrs 'objc-class-pointer class-count)
       (objc-get-class-list class-ptrs class-count)
@@ -507,14 +552,19 @@
 
 ;;; CLOS definitions
 (defclass objc-object ()
-  ((isa :initarg :isa :accessor obj-class)
-   (id :initarg :id)))
+  ((isa :initarg :isa 
+	:accessor obj-class
+	:documentation "Returns the Objective C class of the
+	specified object")
+   (id :initarg :id))
+  (:documentation "Objective C Object Class"))
 
 (defvar objc-nil-object
   (make-instance 'objc-object :isa objc-nil-class :id (null-pointer))
-  "The Objective C Object/instance nil")
+  "The Objective C Object instance nil")
 
 (defun objc-nil-object-p (obj)
+  "Returns TRUE if obj is a nil object"
   (eq obj objc-nil-object))
 
 ;;; printer
@@ -564,6 +614,8 @@
 		    (class-ivars isa)))))
 
 (defun get-ivar (obj ivar-name)
+  "Returns the value of instance variable named `IVAR-NAME` of
+Objective C object `obj`"
   (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))
@@ -576,6 +628,8 @@
       (t (mem-ref ret type)))))
 
 (defun set-ivar (obj ivar-name value)
+  "Set the value of instance variable named `IVAR-NAME` of
+Objective C object `OBJ` with `VALUE`"
   (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))

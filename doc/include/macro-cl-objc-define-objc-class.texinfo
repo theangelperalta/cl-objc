@@ -1,0 +1,14 @@
+@anchor{Macro cl-objc:define-objc-class}
+@deffn {Macro} cl-objc:define-objc-class symbol-name symbol-superclass (&rest ivars)
+@findex cl-objc:define-objc-class
+Define and returns a new Objective @code{c} class `SYMBOL-NAME`
+deriving from `SYMBOL-SUPERCLASS`. Names are translated by
+@code{symbol-to-objc-class-name}.
+
+`IVARS` is a list of pairs where the first element is the
+variable name (translated by symbols-to-objc-selector) and the
+second on is the @code{cffi} type of the variable.
+
+If a class with the same name already exists the method returns
+without adding the new definition.
+@end deffn

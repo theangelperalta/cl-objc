@@ -1,0 +1,5 @@
+@anchor{Variable objc-reader:*accept-untyped-call*}
+@defvr {Variable} objc-reader:*accept-untyped-call*
+@vindex objc-reader:*accept-untyped-call*
+If nil, methods have to be invoked with input type parameters.
+@end defvr

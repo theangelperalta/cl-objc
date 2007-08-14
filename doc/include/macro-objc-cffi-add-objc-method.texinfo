@@ -1,0 +1,19 @@
+@anchor{Macro objc-cffi:add-objc-method}
+@deffn {Macro} objc-cffi:add-objc-method (name class &key return-type class-method) argument-list &body body
+@findex objc-cffi:add-objc-method
+Add an Objective @code{c} method to `CLASS` returning the @code{cffi}
+`RETURN-TYPE` and binding it to a selector with `NAME`.
+If `CLASS-METHOD` is true then a class method will be added to `CLASS`.
+
+`ARGUMENT-LIST` is a list of list with two elements. The first
+one is the name of the argument, while the second is its @code{cffi}
+type. 
+
+In `BODY` are also bound the symbols `SELF` pointing to the
+receiver of the message and `SEL` pointing to the selector.
+
+If a method binded to `SEL` is already present in `CLASS` it
+installs the new definition discarding the previous one.
+
+Return a new Objective @code{c} Method object.
+@end deffn

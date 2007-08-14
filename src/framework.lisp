@@ -10,6 +10,8 @@
        t)))
 
 (defmacro define-objc-framework (framework-name &body cffi-definitions)
+  "Import definitions from `framework`. `framework` will be
+searched in CFFI: *DARWIN-FRAMEWORK-DIRECTORIES*."
   `(eval-when (:compile-toplevel :load-toplevel :execute) 
      (use-objc-framework ,framework-name)
      ,@cffi-definitions

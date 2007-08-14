@@ -19,7 +19,9 @@
     (#\@ objc-cffi:objc-id)
     (#\# objc-cffi:objc-class-pointer)
     (#\: objc-cffi:objc-sel)
-    (#\? objc-unknown-type)))
+    (#\? objc-unknown-type))
+  "List of simple types and character code used by Objective C
+  runtime")
 
 (defun char-to-type (char)
   (loop for (type-char type) in typemap
@@ -124,6 +126,7 @@
    (start-union name-separator type-sequence end-union #'(lambda (a b c d) (declare (ignore b d)) (list :union a c)))))
 
 (defun parse-objc-typestr (str)
+  "Parse a method type signature"
   (parse-with-lexer (typestr-lexer str) *objc-type-parser*))
 
 (defun parse-objc-method-signature (method)
@@ -137,6 +140,7 @@
       (:args ,@arguments))))
 
 (defun encode-types (types &optional align)
+  "Encode a type list to a method type signature"
   (format nil "~{~A~}" (mapcar (lambda (type) (encode-type type align)) types)))
 
 (defun lookup-type-char (type)
@@ -146,6 +150,8 @@
   (first (find type method-code-map :key #'second)))
 
 (defun encode-type (type &optional align)
+  "Encode a type specification to a type string used by Objective
+C runtime."
   (cond 
     ((and (listp type) (eq :align (car type))) (format nil "~a~d" (encode-type (third type)) (second type)))
     ((lookup-type-char type) (if align (format nil "~a~d" (lookup-type-char type) 8) (lookup-type-char type)))

@@ -1,0 +1,11 @@
+@anchor{Function objc-cffi:add-objc-class}
+@deffn {Function} objc-cffi:add-objc-class class-name super-class &optional ivar-list
+@findex objc-cffi:add-objc-class
+Adds and returns a new Objective @code{c} class `CLASS-NAME` deriving from `SUPER-CLASS`.
+
+`IVAR-LIST` is a list of instance variable object that will be
+added to the new class.
+
+If a class with the same name already exists the method raise an
+error of type @code{objc-class-already-exists}.
+@end deffn

@@ -18,7 +18,6 @@
 
 (define-objc-method (:convert-currency :at-rate) (:return-type :float)
     ((self converter) (currency :float) (rate :float))
-  (declare (ignore self sel))
   (* currency rate))
 
 (define-objc-class converter-controller ns-object
@@ -29,7 +28,7 @@
 
 (define-objc-method :convert (:return-type :void)
     ((self converter-controller) (sender objc-id))
-  (declare (ignore sel sender))
+  (declare (ignore sender))
   (with-ivar-accessors converter-controller
     (let* ((currency (invoke (first-currency-field self) float-value))
 	   (rate (invoke (rate-field self) float-value))

@@ -1,0 +1,6 @@
+@anchor{Function objc-types:encode-type}
+@deffn {Function} objc-types:encode-type type &optional align
+@findex objc-types:encode-type
+Encode a type specification to a type string used by Objective
+@code{c} runtime.
+@end deffn
