@@ -204,8 +204,9 @@ C types (float, int, char *) are translated by CFFI in the common way.
 Struct values as in CFFI are always managed by a pointer to their data.
 The specific Objective C types (like id) are translated automatically by
 foreign type translators into lisp types and viceversa when needed.
-Several CLOS classes are added to handle them. The following types
-translators are installed:
+Several CLOS classes are added to handle them and custom
+@var{print-object} and @var{describe-object} are provided in the
+OBJC-CFFI package. The following types translators are installed:
 
 @multitable @columnfractions .33 .33 .33
 @item @emph{Objective C type} @tab @emph{Description} @tab @emph{Lisp type}
@@ -248,6 +249,58 @@ A selector name is translated in a list of symbols or a single symbol.
 @item [NSNumber numberWithInt: 3]
 (invoke 'ns-number :number-with-int 3)
 @end table
+
+@section Utilities
+Several macros are present for the sake of convenience. 
+
+@subsection The slet, slet* macro
+
+The CL-OBJC:slet* and CL-OBJC:slet* macro are used to handle data stored
+in structs. They bind variable to new allocated (or not if you provide
+a value) structs and provide lisp accessor to their fields.
+
+@example
+@lisp
+(defun make-rect (x y width height)
+  (slet* ((rect ns-rect)
+	  (size ns-size (ns-rect-size rect))
+	  (point ns-point (ns-rect-origin rect)))
+    (setf (ns-point-x point) (coerce x 'float)
+	  (ns-point-y point) (coerce y 'float)
+	  (ns-size-width size) (coerce width 'float)
+	  (ns-size-height size) (coerce height 'float))
+    rect))
+@end lisp
+@end example
+
+
+@subsection with-object and objc-let
+As a common snippet Objective C code pattern is @code{[[MyClass alloc]
+initWithParam param]} it is provided the macro @var{CL-OBJC:objc-let}
+that binds variables to new allocated and initialized object. So the
+previous examples becomes @code{(objc-let ((obj my-class
+:init-with-param param)) ...)}.
+
+Another common situation is to call several methods with the same
+receiver (e.g. self). For the sake of convenience it is provided the
+@var{with-object} macro. So the Objective C code
+@example
+[obj methodA]
+[obj methodB: param1 C: param2]
+[obj methodD: param1]
+@end example
+
+becomes in the CL-ObjC syntax:
+
+@example
+@lisp
+(with-object obj
+  (method-a)
+  (:method-b param1)
+  (:method-c param1 :c param2)
+  (:method-d: param1))
+@end lisp
+@end example
 
 @section The Currency Converter Example
 This section concerns the construction of a Cocoa application using an
@@ -346,6 +399,9 @@ So the second definition in the example define the instance method named
 ``convertCurrency:atRate:'' returning a :float. It accepts 2 arguments
 and it is binded to the class converter.
 
+The @var{with-ivar-accessors} macro establishes useful accessors to read
+and modify instance variables of ObjectiveC objects.
+
 At last the main entry point of our application looks like:
 
 @lisp
@@ -441,6 +497,16 @@ FIXME: exported accessors need documentation too!
 
 @node Reader Macro
 @chapter Reader Macro
+
+The reader macro allows the user to mix ObjectiveC and Common Lisp code.
+
+When the macro dispatch character ``[`` is readed, then the reader
+excepts a symbol naming a class (read preserving case), then selectors
+and arguments. Arguments are read using the default Common Lisp
+readtable. In order to send methods to instance objects you can use the
+``,'' (comma) character to read and eval symbols with the standard
+readtable. For the sake of convenience it is provided the @@ (at-sign)
+macro that build @var{NSString} objects.
 
 @include include/var-objc-reader-star-accept-untyped-call-star.texinfo
 @include include/fun-objc-reader-restore-readtable.texinfo
