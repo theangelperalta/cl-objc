@@ -130,21 +130,17 @@ E.g.
   (let ((greceiver (gensym)))
     (destructuring-bind (selector args types-and-args)
 	(parse-invoke-arguments selector-and-args)
-      (cond 
-	((typed-invocation-p selector-and-args)
-	 `(let ((,greceiver ,receiver)) 
-	    (typed-objc-msg-send ((if (symbolp ,greceiver) 
-				      (objc-get-class (symbol-to-objc-class-name ,greceiver)) 
-				      ,greceiver) 
-				  ,(symbols-to-objc-selector selector)) 
-				 ,@types-and-args)))
-	((not (typed-invocation-p selector-and-args))
-	 `(let ((,greceiver ,receiver)) 
-	    (untyped-objc-msg-send (if (symbolp ,greceiver)  
-				       (objc-cffi:objc-get-class (symbol-to-objc-class-name ,greceiver)) 
-				       ,greceiver) 
-				   ,(symbols-to-objc-selector selector) 
-				   ,@args)))))))
+      `(let* ((,greceiver ,receiver)
+	      (,greceiver (if (symbolp ,greceiver) 
+			      (objc-get-class (symbol-to-objc-class-name ,greceiver)) 
+			      ,greceiver)))
+	 ,(if (typed-invocation-p selector-and-args)
+	      `(typed-objc-msg-send (,greceiver 
+				     ,(symbols-to-objc-selector selector)) 
+				    ,@types-and-args)
+	      `(untyped-objc-msg-send ,greceiver 
+				      ,(symbols-to-objc-selector selector) 
+				      ,@args))))))
 
 (defun slet-macrolet-forms (types)
   (when types
