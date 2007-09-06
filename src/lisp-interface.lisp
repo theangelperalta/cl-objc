@@ -17,7 +17,10 @@
 	(setf string (simple-replace-string (cdr replacement) (car replacement) string)))
       string)))
 
-(defun objc-selector-to-symbols (selector)
+(defmethod objc-selector-to-symbols ((selector objc-cffi:objc-selector))
+  (objc-selector-to-symbols (sel-name selector)))
+
+(defmethod objc-selector-to-symbols ((selector string))
   "The inverse of SYMBOLS-TO-OBJC-SELECTOR"
   (flet ((convert-selector-part (selector-part)
 	   (if selector-part
@@ -45,7 +48,7 @@
 	    (mapcar #'replace-acronyms-1 
 		    (mapcar #'convert-selector-part (split-string selector #\:))))))
 
-(defun symbols-to-objc-selector (selector)
+(defun symbols-to-objc-selector (lst)
   "Translate a list of symbols to a string naming a translator"
   (flet ((convert-selector-part (part)
 	   (if (string-equal part "*")
@@ -60,11 +63,11 @@
 		    do (setf old-char char))))))
     (let ((string 
 	   (with-output-to-string (out)
-	     (let* ((parts (mapcar #'convert-selector-part (mapcar #'symbol-name selector))))
+	     (let* ((parts (mapcar #'convert-selector-part (mapcar #'symbol-name lst))))
 	       (loop for el in parts
 		  do 
 		  (princ el out)
-		  (if (keywordp (car selector))
+		  (if (keywordp (car lst))
 		      (princ #\: out)))))))
       (dolist (acronym *acronyms*) 
 	(setf string 

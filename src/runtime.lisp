@@ -53,7 +53,7 @@
 	    (class-get-instance-method (metaclass class) selector))
 	  (progn 
 	    (class-add-methods class method-list)
-	    (class-get-instance-method class  selector))))))
+	    (class-get-instance-method class selector))))))
 
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
@@ -73,6 +73,7 @@ installs the new definition discarding the previous one.
 
 Return a new Objective C Method object." 
   (let* ((callback (gensym (format nil "~A-CALLBACK-" (remove #\: name))))
+	 (new-method (gensym))
 	 (type-list (append (list 'objc-id 'objc-sel) 
 			    (mapcar (lambda (type) 
 				      (if (listp type) 
@@ -96,11 +97,14 @@ Return a new Objective C Method object."
 	   ,(if has-declare
 		`(progn ,@(cdr body))
 		`(progn ,@body)))
-	 (register-method ,class
-			  ,name
-			  (objc-types:encode-types (append (list ',return-type) ',type-list) t)
-			  (callback ,callback)
-			  ,class-method)))))
+	 (let ((,new-method
+		(register-method ,class
+				 ,name
+				 (objc-types:encode-types (append (list ',return-type) ',type-list) t)
+				 (callback ,callback)
+				 ,class-method)))
+	   (when objc-clos:*automatic-definitions-update*
+	     (objc-clos:add-clos-method ,new-method (objc-get-class ,class))))))))
 
 ;;;; Adding Objective-C classes at runtime
 
@@ -182,6 +186,8 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 	    cache (null-pointer)
 	    protocols (null-pointer)))
     (objc-add-class new-class)
+    (when objc-clos:*automatic-definitions-update*
+      (objc-clos:add-clos-class (objc-get-class class-name)))
     (objc-get-class class-name)))
 
 (defun ensure-objc-class (class-name super-class &optional ivar-list)

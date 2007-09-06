@@ -22,8 +22,8 @@
      (intern (concatenate 'string "_NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 3)))))))
     (t (car (cl-objc:objc-selector-to-symbols name)))))
 
-(defparameter *objc-struct-db* nil)
-(defparameter *registered-structs* nil)
+(defvar *objc-struct-db* nil)
+(defvar *registered-structs* nil)
 
 (defun update-rect-cstruct-database ()
   (setf *objc-struct-db* 

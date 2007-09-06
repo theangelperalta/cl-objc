@@ -14,13 +14,19 @@
 			  :components ((:file "packages")
 				       (:file "reader-macro" :depends-on ("packages" "cffi" "msg-send"))
 				       (:file "utils" :depends-on ("packages"))
-				       (:file "framework" :depends-on ("packages"))
+				       (:file "framework" :depends-on ("packages" "clos"))
 				       (:file "cffi" :depends-on ("packages" "utils" "objc-types"))
 				       (:file "structs" :depends-on ("packages" "utils" "objc-types"))
 				       (:file "msg-send" :depends-on ("packages" "utils" "objc-types" "cffi"))
-				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils"))
+				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils" "clos"))
 				       (:file "objc-types" :depends-on ("packages"))
-				       (:file "lisp-interface" :depends-on ("packages" "utils" "cffi")))))
+				       (:file "lisp-interface" :depends-on ("packages" "utils" "cffi"))
+				       (:file "clos" :depends-on ("packages" 
+								  "utils"
+								  "cffi"
+								  "msg-send"
+								  "lisp-interface"
+								  "structs")))))
     :depends-on (:cffi :yacc))
 
 (defsystem  cl-objc.test
@@ -31,7 +37,8 @@
 				     (:file "untyped" :depends-on ("suite" "utils"))
 				     (:file "reader" :depends-on ("suite"))
 				     (:file "runtime" :depends-on ("suite"))
-				     (:file "lisp-objc" :depends-on ("suite" "utils")))))
+				     (:file "lisp-objc" :depends-on ("suite" "utils"))
+				     (:file "clos" :depends-on ("suite")))))
   :depends-on (:cl-objc :FiveAM))
 
 (defsystem cl-objc.examples

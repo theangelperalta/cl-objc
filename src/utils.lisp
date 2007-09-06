@@ -62,3 +62,9 @@ a list."
 	 :key (lambda (el) 
 		(symbol-name (car el))) 
 	 :test #'string-equal)))
+
+(defmacro composite-mapcar (list &rest fns)
+  "Compose each function in fns to mapcar the list to them."
+  (if (= 1 (length fns))
+      `(mapcar ,(car fns) ,list)
+      `(composite-mapcar (mapcar ,(car fns) ,list) ,@(cdr fns))))
