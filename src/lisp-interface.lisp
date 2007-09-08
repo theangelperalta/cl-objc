@@ -2,19 +2,27 @@
 
 ;;; Name translators
 (defparameter *acronyms* '("UTF"
-			   "FTP")
+			   "FTP"
+			   "WEB"
+			   "HTTP")
   "Acronyms used in name translators")
 
 (defun replace-acronyms-1 (string)
   (flet ((transform-acronym (acronym)
 	   (cons acronym
-		 (with-output-to-string (out)
-		   (loop 
-		      for char across acronym
-		      do (princ #\- out) (princ char out))))))
+		 (subseq  
+		  (with-output-to-string (out)
+		    (loop 
+		       for char across acronym
+		       do (princ #\- out) (princ char out)))
+		  1))))
     (let ((transformed-acronyms (mapcar #'transform-acronym *acronyms*)))
       (dolist (replacement transformed-acronyms)
-	(setf string (simple-replace-string (cdr replacement) (car replacement) string)))
+	(let ((new-string (simple-replace-string (cdr replacement) (car replacement) string))
+	      (pos (search (cdr replacement) string)))
+	  (if (and pos (= 1 pos))
+	      (setf string (subseq new-string 1))
+	      (setf string new-string))))
       string)))
 
 (defmethod objc-selector-to-symbols ((selector objc-cffi:objc-selector))
@@ -71,7 +79,10 @@
 		      (princ #\: out)))))))
       (dolist (acronym *acronyms*) 
 	(setf string 
-	      (simple-replace-string (string-downcase acronym) (string-upcase acronym) string)))
+	      (let ((pos (search (string-downcase acronym) string)))
+		(if (and pos (zerop pos))
+		    (simple-replace-string (string-downcase acronym) (string-upcase acronym) string)
+		    (simple-replace-string (string-capitalize (string-downcase acronym)) (string-upcase acronym) string)))))
       string)))
 
 (defun selector (&rest symbols)

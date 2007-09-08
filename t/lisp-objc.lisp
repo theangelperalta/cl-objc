@@ -143,7 +143,7 @@ big struct as input parameter"
 
 (test lisp-subclassing-and-more-ivars
   (objc-let ((x 'test-derived-1)
-	     (s 'ns-string :init-with-u-t-f8-string "foo"))
+	     (s 'ns-string :init-with-utf8-string "foo"))
     (with-ivar-accessors test-derived-1
       (setf (var6 x) s
 	    (var4 x) 2.0))

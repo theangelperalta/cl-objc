@@ -24,7 +24,7 @@
   (fresh-line))
 
 (defun lisp-string-to-nsstring (string)
-  (invoke (invoke 'ns-string alloc) :init-with-u-t-f8-string string))
+  (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
 
 (defun make-rect (x y width height)
   (slet* ((rect ns-rect)

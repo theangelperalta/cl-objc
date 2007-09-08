@@ -2,9 +2,8 @@
 
 (in-suite :objc-clos)
 
-(update-clos-definitions)
-
 (test class-creation
+  (update-clos-definitions)
   (dolist (class-symbol
 	    (composite-mapcar (get-class-list) 
 			      #'class-name 
@@ -14,6 +13,7 @@
     (is (find-class class-symbol t))))
 
 (test instance-creation
+  (update-clos-definitions)
   (let* ((n (make-instance (intern "NS-NUMBER" "OBJC")))
 	 (id (objc-id n)))
     (is (string-equal
@@ -21,6 +21,7 @@
 	 (class-name (objc-cffi:obj-class id))))))
 
 (test simple-method-invocation
+  (update-clos-definitions)
   (let ((n (make-instance (intern "NS-NUMBER" "OBJC")))
 	(num 10))
     (is (= (funcall (intern "INT-VALUE" "OBJC") (funcall (intern "INIT-WITH-INT?" "OBJC") n num))))))

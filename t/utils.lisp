@@ -6,7 +6,7 @@
 			"initWithUTF8String:") :string string))
 
 (defun create-nsstring (string)
-  (invoke (invoke 'ns-string alloc) :init-with-u-t-f8-string string))
+  (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
 
 (define-objc-framework "Foundation"
   (define-objc-struct (nsrange "_NSRange") (location :unsigned-int) (length :unsigned-int))

@@ -15,12 +15,13 @@
 
 (defun objc-class-name-to-symbol (name)
   "Returns a symbol that can be used in CL-Objc to identify the class named `NAME`."
-  (cond 
-    ((string-equal "ns" (subseq name 0 2))
-     (intern (concatenate 'string "NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 2)))))))
-    ((string-equal "_ns" (subseq name 0 3))
-     (intern (concatenate 'string "_NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 3)))))))
-    (t (car (cl-objc:objc-selector-to-symbols name)))))
+  (let ((cl-objc:*acronyms* nil))
+    (cond 
+      ((string-equal "ns" (subseq name 0 2))
+       (intern (concatenate 'string "NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 2)))))))
+      ((string-equal "_ns" (subseq name 0 3))
+       (intern (concatenate 'string "_NS" (symbol-name (car (cl-objc:objc-selector-to-symbols (subseq name 3)))))))
+      (t (car (cl-objc:objc-selector-to-symbols name))))))
 
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)

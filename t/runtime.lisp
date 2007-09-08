@@ -73,9 +73,9 @@
   (flet ((choose-randomly (list) (nth (random (length list)) list)))
     (let* ((var-count 5)
 	   (var-names (mapcar #'symbol-name (mapcar #'gensym (loop for i upto var-count collecting "foo"))))
-	   (types (mapcar (lambda (foo) 
-			    (choose-randomly  (remove-if (lambda (el) (member el '(:void objc-unknown-type))) 
-							 (mapcar #'cadr objc-types:typemap)))) var-names))
+	   (types (loop for i upto var-names collecting  
+		       (choose-randomly  (remove-if (lambda (el) (member el '(:void objc-unknown-type))) 
+						    (mapcar #'cadr objc-types:typemap))) var-names))
 	   (vars (mapcar #'make-ivar var-names types)))
       (is (equal types (mapcar #'car (mapcar #'ivar-type vars))))
       (is (equal var-names (mapcar #'ivar-name vars))))))
