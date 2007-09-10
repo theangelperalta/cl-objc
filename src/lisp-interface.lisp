@@ -25,11 +25,13 @@
 	      (setf string new-string))))
       string)))
 
+(defgeneric objc-selector-to-symbols (selector)
+  (:documentation "The inverse of SYMBOLS-TO-OBJC-SELECTOR"))
+
 (defmethod objc-selector-to-symbols ((selector objc-cffi:objc-selector))
   (objc-selector-to-symbols (sel-name selector)))
 
 (defmethod objc-selector-to-symbols ((selector string))
-  "The inverse of SYMBOLS-TO-OBJC-SELECTOR"
   (flet ((convert-selector-part (selector-part)
 	   (if selector-part
 	       (with-output-to-string (out)

@@ -25,3 +25,9 @@
   (let ((n (make-instance (intern "NS-NUMBER" "OBJC")))
 	(num 10))
     (is (= (funcall (intern "INT-VALUE" "OBJC") (funcall (intern "INIT-WITH-INT?" "OBJC") n num))))))
+
+(test simple-class-method-invocation
+  (update-clos-definitions)
+  (let* ((num 10)
+	 (n (funcall (intern "INIT-WITH-INT?" "OBJC") (intern "NS-NUMBER" "OBJC") num)))
+    (is (= (funcall (intern "INT-VALUE" "OBJC") n) num))))

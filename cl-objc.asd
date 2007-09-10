@@ -16,7 +16,7 @@
 				       (:file "utils" :depends-on ("packages"))
 				       (:file "framework" :depends-on ("packages" "clos"))
 				       (:file "cffi" :depends-on ("packages" "utils" "objc-types"))
-				       (:file "structs" :depends-on ("packages" "utils" "objc-types"))
+				       (:file "structs" :depends-on ("packages" "utils" "objc-types" "lisp-interface"))
 				       (:file "msg-send" :depends-on ("packages" "utils" "objc-types" "cffi"))
 				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils" "clos"))
 				       (:file "objc-types" :depends-on ("packages"))

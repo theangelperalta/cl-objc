@@ -28,13 +28,15 @@
 ;; e.g. char-objc-msg-send, unsigned-int-objc-msg-send, etc.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun allowed-simple-return-types ()
-     (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
+  (if (not (fboundp 'allowed-simple-return-types))
+      (defun allowed-simple-return-types ()
+	(remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap))))
 
-  (defun make-objc-msg-send-symbol (type)
-    (intern 
-     (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
-     (find-package "OBJC-CFFI"))))
+  (if (not (fboundp 'make-objc-msg-send-symbol))
+      (defun make-objc-msg-send-symbol (type)
+	(intern 
+	 (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
+	 (find-package "OBJC-CFFI")))))
 
 (defmacro %objc-msg-send (return-type id sel args)
   (let ((gensyms (loop repeat (+ 2 (/ (length args) 2)) collect (gensym))))

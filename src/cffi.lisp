@@ -548,6 +548,11 @@
          collect
            class-ptr))))
 
+(defun get-class-ordered-list ()
+  "Returns the list of all the Objective C Class available
+  ordered by the number of superclass they have"
+  (sort (get-class-list) #'< :key (lambda (class) (length (super-classes class)))))
+
 ;;; Objects
 
 ;;; CLOS definitions
