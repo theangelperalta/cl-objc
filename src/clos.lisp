@@ -2,6 +2,10 @@
 
 (defparameter *automatic-definitions-update* t)
 
+(defparameter *objc-metaclasses* (make-hash-table)
+  "This variables contains instances of CLOS classes representing
+  ObjC metaclasses. So every entry represents an ObjC class.")
+
 (defclass objc-clos-class (standard-class)
   ())
 
@@ -9,11 +13,11 @@
   ((objc-id :accessor objc-id))
   (:documentation "Define objc-id just to avoid warnings"))
 
-(defclass objc-generic-function (sb-mop:standard-generic-function)
+(defclass objc-generic-function (standard-generic-function)
   ()
-  (:metaclass sb-mop:funcallable-standard-class))
+  (:metaclass closer-mop:funcallable-standard-class))
 
-(defmethod sb-mop:validate-superclass
+(defmethod closer-mop:validate-superclass
            ((class objc-clos-class)
             (superclass standard-class))
   t)
@@ -101,10 +105,10 @@ value (CLOS instance or primitive type)"
 	 (gf (if (fboundp method-symbol-name)
 		 (coerce method-symbol-name 'function) 
 		 (prog1
-		     (sb-mop:ensure-generic-function-using-class nil 
-								 method-symbol-name
-								 :generic-function-class 'objc-generic-function
-								 :lambda-list lambda-list)
+		     (closer-mop:ensure-generic-function-using-class nil 
+								     method-symbol-name
+								     :generic-function-class 'objc-generic-function
+								     :lambda-list lambda-list)
 		   (when output-stream
 		     (format output-stream "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defgeneric ~s ~s
 ~2t(:documentation \"Invokes the ~a method\"))~%~%"
@@ -121,17 +125,17 @@ value (CLOS instance or primitive type)"
 						   ,@(remove '&optional 
 							     (cdr lambda-list)))))))
 	 (new-method (make-instance 
-		      (sb-mop:generic-function-method-class gf)
+		      (closer-mop:generic-function-method-class gf)
 		      :qualifiers nil
 		      :specializers specializers
 		      :lambda-list lambda-list
 		      :function (coerce 
-				 (sb-mop:make-method-lambda gf
-						       (sb-mop:class-prototype 
-							(sb-mop:generic-function-method-class gf))
-						       fdefinition
-						       nil)
-					'function))))
+				 (closer-mop:make-method-lambda gf
+							   (closer-mop:class-prototype 
+							    (closer-mop:generic-function-method-class gf))
+							   fdefinition
+							   nil)
+				 'function))))
     (when output-stream
       (format output-stream "(defmethod ~s ~s 
 ~2t~{~s~})~%~%"
@@ -161,15 +165,15 @@ value (CLOS instance or primitive type)"
 				      :readers '(objc-clos:objc-id)
 				      :writers '((setf objc-clos:objc-id))))))
     ;; Add the class
-    (sb-mop:ensure-class class-symbol-name
-			 :direct-superclasses super-classes
-			 :direct-slots slots
-			 :metaclass 'objc-clos-class)
+    (closer-mop:ensure-class class-symbol-name
+			     :direct-superclasses super-classes
+			     :direct-slots slots
+			     :metaclass 'objc-clos-class)
     ;; Add metaclass
-    (sb-mop:ensure-class metaclass-symbol-name
-			 :direct-superclasses (composite-mapcar super-classes #'export-symbol #'metaclass-name)
-			 :direct-slots metaclass-slots
-			 :metaclass 'objc-clos-class)
+    (closer-mop:ensure-class metaclass-symbol-name
+			     :direct-superclasses (composite-mapcar super-classes #'export-symbol #'metaclass-name)
+			     :direct-slots metaclass-slots
+			     :metaclass 'objc-clos-class)
     (setf (gethash class-symbol-name *objc-metaclasses*) (make-instance metaclass-symbol-name))
 
     (when output-stream
@@ -182,26 +186,8 @@ value (CLOS instance or primitive type)"
 	      super-classes
 	      class-symbol-name))))
 
-(defmethod sb-mop:compute-applicable-methods-using-classes ((gf objc-generic-function) classes)
-  (values
-   (let ((method (find-method gf nil (append (list (first classes)) (loop for i below (1- (length classes)) collecting t)) nil)))
-     (if method
-	 (list method)
-	 (let* ((gf-name (sb-mop:generic-function-name gf))
-		(objc-class (objc-get-class (symbol-to-objc-class-name (class-name (first classes)))))
-		(objc-method (class-get-instance-method objc-class (clos-symbol-to-objc-selector gf-name)))
-		(class-symbol-name (export-class-symbol objc-class)))
-	   (add-clos-method objc-method class-symbol-name)
-	   (assert (find-method gf nil (append (list (first classes)) (loop for i below (1- (length classes)) collecting t)) nil))
-	   (list (find-method gf nil (append (list (first classes)) (loop for i below (1- (length classes)) collecting t)) nil)))))
-   t))
-
 (defun private-method-p (method)
   (char-equal #\_ (elt (sel-name (method-selector method)) 0)))
-
-(defparameter *objc-metaclasses* (make-hash-table)
-  "This variables contains instances of CLOS classes representing
-  ObjC metaclasses. So every entry represents an ObjC class.")
 
 (defun meta (symbol)
   (gethash symbol *objc-metaclasses*))
