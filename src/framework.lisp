@@ -17,7 +17,7 @@
 
 (defmacro define-objc-framework (framework-name &body cffi-definitions)
   "Import definitions from `framework`. `framework` will be
-searched in CFFI: *DARWIN-FRAMEWORK-DIRECTORIES*."
+searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*."
   (let ((name (intern (concatenate 'string (string-downcase framework-name) "-framework"))))
     `(eval-when (:compile-toplevel :load-toplevel :execute) 
        (define-foreign-library ,name
@@ -31,6 +31,6 @@ searched in CFFI: *DARWIN-FRAMEWORK-DIRECTORIES*."
 	     (progn
 	       (with-open-file (out (clos-definition-cache-for-framework ,framework-name) 
 				    :direction :output :if-exists :supersede :if-does-not-exist :create)
-		 (objc-clos:update-clos-definitions out))
+		 (objc-clos:update-clos-definitions :output-stream out))
 	       (compile-file (clos-definition-cache-for-framework ,framework-name) :verbose nil :print nil))))
        t)))
