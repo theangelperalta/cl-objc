@@ -1,0 +1,39 @@
+;; -*- outline -*-
+
+* Optimization: Specialize on expand-{to/from}-foreign instead of translate-{to/from}-foreign
+
+* Generate at runtime C glue code to solve the struct-by-value problem. Better solution: just a function for each struct. See the bridgesupport and cffi-grovel projects
+
+* Define a variadic defun to call objc methods instead of having a variadic macro (see segv suggestions)
+
+* Update the docs to make it document each exported function, add a tutorial on the clos interface and a makefile to generate the doc (using sb-texinfo)
+
+* Add more examples (one using the clos interface)
+
+* Feature: struct definition Caching
+
+* BugFix: Allow the working of cl-objc on a read-only installation (i.e. without framework caching)
+
+* Search for the framework cache also in another location (useful for the deploy of ready-to-use application)
+
+* Feature: Complete the ObjC CLOS interface
+
+* Feature: Support for the call to super
+
+* Feature: Make ensure-objc-class try to add the ivars to a class if the definition is the same as previous
+
+* Feature: Add an objc-let* macro
+
+* Use cl-launch for the examples
+
+* Check if cl-objc works with variadic methods
+
+* Remove warnings in test suite :runtime and in with-ivar-accessors
+
+* Refactoring: Use aif and split-sequence when possible
+
+* Remove functions wrapping defcfuns just to save docstrings (outdated feature by last CFFI version)
+
+* Feature: Protocol management
+
+* Feature: Exception management
