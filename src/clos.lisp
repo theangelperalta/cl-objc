@@ -1,5 +1,18 @@
 (in-package :objc-clos)
 
+(eval-when (:load-toplevel)
+  (defparameter *cl-objc-directory* (pathname-directory *load-pathname*)))
+
+(eval-when (:compile-toplevel)
+  (defparameter *cl-objc-directory* (pathname-directory *compile-file-pathname*)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export (intern "OBJC-ID" "OBJC") "OBJC"))
+
+(defclass objc-clos-fake-class ()
+  ((objc:objc-id :accessor objc:objc-id))
+  (:documentation "Define objc-id just to avoid warnings"))
+
 (defparameter *automatic-definitions-update* t)
 
 (defparameter *objc-metaclasses* (make-hash-table)
@@ -8,14 +21,6 @@
 
 (defclass objc-clos-class (standard-class)
   ())
-
-(defclass objc-clos-nil-class-instance ()
-  ((objc-id :accessor objc-id))
-  (:documentation "Define objc-id just to avoid warnings"))
-
-(defclass objc-generic-function (standard-generic-function)
-  ()
-  (:metaclass closer-mop:funcallable-standard-class))
 
 (defmethod closer-mop:validate-superclass
            ((class objc-clos-class)
@@ -32,7 +37,9 @@
 (defun clos-symbol-to-objc-selector (symbol)
   (let* ((tmp (split-string (symbol-name symbol) #\?))
 	 (selector-symbols (mapcar (lambda (part) (intern part
-						     (if (and (= 1 (length tmp)) (not (char-equal #\? (elt (reverse (symbol-name symbol)) 0))))
+						     (if (and (= 1 (length tmp)) 
+							      (not (char-equal #\? 
+									       (elt (reverse (symbol-name symbol)) 0))))
 							 "OBJC"
 							 "KEYWORD")))
 				   tmp)))
@@ -91,7 +98,7 @@ value (CLOS instance or primitive type)"
     (objc-object 
      (let ((new-ret 
 	    (make-instance (export-class-symbol (obj-class ret)))))
-       (setf (objc-id new-ret) ret)
+       (setf (objc:objc-id new-ret) ret)
        new-ret))
     (fixnum ret)
     (otherwise (error "Not yet supported ~s" (class-name (class-of ret))))))
@@ -107,7 +114,7 @@ value (CLOS instance or primitive type)"
 		 (prog1
 		     (closer-mop:ensure-generic-function-using-class nil 
 								     method-symbol-name
-								     :generic-function-class 'objc-generic-function
+								     :generic-function-class 'standard-generic-function
 								     :lambda-list lambda-list)
 		   (when output-stream
 		     (format output-stream "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defgeneric ~s ~s
@@ -118,7 +125,7 @@ value (CLOS instance or primitive type)"
 	      (sel-name (method-selector objc-method)))))))
 	 (specializers (compute-specializers class-symbol-name lambda-list))
 	 (fdefinition `(lambda ,lambda-list
-			 (let ((id (objc-id objc:receiver)))
+			 (let ((id (objc:objc-id objc:receiver)))
 			   (convert-result-from-objc 
 			    (untyped-objc-msg-send id 
 						   ,(sel-name (method-selector objc-method)) 
@@ -149,21 +156,39 @@ value (CLOS instance or primitive type)"
 	      (cddr fdefinition)))
     (add-method gf new-method)))
 
+(defun eval-lambda-in-list (list)
+  (mapcar (lambda (form) 
+	    (if (and (listp form)
+		     (eq (car form) 'lambda))
+		(eval form)
+		form))
+	  list))
+
+(defun canonicalize-slot-definition (slot)
+  (let ((ret (remove :name (butlast slot 2))))
+    (let ((position (position :readers ret)))
+      (setq ret (append (subseq ret 0 position) (list :accessor (first (nth (1+ position) ret)))))
+      (setq position (position :initfunction ret))
+      (setq ret (append (subseq ret 0 position) (subseq ret (+ 2 position)))))))
+
 (defun add-clos-class (objc-class &optional output-stream)
   (let* ((class-symbol-name (export-class-symbol objc-class))
 	 (metaclass-symbol-name (export-symbol (metaclass-name class-symbol-name)))
 	 (super-classes
 	  (when (second (super-classes objc-class))
 	    (list (export-class-symbol (second (super-classes objc-class))))))
-	 (slots (list (list :name 'objc-id
+	 (metaclass-superclasses (composite-mapcar super-classes #'export-symbol #'metaclass-name))
+	 (slots (list (list :name 'objc:objc-id
+			    :initform `(invoke ',class-symbol-name alloc)
 			    :initfunction (lambda () (invoke class-symbol-name alloc))
-						   :readers '(objc-clos:objc-id)
-						   :writers '((setf objc-clos:objc-id)))))
-	 (metaclass-slots (list (list :name 'objc-id
-				      :initfunction (lambda () objc-class)
+			    :readers '(objc:objc-id)
+			    :writers '((setf objc:objc-id)))))
+	 (metaclass-slots (list (list :name 'objc:objc-id
+				      :initform `(objc-get-class ,(class-name objc-class))
+				      :initfunction (lambda () (objc-get-class (class-name objc-class)))
 				      :allocation :class
-				      :readers '(objc-clos:objc-id)
-				      :writers '((setf objc-clos:objc-id))))))
+				      :readers '(objc:objc-id)
+				      :writers '((setf objc:objc-id))))))
     ;; Add the class
     (closer-mop:ensure-class class-symbol-name
 			     :direct-superclasses super-classes
@@ -171,36 +196,51 @@ value (CLOS instance or primitive type)"
 			     :metaclass 'objc-clos-class)
     ;; Add metaclass
     (closer-mop:ensure-class metaclass-symbol-name
-			     :direct-superclasses (composite-mapcar super-classes #'export-symbol #'metaclass-name)
+			     :direct-superclasses metaclass-superclasses
 			     :direct-slots metaclass-slots
 			     :metaclass 'objc-clos-class)
     (setf (gethash class-symbol-name *objc-metaclasses*) (make-instance metaclass-symbol-name))
 
     (when output-stream
-      (format output-stream
-	      "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defclass ~s ~s 
- ((objc-id :accessor objc-clos:objc-id :initfunction (lambda () (cl-objc:invoke '~s alloc))))
- (:metaclass objc-clos::objc-clos-class))~%~%"
-	      class-symbol-name
-	      class-symbol-name
-	      super-classes
-	      class-symbol-name))))
+      (let ((*package* (find-package "CL-OBJC-USER")))
+	(format output-stream
+		"(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defclass ~s ~s 
+~2t~s
+~2t(:metaclass objc-clos-class))~%~%"
+		class-symbol-name
+		class-symbol-name
+		super-classes
+		(mapcar #'canonicalize-slot-definition slots))
+	(format output-stream
+		"(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defclass ~s ~s 
+~2t~s 
+~2t(:metaclass objc-clos-class))~%~%"
+		metaclass-symbol-name
+		metaclass-symbol-name
+		metaclass-superclasses
+		(mapcar #'canonicalize-slot-definition metaclass-slots))))))
 
 (defun private-method-p (method)
   (char-equal #\_ (elt (sel-name (method-selector method)) 0)))
 
 (defun meta (symbol)
-  (gethash symbol *objc-metaclasses*))
+  (nth-value 0 (gethash symbol *objc-metaclasses*)))
 
 (defun metaclass-name (symbol)
   (intern (format nil "META-~a" (symbol-name symbol)) "OBJC"))
+
+(defun delete-clos-definitions ()
+  ;; unintern each symbol in objc
+  (do-symbols (symbol "OBJC")
+    (when (fboundp symbol) (fmakunbound symbol))
+    (unintern symbol "OBJC")))
 
 ;; Fixme: when types of args are available, method should be
 ;; specialized on the corresponding lisp types
 (defun update-clos-definitions (&key output-stream force)
   (when output-stream
     (format output-stream ";;; THIS FILE IS AN AUTOGENERATED CACHE OF CLOS DEFINITIONS -- PLEASE DO NOT EDIT
-~%~%(in-package \"CL-USER\")~%~%"))
+~%(in-package \"CL-OBJC-USER\")~%~%"))
   (dolist (objc-class (get-class-ordered-list))
     ;; Adding Classes
     (when (or force
@@ -208,19 +248,21 @@ value (CLOS instance or primitive type)"
       (add-clos-class objc-class output-stream))
     ;; Adding Generic Functions and instance methods
     (dolist (method (get-instance-methods objc-class))
-      (unless (or (private-method-p method) force)
-	(when (or (not (fboundp (export-method-symbol method)))
-		(not (find-method (coerce (export-method-symbol method) 'function) 
-				  nil 
-				  (compute-specializers (export-class-symbol objc-class) (compute-lambda-list method)) 
-				  nil)))
-	    (add-clos-method method objc-class :output-stream output-stream))))
-    ;; Adding Generic Functions and class methods    
+      (if (or force 
+	      (and (not (private-method-p method)) 
+		   (or (not (fboundp (export-method-symbol method)))
+		       (not (find-method (coerce (export-method-symbol method) 'function) 
+					 nil 
+					 (compute-specializers (export-class-symbol objc-class) (compute-lambda-list method)) 
+					 nil)))))
+	  (add-clos-method method objc-class :output-stream output-stream)))
+    ;; Adding Generic Functions and class methods
     (dolist (method (get-class-methods objc-class))
-      (unless (or (private-method-p method) force)
-	(if (or (not (fboundp (export-method-symbol method)))
-		(not (find-method (coerce (export-method-symbol method) 'function)
-				  nil
-				  (compute-specializers (metaclass-name (export-class-symbol objc-class)) (compute-lambda-list method))
-				  nil)))
-	    (add-clos-method method objc-class :output-stream output-stream :class-method t))))))
+      (if (or force
+	      (and (not (private-method-p method))
+		   (or (not (fboundp (export-method-symbol method)))
+		       (not (find-method (coerce (export-method-symbol method) 'function)
+					 nil
+					 (compute-specializers (metaclass-name (export-class-symbol objc-class)) (compute-lambda-list method))
+					 nil)))))
+	  (add-clos-method method objc-class :output-stream output-stream :class-method t)))))

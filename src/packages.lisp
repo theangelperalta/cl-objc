@@ -90,14 +90,18 @@
   (:use "COMMON-LISP" "OBJC-CFFI" "CL-OBJC" "CL-OBJC-UTILS")
   (:export 
    "UPDATE-CLOS-DEFINITIONS"
+   "DELETE-CLOS-DEFINITIONS"
    "ADD-CLOS-METHOD"
    "ADD-CLOS-CLASS"
+   "OBJC-CLOS-CLASS"
    "*AUTOMATIC-DEFINITIONS-UPDATE*"
-   "OBJC-ID"
    "META"
    "CONVERT-RESULT-FROM-OBJC"))
 
-(defpackage "OBJC")
+(defpackage "OBJC"
+  (:export 
+   "OBJC-ID"
+   "RECEIVER"))
 
 (defpackage "OBJC-TYPES"
   (:use "COMMON-LISP" "YACC")
@@ -114,6 +118,9 @@
 	   "*ACCEPT-UNTYPED-CALL*"))
 
 (defpackage "CL-OBJC-EXAMPLES"
-  (:use "COMMON-LISP" "CL-OBJC" "OBJC-CFFI" "OBJC-READER")
+  (:use "COMMON-LISP" "CL-OBJC" "OBJC-CFFI" "OBJC-READER" "OBJC-CLOS")
   (:export "LISP-HELLO-WORLD"
 	   "CONVERTER"))
+
+(defpackage "CL-OBJC-USER"
+  (:use "COMMON-LISP" "CL-OBJC" "OBJC-CFFI" "OBJC-READER" "OBJC-CLOS"))

@@ -38,6 +38,7 @@
 				     (:file "reader" :depends-on ("suite"))
 				     (:file "runtime" :depends-on ("suite"))
 				     (:file "lisp-objc" :depends-on ("suite" "utils"))
+				     (:file "cache" :depends-on ("suite"))
 				     (:file "clos" :depends-on ("suite")))))
   :depends-on (:cl-objc :FiveAM))
 

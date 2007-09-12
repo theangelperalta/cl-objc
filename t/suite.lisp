@@ -18,3 +18,4 @@
 (5am:def-suite :runtime :in :cl-objc)
 (5am:def-suite :lisp-objc :in :cl-objc)
 (5am:def-suite :objc-clos :in :cl-objc)
+(5am:def-suite :cache :in :cl-objc)

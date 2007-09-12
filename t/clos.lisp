@@ -4,18 +4,20 @@
 
 (test class-creation
   (update-clos-definitions)
+  (dolist (class-symbol (mapcar #'objc-clos::export-class-symbol (get-class-list)))
+    (is (find-class class-symbol t)))
+
   (dolist (class-symbol
 	    (composite-mapcar (get-class-list) 
 			      #'class-name 
 			      #'objc-class-name-to-symbol 
-			      #'symbol-name 
-			      (lambda (name) (intern name "OBJC"))))
+			      #'objc-clos::metaclass-name))
     (is (find-class class-symbol t))))
 
 (test instance-creation
   (update-clos-definitions)
   (let* ((n (make-instance (intern "NS-NUMBER" "OBJC")))
-	 (id (objc-id n)))
+	 (id (objc:objc-id n)))
     (is (string-equal
 	 "NSPlaceholderNumber"
 	 (class-name (objc-cffi:obj-class id))))))
