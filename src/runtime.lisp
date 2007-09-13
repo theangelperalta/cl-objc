@@ -72,7 +72,7 @@ If a method binded to `SEL` is already present in `CLASS` it
 installs the new definition discarding the previous one.
 
 Return a new Objective C Method object." 
-  (let* ((callback (gensym (format nil "~A-CALLBACK-" (remove #\: name))))
+  (let* ((callback (intern (gensym (format nil "~A-CALLBACK-" (remove #\: name)))))
 	 (new-method (gensym))
 	 (type-list (append (list 'objc-id 'objc-sel) 
 			    (mapcar (lambda (type) 
