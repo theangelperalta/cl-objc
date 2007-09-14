@@ -31,6 +31,9 @@ searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*."
 	     (progn
 	       (with-open-file (out (clos-definition-cache-for-framework ,framework-name) 
 				    :direction :output :if-exists :supersede :if-does-not-exist :create)
+		 (format *trace-output* "~%Caching definition for ~a framework in ~a~%" 
+			 ,framework-name
+			 (clos-definition-cache-for-framework ,framework-name))
 		 (objc-clos:update-clos-definitions :output-stream out))
 	       (compile-file (clos-definition-cache-for-framework ,framework-name) :verbose nil :print nil))))
        t)))
