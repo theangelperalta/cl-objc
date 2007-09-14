@@ -22,6 +22,10 @@
 (defclass objc-clos-class (standard-class)
   ())
 
+(defclass objc-generic-function (standard-generic-function)
+  ()
+  (:metaclass closer-mop:funcallable-standard-class))
+
 (defmethod closer-mop:validate-superclass
            ((class objc-clos-class)
             (superclass standard-class))
@@ -114,11 +118,12 @@ value (CLOS instance or primitive type)"
 		 (prog1
 		     (closer-mop:ensure-generic-function-using-class nil 
 								     method-symbol-name
-								     :generic-function-class 'standard-generic-function
+								     :generic-function-class 'objc-generic-function
 								     :lambda-list lambda-list)
 		   (when output-stream
 		     (format output-stream "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defgeneric ~s ~s
-~2t(:documentation \"Invokes the ~a method\"))~%~%"
+~2t(:documentation \"Invokes the ~a method\")
+~2t(:generic-function-class objc-clos:objc-generic-function))~%~%"
 	      method-symbol-name
 	      method-symbol-name
 	      lambda-list

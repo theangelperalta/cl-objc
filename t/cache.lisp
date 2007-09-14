@@ -18,21 +18,13 @@
 
   ;; some tries
   (is (make-instance (intern "NS-NUMBER" "OBJC")))
-  (is
-   (funcall (intern "INT-VALUE" "OBJC") 
-	    (funcall (intern "NUMBER-WITH-INT?" "OBJC")
-		     (meta (intern "NS-NUMBER" "OBJC"))
-		     5))))
+  (is (create-ns-number 5)))
 
 (test cache-load 
   (load (compile-file-pathname (tmp-cache-filename)))
   
   ;; some tries
   (is (make-instance (intern "NS-NUMBER" "OBJC")))
-  (is
-   (funcall (intern "INT-VALUE" "OBJC") 
-	    (funcall (intern "NUMBER-WITH-INT?" "OBJC")
-		     (meta (intern "NS-NUMBER" "OBJC"))
-		     5)))
+  (is (create-ns-number 5))
   ;; deleting temporary cache
   (delete-file (tmp-cache-filename)))
