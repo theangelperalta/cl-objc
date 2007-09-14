@@ -16,6 +16,8 @@
 
 * Search for the framework cache also in another location (useful for the deploy of ready-to-use application)
 
+* BugFix: CLOS Definitions per framework. Actually we can't distinguish where methods/classes come from if we force the generation of clos definitions
+
 * Feature: Complete the ObjC CLOS interface
 
 * Feature: Support for the call to super
@@ -37,3 +39,7 @@
 * Feature: Protocol management
 
 * Feature: Exception management
+
+* Remove unused functions
+
+* Optimize message calling removing calls to cl:compile

@@ -5,6 +5,3 @@
   functions (it doesn't do argument promotion), we can't use normal
   defcfun but we are using internal methods of CFFI
 
-* Protocol management to be completed
-
-* Optimize message calling removing calls to cl:compile
