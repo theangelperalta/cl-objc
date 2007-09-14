@@ -147,6 +147,22 @@ method binded to `SEL`.
 	       (t (error "Unknown return type ~s" ,greturn-type))))
 	   (error "ObjC method ~a not found" ,gsel)))))
 
+(defparameter *untyped-methods-cache* (make-hash-table :test #'equal))
+
+(defun cache-compile-for-untyped (sel method)
+  (let ((sel-name (etypecase sel
+		    (objc-selector (sel-name sel))
+		    (string sel))))
+    (or (gethash sel-name *untyped-methods-cache*)
+	(setf (gethash sel-name *untyped-methods-cache*)
+	      (compile nil
+		       (let ((varargs (loop for i upto (- (method-get-number-of-arguments method) 2) collecting (gensym))))
+			 `(lambda ,varargs
+			    (typed-objc-msg-send (,(first varargs) ,sel) 
+						 ,@(interpose 
+						    (pack-struct-arguments-type (method-argument-types method)) 
+						    (pack-struct-arguments-val (cdr varargs) method))))))))))
+
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to `SELECTOR` to `RECEIVER` returning
 the value of the Objective C call with `ARGS`.
@@ -154,18 +170,11 @@ the value of the Objective C call with `ARGS`.
 This method invokes typed-objc-msg-send calculating the types of
 `ARGS` at runtime.
 "
-  (with-gensyms (greceiver gselector gmethod gargs-var)
+  (with-gensyms (greceiver gselector gmethod)
     `(let* ((,greceiver ,receiver)
 	    (,gselector ,selector)
 	    (,gmethod (etypecase ,greceiver
 			(objc-class (class-get-class-method ,greceiver ,gselector))
-			(objc-object (class-get-instance-method (obj-class ,greceiver) ,gselector))))
-	    (,gargs-var (mapcar (lambda (arg) (declare (ignore arg)) (gensym)) (list ,@args))))
-       (funcall
-	(compile nil
-		 `(lambda ,,gargs-var 
-		    (typed-objc-msg-send (,,greceiver ,,gselector) 
-					 ,@(interpose 
-					    (pack-struct-arguments-type (method-argument-types ,gmethod)) 
-					    (pack-struct-arguments-val ,gargs-var ,gmethod)))))
-	,@args))))
+			(objc-object (class-get-instance-method (obj-class ,greceiver) ,gselector)))))
+       (funcall	(cache-compile-for-untyped ,gselector ,gmethod)
+	,greceiver ,@args))))
