@@ -25,13 +25,10 @@
 	      (setf string new-string))))
       string)))
 
-(defgeneric objc-selector-to-symbols (selector)
-  (:documentation "The inverse of SYMBOLS-TO-OBJC-SELECTOR"))
-
-(defmethod objc-selector-to-symbols ((selector objc-cffi:objc-selector))
-  (objc-selector-to-symbols (sel-name selector)))
-
-(defmethod objc-selector-to-symbols ((selector string))
+(memoize:def-memoized-function objc-selector-to-symbols (selector)
+  "The inverse of SYMBOLS-TO-OBJC-SELECTOR"
+  (when (eq (find-class 'objc-selector) (class-of selector))
+    (setq selector (sel-name selector)))
   (flet ((convert-selector-part (selector-part)
 	   (if selector-part
 	       (with-output-to-string (out)

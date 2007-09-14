@@ -23,7 +23,7 @@
   ())
 
 (defclass objc-generic-function (standard-generic-function)
-  ()
+  ((df :accessor df :initform nil))
   (:metaclass closer-mop:funcallable-standard-class))
 
 (defmethod closer-mop:validate-superclass
@@ -31,9 +31,11 @@
             (superclass standard-class))
   t)
 
-(defun objc-selector-to-clos-symbol (selector)
+(memoize:def-memoized-function objc-selector-to-clos-symbol (selector)
   (let* ((selector-symbols (objc-selector-to-symbols (sel-name selector)))
-	 (tmp (subseq (reduce (lambda (s e) (concatenate 'string s "?" e)) (mapcar #'symbol-name selector-symbols) :initial-value "") 1)))
+	 (tmp (subseq (reduce (lambda (s e) (concatenate 'string s "?" e)) 
+			      (mapcar #'symbol-name selector-symbols) :initial-value "") 
+		      1)))
     (if (keywordp (first selector-symbols))
 	(concatenate 'string tmp "?")
 	tmp)))
@@ -62,38 +64,17 @@
 (defun export-method-symbol (objc-method)
   (export-symbol (objc-selector-to-clos-symbol (method-selector objc-method))))
 
-(defun zero-arg-method-p (method)
-  (let ((selector-symbols (objc-selector-to-symbols (method-selector method))))
-    (and (listp selector-symbols) 
-	 (= 1 (length selector-symbols))
-	 (symbolp (car selector-symbols))
-	 (not (keywordp (car selector-symbols))))))
-
-(defun one-or-more-arg-method-p (method)
-  (let ((selector-symbols (objc-selector-to-symbols (method-selector method))))
-    (and (listp selector-symbols) 
-	 (> (length selector-symbols) 0))))
-
-(defun dummy-add-clos-method (method-name class-name)
-  (add-clos-method (class-get-instance-method class-name method-name) (export-symbol (objc-class-name-to-symbol class-name))))
-
-(defun compute-specializers (class-symbol-name lambda-list)
-  (append (list (find-class class-symbol-name)) 
-	  (loop for i below (1- (length lambda-list)) collecting (find-class 't))))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export (intern "RECEIVER" "OBJC") "OBJC"))
 
-(defun compute-lambda-list (objc-method)
+(defun compute-lambda-list (selector)
   (append (list 'objc:receiver)
 	  (loop 
-	     with arguments-name = (objc-selector-to-symbols (method-selector objc-method))
+	     with arguments-name = (objc-selector-to-symbols selector)
 	     for arg-name in arguments-name 
-	     when (keywordp arg-name) collect (intern (symbol-name 
-						       (gensym 
-							(format nil "ARG-~a-" 
-								(symbol-name arg-name))))
-						      "OBJC"))))
+	     for i upfrom 1
+	     when (keywordp arg-name) collect (intern (format nil "ARG-~a-~d" (symbol-name arg-name) i)
+						       "OBJC"))))
 
 (defun convert-result-from-objc (ret)
   "Convert the returned value of an Objc Method to a lisp
@@ -107,59 +88,46 @@ value (CLOS instance or primitive type)"
     (fixnum ret)
     (otherwise (error "Not yet supported ~s" (class-name (class-of ret))))))
 
+(defmethod closer-mop:compute-discriminating-function ((gf objc-generic-function))
+  (let* ((gf-name (closer-mop:generic-function-name gf))
+	 (sel-name (clos-symbol-to-objc-selector gf-name))
+	 (selector (sel-get-uid sel-name))
+	 (lambda-list (compute-lambda-list selector)))
+    (or (df gf)
+	(lambda (&rest args)
+	  (flet ((dfun (&rest args) 
+		   (apply 
+		    (eval `(lambda ,lambda-list
+			     (let ((id (objc:objc-id objc:receiver)))
+			       (convert-result-from-objc 
+				(untyped-objc-msg-send id 
+						       ,sel-name 
+						       ,@(remove '&optional 
+								 (cdr lambda-list)))))))
+		    args)))
+	    (closer-mop:set-funcallable-instance-function gf #'dfun)
+	    (setf (df gf) #'dfun)
+	    (apply #'dfun args))))))
+
+
 (defun add-clos-method (objc-method objc-class &key output-stream class-method)
-  (let* ((class-symbol-name (if class-method 
-				(export-symbol (metaclass-name (export-class-symbol objc-class)))
-				(export-class-symbol objc-class)))
-	 (method-symbol-name (export-method-symbol objc-method))
-	 (lambda-list (compute-lambda-list objc-method))
-	 (gf (if (fboundp method-symbol-name)
-		 (coerce method-symbol-name 'function) 
-		 (prog1
-		     (closer-mop:ensure-generic-function-using-class nil 
-								     method-symbol-name
-								     :generic-function-class 'objc-generic-function
-								     :lambda-list lambda-list)
-		   (when output-stream
-		     (format output-stream "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defgeneric ~s ~s
+  (declare (ignore objc-class class-method))
+  (let* ((method-symbol-name (export-method-symbol objc-method))
+	 (lambda-list (compute-lambda-list (method-selector objc-method))))
+
+    (prog1
+	(closer-mop:ensure-generic-function-using-class nil 
+							method-symbol-name
+							:generic-function-class 'objc-generic-function
+							:lambda-list lambda-list)
+      (when output-stream
+	(format output-stream "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defgeneric ~s ~s
 ~2t(:documentation \"Invokes the ~a method\")
 ~2t(:generic-function-class objc-clos:objc-generic-function))~%~%"
-	      method-symbol-name
-	      method-symbol-name
-	      lambda-list
-	      (sel-name (method-selector objc-method)))))))
-	 (specializers (compute-specializers class-symbol-name lambda-list))
-	 (fdefinition `(lambda ,lambda-list
-			 (let ((id (objc:objc-id objc:receiver)))
-			   (convert-result-from-objc 
-			    (untyped-objc-msg-send id 
-						   ,(sel-name (method-selector objc-method)) 
-						   ,@(remove '&optional 
-							     (cdr lambda-list)))))))
-	 (new-method (make-instance 
-		      (closer-mop:generic-function-method-class gf)
-		      :qualifiers nil
-		      :specializers specializers
-		      :lambda-list lambda-list
-		      :function (coerce 
-				 (closer-mop:make-method-lambda gf
-							   (closer-mop:class-prototype 
-							    (closer-mop:generic-function-method-class gf))
-							   fdefinition
-							   nil)
-				 'function))))
-    (when output-stream
-      (format output-stream "(defmethod ~s ~s 
-~2t~{~s~})~%~%"
-	      method-symbol-name
-	      (loop 
-		 for i upto (length lambda-list)
-		 for arg in lambda-list
-		 with l = (length specializers)
-		 when (< i l) collect (list arg (class-name (nth i specializers)))
-		 when (>= i l) collect arg)
-	      (cddr fdefinition)))
-    (add-method gf new-method)))
+		method-symbol-name
+		method-symbol-name
+		lambda-list
+		(sel-name (method-selector objc-method)))))))
 
 (defun eval-lambda-in-list (list)
   (mapcar (lambda (form) 
@@ -251,23 +219,9 @@ value (CLOS instance or primitive type)"
     (when (or force
 	    (not (find-class (export-class-symbol objc-class) nil)))
       (add-clos-class objc-class output-stream))
-    ;; Adding Generic Functions and instance methods
-    (dolist (method (get-instance-methods objc-class))
+    ;; Adding Generic Functions for ObjC methods
+    (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
       (if (or force 
 	      (and (not (private-method-p method)) 
-		   (or (not (fboundp (export-method-symbol method)))
-		       (not (find-method (coerce (export-method-symbol method) 'function) 
-					 nil 
-					 (compute-specializers (export-class-symbol objc-class) (compute-lambda-list method)) 
-					 nil)))))
-	  (add-clos-method method objc-class :output-stream output-stream)))
-    ;; Adding Generic Functions and class methods
-    (dolist (method (get-class-methods objc-class))
-      (if (or force
-	      (and (not (private-method-p method))
-		   (or (not (fboundp (export-method-symbol method)))
-		       (not (find-method (coerce (export-method-symbol method) 'function)
-					 nil
-					 (compute-specializers (metaclass-name (export-class-symbol objc-class)) (compute-lambda-list method))
-					 nil)))))
-	  (add-clos-method method objc-class :output-stream output-stream :class-method t)))))
+		   (not (fboundp (export-method-symbol method)))))
+	  (add-clos-method method objc-class :output-stream output-stream)))))

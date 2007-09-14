@@ -27,7 +27,7 @@
 								  "msg-send"
 								  "lisp-interface"
 								  "structs")))))
-    :depends-on (:cffi :yacc :closer-mop))
+    :depends-on (:cffi :yacc :closer-mop :memoize))
 
 (defsystem  cl-objc.test
   :components ((:module :t
