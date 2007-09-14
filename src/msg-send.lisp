@@ -87,6 +87,22 @@
   (when (> (length list) 1)
     (cons (car list) (even-positioned-elements (cddr list)))))
 
+(defparameter *methods-cache* (make-hash-table))
+
+(defun cache-compile (sel return-type types)
+  (let ((sel-name (etypecase sel
+		    (objc-selector (sel-name sel))
+		    (string sel))))
+    (or (gethash sel-name *methods-cache*)
+	(setf (gethash sel-name *methods-cache*)
+	      (compile nil
+		       (let ((varargs (loop for i upto (length types) collecting (gensym))))
+			 `(lambda ,varargs
+			    (,(make-objc-msg-send-symbol return-type) 
+			      ,(first varargs) 
+			      ,sel
+			      ,(interpose types (cdr varargs))))))))))
+
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest args-and-types)
   "Send the message binded to selector `SEL` to the object `ID`
 returning the value of the Objective C call.
@@ -103,40 +119,33 @@ If `ID` is an Objective C class object it will call the class
 method binded to `SEL`.
 "
   (with-gensyms (gsel gid gmethod greturn-type)
-    (let ((varargs (loop for i below (/ (length args-and-types) 2) collecting (gensym))))
-      `(let* ((,gsel ,sel)
-	      (,gid ,id)
-	      (,gmethod (etypecase ,gid
-			  (objc-class (class-get-class-method ,gid ,gsel))
-			  (objc-object (class-get-instance-method (obj-class ,gid) ,gsel)))))
-	 (if ,gmethod
-	     (let ((,greturn-type (method-return-type ,gmethod)))
-	       (cond
-		 ;; big struct passed by value as argument
-		 ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
-		       (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
-			      ',(even-positioned-elements args-and-types)))
-		  (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
+    `(let* ((,gsel ,sel)
+	    (,gid ,id)
+	    (,gmethod (etypecase ,gid
+			(objc-class (class-get-class-method ,gid ,gsel))
+			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel)))))
+       (if ,gmethod
+	   (let ((,greturn-type (method-return-type ,gmethod)))
+	     (cond
+	       ;; big struct passed by value as argument
+	       ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
+		     (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
+			    ',(even-positioned-elements args-and-types)))
+		(untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
 
-		 ;; big struct as return value passed by value
-		 ((big-struct-type-p ,greturn-type) 
-		  (objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,gid ,gsel ,@args-and-types))
-		 ((small-struct-type-p ,greturn-type)
-		  (objc-msg-send ,gid ,gsel ,@args-and-types)) 
+	       ;; big struct as return value passed by value
+	       ((big-struct-type-p ,greturn-type) 
+		(objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,gid ,gsel ,@args-and-types))
+	       ((small-struct-type-p ,greturn-type)
+		(objc-msg-send ,gid ,gsel ,@args-and-types)) 
 
-		 ;; general case
-		 ((member ,greturn-type ',(allowed-simple-return-types)) 
-		  (funcall 
-		   (compile nil
-			    `(lambda ,',varargs
-			       (,(make-objc-msg-send-symbol ,greturn-type) 
-				 ,,gid 
-				 ,,gsel 
-				 ,(interpose (even-positioned-elements ',args-and-types)
-					      ',varargs))))
-		   ,@(odd-positioned-elements args-and-types)))
-		 (t (error "Unknown return type ~s" ,greturn-type))))
-	     (error "ObjC method ~a not found" ,gsel))))))
+	       ;; general case
+	       ((member ,greturn-type ',(allowed-simple-return-types)) 
+		(funcall 
+		 (cache-compile ,gsel ,greturn-type ',(even-positioned-elements args-and-types))
+		 ,gid ,@(odd-positioned-elements args-and-types)))
+	       (t (error "Unknown return type ~s" ,greturn-type))))
+	   (error "ObjC method ~a not found" ,gsel)))))
 
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to `SELECTOR` to `RECEIVER` returning
