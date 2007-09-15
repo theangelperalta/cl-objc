@@ -1,7 +1,5 @@
 ;; -*- outline -*-
 
-* Put the CLOS interface in another asdf system
-
 * Optimization: Specialize on expand-{to/from}-foreign instead of translate-{to/from}-foreign
 
 * Generate at runtime C glue code to solve the struct-by-value problem. Better solution: just a function for each struct. See the bridgesupport and cffi-grovel projects

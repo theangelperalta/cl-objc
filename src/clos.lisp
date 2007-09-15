@@ -7,7 +7,7 @@
   ((objc:objc-id :accessor objc:objc-id))
   (:documentation "Define objc-id just to avoid warnings"))
 
-(defparameter *automatic-definitions-update* t)
+(defparameter *automatic-definitions-update* nil)
 
 (defclass objc-clos-class (standard-class)
   ())
