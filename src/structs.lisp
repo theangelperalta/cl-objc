@@ -26,17 +26,26 @@
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)
 
-(defun update-rect-cstruct-database ()
-  (setf *objc-struct-db* 
-	(remove-duplicates 
-	 (mapcar #'cdr
-		 (remove-if-not (lambda (el) 
-				  (and (listp el) (eq (car el) :struct))) 
-				(mapcar #'caddr 
-					(mapcan #'objc-types:parse-objc-typestr 
-						(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list)))))))
-	 :key #'car
-	 :test #'string-equal)))
+(defun update-rect-cstruct-database (&key output-stream)
+  (let ((updated-structs
+	 (remove-duplicates 
+	  (remove "?"
+		  (mapcar #'cadr
+			  (remove-if-not (lambda (el) 
+					   (and (listp el) (eq (car el) :struct))) 
+					 (mapcar #'caddr 
+						 (mapcan #'objc-types:parse-objc-typestr 
+							 (mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list)))))))
+		  :test #'string-equal)
+	  :test #'string-equal)))
+    (when output-stream
+      (let ((*package* (find-package "CL-OBJC-USER")))
+	(format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC-USER\")
+~%(dolist (struct-name (list ~{~s~}))
+~2t(pushnew struct-name ~s :test #'string-equal))~%~%"
+		(set-difference updated-structs *objc-struct-db*)
+		'*objc-struct-db*)))
+    (setf *objc-struct-db* updated-structs)))
 
 (defun canonicalize-objc-struct-name (name)
   (or (cdr (assoc name *registered-structs* :test #'equal)) 
@@ -135,8 +144,8 @@ error will be raised if the trial fails.
 		(,private-name (concatenate 'string "_" ,gobjc-name)))
 	   (setf ,gobjc-name
 		 (cond 
-		   ((find ,gobjc-name *objc-struct-db* :key #'car :test #'string-equal) ,gobjc-name)
-		   ((find ,private-name *objc-struct-db* :key #'car :test #'string-equal) ,private-name)
+		   ((find ,gobjc-name *objc-struct-db* :test #'string-equal) ,gobjc-name)
+		   ((find ,private-name *objc-struct-db* :test #'string-equal) ,private-name)
 		   (t (error "There is no ObjC struct binded to ~a or ~a" ,gobjc-name ,private-name))))
 	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-name))
 	 (cffi:defcstruct ,name-and-options
