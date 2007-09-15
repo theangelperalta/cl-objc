@@ -9,7 +9,7 @@
 (defun cache-root-dir ()
   (make-pathname 
    :directory (append 
-	       (pathname-directory *cl-objc-directory*)
+	       *cl-objc-directory*
 	       (list "frameworks"))))
 
 (defun clos-definition-cache-for-framework (framework-name)
