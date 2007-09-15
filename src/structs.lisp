@@ -127,18 +127,20 @@ ns-rect is the lisp name of the struct. If you don't specify the
 former the method will try to guess it automatically, but an
 error will be raised if the trial fails.
 "
-  (destructuring-bind (name-and-options objc-name lisp-name)
-      (parse-objc-struct-name-options name-and-objc-options)
-    (let ((private-name (concatenate 'string "_" objc-name)))
-      (setf objc-name
-	    (cond 
-	      ((find objc-name *objc-struct-db* :key #'car :test #'string-equal) objc-name)
-	      ((find private-name *objc-struct-db* :key #'car :test #'string-equal) private-name)
-	      (t (error "There is no ObjC struct binded to ~a or ~a" objc-name private-name)))))
-    `(progn
-       (objc-cffi::register-struct-name ,objc-name ',lisp-name)
-       (cffi:defcstruct ,name-and-options
-	 ,@doc-and-slots))))
+  (with-gensyms (private-name gobjc-name)
+    (destructuring-bind (name-and-options objc-name lisp-name)
+	(parse-objc-struct-name-options name-and-objc-options)
+      `(progn
+	 (let* ((,gobjc-name ,objc-name)
+		(,private-name (concatenate 'string "_" ,gobjc-name)))
+	   (setf ,gobjc-name
+		 (cond 
+		   ((find ,gobjc-name *objc-struct-db* :key #'car :test #'string-equal) ,gobjc-name)
+		   ((find ,private-name *objc-struct-db* :key #'car :test #'string-equal) ,private-name)
+		   (t (error "There is no ObjC struct binded to ~a or ~a" ,gobjc-name ,private-name))))
+	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-name))
+	 (cffi:defcstruct ,name-and-options
+	   ,@doc-and-slots)))))
 
 (defun objc-struct-slot-value (ptr type slot-name)
   "Return the value of `SLOT-NAME` in the ObjC Structure `TYPE` at `PTR`."
