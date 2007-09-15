@@ -163,6 +163,10 @@ method binded to `SEL`.
 						    (pack-struct-arguments-type (method-argument-types method)) 
 						    (pack-struct-arguments-val (cdr varargs) method))))))))))
 
+(defun clear-method-caches ()
+  (setf *methods-cache* (make-hash-table)
+	*untyped-methods-cache* (make-hash-table)))
+
 (defmacro untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to `SELECTOR` to `RECEIVER` returning
 the value of the Objective C call with `ARGS`.

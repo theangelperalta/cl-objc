@@ -217,18 +217,17 @@ selector.
 If a method binded to the same selector is already present it
 installs the new definition discarding the previous one.
 
-Return a new Objective C Method object." 
-  `(add-objc-method (,(symbols-to-objc-selector (ensure-list list-selector))
-		      ,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
-						      (error "You have to specify the `self` argument and the related type")))
-		      :return-type ,return-type
-		      :class-method ,class-method)
-       (,@(or (remove "self" 
-		      (remove "sel" argument-list :key (lambda (el) (symbol-name (car el))) :test #'string-equal) 
-		      :test #'string-equal 
-		      :key (lambda (el) (symbol-name (car el))))
-	      ()))
-     ,@body))
+Return a new Objective C Method object."
+  (flet ((remove-symbol-with-name (symbol-name list)
+	   (remove symbol-name list :key (lambda (el) (symbol-name (car el))) :test #'string-equal)))
+    `(add-objc-method (,(symbols-to-objc-selector (ensure-list list-selector))
+			,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
+							(error "You have to specify the `self` argument and the related type")))
+			:return-type ,return-type
+			:class-method ,class-method)
+	 (,@(or (remove-symbol-with-name "self" (remove-symbol-with-name "sel" argument-list))
+		()))
+       ,@body)))
 
 (defmacro ivars-macrolet-forms (vars class &body body)
   (if vars
@@ -246,10 +245,10 @@ Return a new Objective C Method object."
 form (`class-name`-`ivar-name`)"
   (let ((class (objc-get-class (symbol-to-objc-class-name symbol-class))))
     `(ivars-macrolet-forms ,(class-ivars class) ,symbol-class 
-	 ,@body)))
+      ,@body)))
 
 (defmacro define-objc-class (symbol-name symbol-superclass (&rest ivars))
-    "Define and returns a new Objective C class `SYMBOL-NAME`
+  "Define and returns a new Objective C class `SYMBOL-NAME`
 deriving from `SYMBOL-SUPERCLASS`. Names are translated by
 SYMBOL-TO-OBJC-CLASS-NAME.
 

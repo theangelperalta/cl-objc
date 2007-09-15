@@ -55,6 +55,21 @@
 	    (class-add-methods class method-list)
 	    (class-get-instance-method class selector))))))
 
+(defun parse-argument-list (argument-list)
+  (let ((types '(objc-id objc-sel))
+	(vars (list (intern "SELF") (intern "SEL"))))
+    (do* ((rest argument-list (cdr rest))
+	  (argument (car rest) (car rest)))
+	 ((null rest) (values vars types)) 
+      (setf types (append types (list 
+				 (if (listp argument)
+				     (or (second argument) 'objc-id)
+				     'objc-id)))
+	    vars (append vars (list 
+			      (if (listp argument)
+				  (first argument)
+				  argument)))))))
+
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
   "Add an Objective C method to `CLASS` returning the CFFI
@@ -72,39 +87,29 @@ If a method binded to `SEL` is already present in `CLASS` it
 installs the new definition discarding the previous one.
 
 Return a new Objective C Method object." 
-  (let* ((callback (gentemp (format nil "~A-CALLBACK-" (remove #\: name))))
-	 (new-method (gensym))
-	 (type-list (append (list 'objc-id 'objc-sel) 
-			    (mapcar (lambda (type) 
-				      (if (listp type) 
-					  (or (second type) 'objc-id) 
-					  'objc-id)) 
-				     argument-list)))
-	 (var-list (append (list (intern "SELF") (intern "SEL")) 
-			   (mapcar (lambda (arg) 
-				     (if (listp arg) 
-					 (first arg) 
-					 arg)) 
-				    argument-list))))
-    (let ((has-declare))
-      `(progn 
-	 (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
-	   ,(when (and (listp (first body)) (eq (car (first body)) 'cl:declare))
-		  (setf has-declare t)
-		  (first body))
-	   ,(intern "SELF")		; to avoid warning
-	   ,(intern "SEL")		; to avoid warning
-	   ,(if has-declare
-		`(progn ,@(cdr body))
-		`(progn ,@body)))
-	 (let ((,new-method
-		(register-method ,class
-				 ,name
-				 (objc-types:encode-types (append (list ',return-type) ',type-list) t)
-				 (callback ,callback)
-				 ,class-method)))
-	   (when objc-clos:*automatic-definitions-update*
-	     (objc-clos:add-clos-method ,new-method (objc-get-class ,class) :class-method ,class-method)))))))
+  (multiple-value-bind (var-list type-list)
+      (parse-argument-list argument-list)
+    (let* ((callback (gentemp (format nil "~A-CALLBACK-" (remove #\: name))))
+	   (new-method (gensym)))
+      (let ((has-declare))
+	`(progn 
+	   (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
+	     ,(when (and (listp (first body)) (eq (car (first body)) 'cl:declare))
+		    (setf has-declare t)
+		    (first body))
+	     ,(intern "SELF")		; to avoid warning
+	     ,(intern "SEL")		; to avoid warning
+	     ,(if has-declare
+		  `(progn ,@(cdr body))
+		  `(progn ,@body)))
+	   (let ((,new-method
+		  (register-method ,class
+				   ,name
+				   (objc-types:encode-types (append (list ',return-type) ',type-list) t)
+				   (callback ,callback)
+				   ,class-method)))
+	     (when objc-clos:*automatic-definitions-update*
+	       (objc-clos:add-clos-method ,new-method (objc-get-class ,class) :class-method ,class-method))))))))
 
 ;;;; Adding Objective-C classes at runtime
 
