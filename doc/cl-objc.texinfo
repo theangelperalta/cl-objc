@@ -420,7 +420,7 @@ at-sign so (lisp-string-to-nsstring ``MainMenu'') becomes @@"MainMenu''
 @section API Reference
 
 @subsection Frameworks
-@include include/macro-objc-cffi-define-objc-framework.texinfo
+@include include/macro-objc-cffi-use-objc-framework.texinfo
 
 @subsection Structs
 @include include/fun-objc-cffi-objc-struct-slot-value.texinfo

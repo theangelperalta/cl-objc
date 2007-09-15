@@ -1,11 +1,11 @@
 (in-package :cl-objc-examples)
 
-(define-objc-framework "Foundation"
+(use-objc-framework "Foundation"
   (define-objc-struct ns-size (width :float) (height :float))
   (define-objc-struct ns-point (x :float) (y :float))
   (define-objc-struct ns-rect (origin ns-point) (size ns-size)))
 
-(define-objc-framework "AppKit"
+(use-objc-framework "AppKit"
   (cffi:defcvar "NSApp" objc-id))
 
 (define-objc-class app-delegate ns-object 

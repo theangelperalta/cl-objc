@@ -15,7 +15,7 @@ with a call to a class method and one to an instance method"
 	   (funcall (intern "NUMBER-WITH-INT?" "OBJC") 
 		    (meta (intern "NS-NUMBER" "OBJC")) num)))
 
-(define-objc-framework "Foundation"
+(use-objc-framework "Foundation"
   (define-objc-struct (nsrange "_NSRange") (location :unsigned-int) (length :unsigned-int))
   (define-objc-struct (nssize "_NSSize") (width :float) (height :float))
   (define-objc-struct (nspoint "_NSPoint") (x :float) (y :float))

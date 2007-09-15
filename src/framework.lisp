@@ -21,7 +21,7 @@
   (ensure-directories-exist (cache-root-dir))
   (probe-file (clos-definition-cache-for-framework framework-name)))
 
-(defmacro define-objc-framework (framework-name &body cffi-definitions)
+(defmacro use-objc-framework (framework-name &body cffi-definitions)
   "Import definitions from `framework`. `framework` will be
 searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*."
   (let ((name (intern (concatenate 'string (string-downcase framework-name) "-framework"))))
