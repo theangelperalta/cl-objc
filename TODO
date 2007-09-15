@@ -1,45 +1,49 @@
 ;; -*- outline -*-
 
-* Optimization: Specialize on expand-{to/from}-foreign instead of translate-{to/from}-foreign
+* Bugfix
+** Allow the working of cl-objc on a read-only installation (i.e. without framework caching)
 
-* Generate at runtime C glue code to solve the struct-by-value problem. Better solution: just a function for each struct. See the bridgesupport and cffi-grovel projects
+** CLOS Definitions per framework. Actually we can't distinguish where methods/classes come from if we force the generation of clos definitions
 
-* Define a variadic defun to call objc methods instead of having a variadic macro (this is a big change to CFFI)
+** Support for Variadic ObjC methods
 
-* Update the docs to make it document each exported function, add a tutorial on the clos interface and a makefile to generate the doc (using sb-texinfo)
+** Remove warnings in test suite :runtime and in with-ivar-accessors
 
-* Add more examples (one using the clos interface)
+** Remove unused functions
 
-* Feature: struct definition Caching
+** See the KNOWN_BUGS file for the WONTFIX bugs
 
-* BugFix: Allow the working of cl-objc on a read-only installation (i.e. without framework caching)
+* Docs & Examples
+** Update the docs to make it document each exported function, add a tutorial on the clos interface and a makefile to generate the doc (using sb-texinfo)
 
-* Search for the framework cache also in another location (useful for the deploy of ready-to-use application)
+** Add more examples (one using the clos interface)
 
-* BugFix: CLOS Definitions per framework. Actually we can't distinguish where methods/classes come from if we force the generation of clos definitions
+** Use cl-launch for the examples
 
-* Feature: Complete the ObjC CLOS interface
+* New minor features
 
-* Feature: Support for the call to super
+** Make ensure-objc-class try to add the ivars to a class if the definition is the same as previous
 
-* Feature: Make ensure-objc-class try to add the ivars to a class if the definition is the same as previous
+** Add an objc-let* macro
 
-* Feature: Add an objc-let* macro
+** README file
 
-* Use cl-launch for the examples
+** Better error signaling if wrong input to functions is passed
 
-* Check if cl-objc works with variadic methods
+** Makes objc reader produce objects that can be handled with the clos interface
 
-* Remove warnings in test suite :runtime and in with-ivar-accessors
+* New major features
 
-* Refactoring: Use aif and split-sequence when possible
+** Define a variadic defun to call foreign functions instead of using a variadic macro
 
-* Remove functions wrapping defcfuns just to save docstrings (outdated feature by last CFFI version)
+** Complete the ObjC CLOS interface (objc ivars in slots, mixed slots, defmethod mixed)
 
-* Feature: Protocol management
+** Support for the call to super
 
-* Feature: Exception management
+** Protocol management
 
-* Remove unused functions
+** Exception management
 
-* Optimize message calling removing calls to cl:compile
+** Easy Deploy feature
+
+** Integration with XCode
