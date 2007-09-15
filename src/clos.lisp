@@ -9,10 +9,6 @@
 
 (defparameter *automatic-definitions-update* t)
 
-(defparameter *objc-metaclasses* (make-hash-table)
-  "This variables contains instances of CLOS classes representing
-  ObjC metaclasses. So every entry represents an ObjC class.")
-
 (defclass objc-clos-class (standard-class)
   ())
 
@@ -166,7 +162,6 @@ value (CLOS instance or primitive type)"
 			     :direct-superclasses metaclass-superclasses
 			     :direct-slots metaclass-slots
 			     :metaclass 'objc-clos-class)
-    (setf (gethash class-symbol-name *objc-metaclasses*) (make-instance metaclass-symbol-name))
 
     (when output-stream
       (let ((*package* (find-package "CL-OBJC-USER")))
@@ -191,7 +186,7 @@ value (CLOS instance or primitive type)"
   (char-equal #\_ (elt (sel-name (method-selector method)) 0)))
 
 (defun meta (symbol)
-  (nth-value 0 (gethash symbol *objc-metaclasses*)))
+  (make-instance (metaclass-name symbol)))
 
 (defun metaclass-name (symbol)
   (intern (format nil "META-~a" (symbol-name symbol)) "OBJC"))
