@@ -1,11 +1,5 @@
 (in-package :objc-clos)
 
-(eval-when (:load-toplevel)
-  (defparameter *cl-objc-directory* (pathname-directory *load-pathname*)))
-
-(eval-when (:compile-toplevel)
-  (defparameter *cl-objc-directory* (pathname-directory *compile-file-pathname*)))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export (intern "OBJC-ID" "OBJC") "OBJC"))
 

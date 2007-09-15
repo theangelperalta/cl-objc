@@ -1,10 +1,16 @@
 (in-package :objc-cffi)
 
+(eval-when (:load-toplevel)
+  (defparameter *cl-objc-directory* (pathname-directory *load-pathname*)))
+
+(eval-when (:compile-toplevel)
+  (defparameter *cl-objc-directory* (pathname-directory *compile-file-pathname*)))
+
 (defun cache-root-dir ()
   (make-pathname 
    :directory (append 
-	       (pathname-directory (user-homedir-pathname))
-	       (list ".cl-objc-cache"))))
+	       (pathname-directory *cl-objc-directory*)
+	       (list "frameworks"))))
 
 (defun clos-definition-cache-for-framework (framework-name)
   (make-pathname :directory (pathname-directory (cache-root-dir))
