@@ -408,6 +408,13 @@
   (:documentation
    "Objective C objc-protocol-list type - pointer to an objc_protocol_list struct"))
 
+(define-foreign-type objc-protocol-type () 
+  () 
+  (:actual-type :pointer)
+  (:simple-parser objc-protocol-pointer)
+  (:documentation
+   "Objective C Class - pointer to an objc_class struct"))
+
 (defcstruct objc-class-cstruct
 	(isa :pointer) ;  we don't use the cffi translation facility
 		       ;  for isa and super_class to avoid an infinite
@@ -422,17 +429,20 @@
 	(ivars objc-ivar-list-pointer)
 	(methodLists :pointer)
 	(cache :pointer)
-;; FIXME: should be objc-protocol-list-pointer
-	(protocols :pointer))
+	(protocols objc-protocol-list-pointer))
 
 (defcstruct objc-protocol-list-cstruct
   (next :pointer)
   (count :int)
   (protocols :pointer))
 
-(defcfun ("objc_getClass" %objc-get-class) objc-class-pointer
-  "Prova"
-  (name :string))
+(defcstruct objc-method-description
+  (name objc-sel)
+  (types :string))
+
+(defcstruct objc-method-description-list
+  (count :int)
+  (list :pointer))
 
 ;; defined just to have a documentation string for the function as
 ;; CFFI doesn't support docstring of defcfun
@@ -502,17 +512,15 @@
 (defmethod translate-to-foreign ((class-name string) (type objc-class-type))
   (slot-value (objc-get-class class-name) 'class-ptr))
 
-(defmethod translate-to-foreign (pointer (type objc-class-type))
-  pointer)
-
 (defmethod translate-from-foreign (protocol-list-ptr (type objc-protocol-list-type))
   (loop 
      for ptr = protocol-list-ptr then (foreign-slot-value ptr 'objc-protocol-list-cstruct 'next)
      until (null-pointer-p ptr)
      nconc (loop 
 	      for idx below (foreign-slot-value ptr 'objc-protocol-list-cstruct 'count) 
-	      for protocol-ptr = (foreign-slot-value ptr 'objc-protocol-list-cstruct 'protocols) then (inc-pointer protocol-ptr (foreign-type-size 'objc-class-cstruct))
-	      collecting (mem-ref protocol-ptr 'objc-class-pointer))))
+	      for protocol-ptr = (foreign-slot-pointer ptr 'objc-protocol-list-cstruct 'protocols) then (inc-pointer protocol-ptr (foreign-type-size 'objc-object-cstruct))
+	      for protocol = (mem-ref protocol-ptr 'objc-protocol-pointer)
+	      collecting protocol)))
 
 (defmethod translate-to-foreign ((protocol-list list) (type objc-protocol-list-type))
   (let ((ret (foreign-alloc 'objc-protocol-list-cstruct))
@@ -526,6 +534,33 @@
        for protocol in protocol-list
        do (setf (mem-aref protocol-ptr :pointer idx) (slot-value protocol 'class-ptr)))
     ret))
+
+(defmethod translate-from-foreign (protocol-ptr (type objc-protocol-type))
+  (unless (null-pointer-p protocol-ptr)
+    (let* ((name (string-objc-msg-send protocol-ptr "name" nil))
+	   (new-protocol
+	    (make-instance 'objc-protocol
+			   :id protocol-ptr
+			   :name name))
+	   (instance-methods (get-ivar new-protocol "instance_methods"))
+	   (class-methods (get-ivar new-protocol "class_methods")))
+      (setf (slot-value new-protocol 'included-protocols) 
+	    (convert-from-foreign (get-ivar new-protocol "protocol_list") 'objc-protocol-list-pointer)
+
+	    (slot-value new-protocol 'instance-methods)
+	    (unless (null-pointer-p instance-methods)
+	      (loop 
+		 for idx below (foreign-slot-value instance-methods 'objc-method-description-list 'count)
+		 for method-desc-ptr = (foreign-slot-pointer instance-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
+		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name)))
+
+	    (slot-value new-protocol 'class-methods)
+	    (unless (null-pointer-p class-methods)
+	      (loop 
+		 for idx below (foreign-slot-value class-methods 'objc-method-description-list 'count)
+		 for method-desc-ptr = (foreign-slot-pointer class-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
+		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name))))
+      new-protocol)))
 
 (defgeneric super-classes (item)
   (:documentation "Get the Super Classes of an Objc Object or of a
@@ -564,6 +599,13 @@
    (id :initarg :id))
   (:documentation "Objective C Object Class"))
 
+(defclass objc-protocol (objc-object)
+  ((name :accessor protocol-name :initarg :name)
+   (class-methods :accessor protocol-class-methods :initarg :class-methods)
+   (instance-methods :accessor protocol-instance-methods :initarg :instance-methods)
+   (included-protocols :accessor protocol-included-protocols :initarg :included-protocols))
+  (:default-initargs :isa (objc-get-class "Protocol")))
+
 (defvar objc-nil-object
   (make-instance 'objc-object :isa objc-nil-class :id (null-pointer))
   "The Objective C Object instance nil")
@@ -577,6 +619,14 @@
   (print-unreadable-object (obj stream)
     (with-slots (isa id) obj
       (format stream "ObjC-~A x~8,'0X"
+              (class-name isa)
+              (pointer-address id)))))
+
+(defmethod print-object ((obj objc-protocol) stream)
+  (print-unreadable-object (obj stream)
+    (with-slots (isa id) obj
+      (format stream "ObjC-~A ~a x~8,'0X"
+	      (protocol-name obj)
               (class-name isa)
               (pointer-address id)))))
 
@@ -618,10 +668,28 @@
 		      (list (ivar-name var) (get-ivar obj (ivar-name var))))
 		    (class-ivars isa)))))
 
+(defmethod describe-object ((protocol objc-protocol) stream)
+  (with-slots (isa id) protocol
+    (format stream "~&~S is an Objective C Protocol at ~8,'0X.~
+                      ~%Class ~A~%~%Name ~a
+Included Protocols: ~{~s~ ~}
+Instance Methods: ~{~s ~}
+Class Methods: ~{~s ~}~%"
+            protocol
+            id
+            isa
+	    (protocol-name protocol)
+	    (protocol-included-protocols protocol)
+	    (protocol-instance-methods protocol)
+	    (protocol-class-methods protocol))))
+
 (defun get-ivar (obj ivar-name)
   "Returns the value of instance variable named `IVAR-NAME` of
 Objective C object `obj`"
-  (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
+  (let* ((class (typecase obj
+		  (objc-object (obj-class obj))
+		  (objc-class obj)))
+	 (var (find ivar-name (class-ivars class) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))
 		   :pointer))

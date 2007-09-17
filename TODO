@@ -40,7 +40,7 @@
 
 ** Support for the call to super
 
-** Protocol management
+** Let user add effective protocols at compile time (afaik at runtime it is not possible)
 
 ** Exception management
 
