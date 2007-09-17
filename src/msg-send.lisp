@@ -27,16 +27,26 @@
 ;; Building foreign function declarations for each objc primitive type
 ;; e.g. char-objc-msg-send, unsigned-int-objc-msg-send, etc.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (if (not (fboundp 'allowed-simple-return-types))
-      (defun allowed-simple-return-types ()
-	(remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap))))
+(defmacro ensure-fun (name args &body body)
+  `(unless (fboundp ',name)
+     (defun ,name ,args ,@body)))
 
-  (if (not (fboundp 'make-objc-msg-send-symbol))
-      (defun make-objc-msg-send-symbol (type)
-	(intern 
-	 (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
-	 (find-package "OBJC-CFFI")))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (ensure-fun allowed-simple-return-types ()
+    (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
+
+  (ensure-fun make-objc-msg-send-symbol (type)
+    (intern 
+     (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
+     (find-package "OBJC-CFFI")))
+
+  (ensure-fun odd-positioned-elements (list)
+    (when (> (length list) 1)
+      (cons (cadr list) (odd-positioned-elements (cddr list)))))
+
+  (ensure-fun even-positioned-elements (list)
+    (when (> (length list) 1)
+      (cons (car list) (even-positioned-elements (cddr list))))))
 
 (defmacro %objc-msg-send (return-type id sel args)
   (let ((gensyms (loop repeat (+ 2 (/ (length args) 2)) collect (gensym))))
@@ -64,6 +74,33 @@
 
 (build-objc-msg-send)
 
+(defmethod translate-from-foreign (protocol-ptr (type objc-protocol-type))
+  (unless (null-pointer-p protocol-ptr)
+    (let* ((name (%objc-msg-send :string protocol-ptr "name" nil))
+	   (new-protocol
+	    (make-instance 'objc-protocol
+			   :id protocol-ptr
+			   :name name))
+	   (instance-methods (get-ivar new-protocol "instance_methods"))
+	   (class-methods (get-ivar new-protocol "class_methods")))
+      (setf (slot-value new-protocol 'included-protocols) 
+	    (convert-from-foreign (get-ivar new-protocol "protocol_list") 'objc-protocol-list-pointer)
+
+	    (slot-value new-protocol 'instance-methods)
+	    (unless (null-pointer-p instance-methods)
+	      (loop 
+		 for idx below (foreign-slot-value instance-methods 'objc-method-description-list 'count)
+		 for method-desc-ptr = (foreign-slot-pointer instance-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
+		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name)))
+
+	    (slot-value new-protocol 'class-methods)
+	    (unless (null-pointer-p class-methods)
+	      (loop 
+		 for idx below (foreign-slot-value class-methods 'objc-method-description-list 'count)
+		 for method-desc-ptr = (foreign-slot-pointer class-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
+		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name))))
+      new-protocol)))
+
 (defun method-return-type (method)
   (caddar (objc-types:parse-objc-typestr (method-type-signature method))))
 
@@ -78,14 +115,6 @@
 
 (defun method-return-type-size (method)
   (objc-foreign-type-size (method-return-type method)))
-
-(defun odd-positioned-elements (list)
-  (when (> (length list) 1)
-    (cons (cadr list) (odd-positioned-elements (cddr list)))))
-
-(defun even-positioned-elements (list)
-  (when (> (length list) 1)
-    (cons (car list) (even-positioned-elements (cddr list)))))
 
 (defparameter *methods-cache* (make-hash-table))
 

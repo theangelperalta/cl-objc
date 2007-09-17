@@ -528,32 +528,7 @@
        do (setf (mem-aref protocol-ptr :pointer idx) (slot-value protocol 'class-ptr)))
     ret))
 
-(defmethod translate-from-foreign (protocol-ptr (type objc-protocol-type))
-  (unless (null-pointer-p protocol-ptr)
-    (let* ((name (string-objc-msg-send protocol-ptr "name" nil))
-	   (new-protocol
-	    (make-instance 'objc-protocol
-			   :id protocol-ptr
-			   :name name))
-	   (instance-methods (get-ivar new-protocol "instance_methods"))
-	   (class-methods (get-ivar new-protocol "class_methods")))
-      (setf (slot-value new-protocol 'included-protocols) 
-	    (convert-from-foreign (get-ivar new-protocol "protocol_list") 'objc-protocol-list-pointer)
-
-	    (slot-value new-protocol 'instance-methods)
-	    (unless (null-pointer-p instance-methods)
-	      (loop 
-		 for idx below (foreign-slot-value instance-methods 'objc-method-description-list 'count)
-		 for method-desc-ptr = (foreign-slot-pointer instance-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
-		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name)))
-
-	    (slot-value new-protocol 'class-methods)
-	    (unless (null-pointer-p class-methods)
-	      (loop 
-		 for idx below (foreign-slot-value class-methods 'objc-method-description-list 'count)
-		 for method-desc-ptr = (foreign-slot-pointer class-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
-		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name))))
-      new-protocol)))
+;; FIXME: Translate to foreign for protocol is in msg-send.lisp because it depends on it
 
 (defgeneric super-classes (item)
   (:documentation "Get the Super Classes of an Objc Object or of a
