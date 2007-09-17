@@ -466,25 +466,32 @@
   (class-ptr objc-class-pointer)
   (iterator :pointer))
 
+(defparameter *objc-classes* (make-hash-table :test #'equal))
+
 ;;; Type Translators
 (defmethod translate-from-foreign (class-ptr (type objc-class-type))
   (if (not (null-pointer-p class-ptr))
-      (with-foreign-slots ((isa super_class name
-                                version info instance_size
-                                ivars methodlists
-                                cache protocols)
-                           class-ptr objc-class-cstruct)
-	(make-instance 'objc-class
-		       :isa (unless (pointer-eq isa class-ptr) 
-			      (convert-from-foreign isa 'objc-class-pointer))
-		       :super-class super_class 
-		       :name name
-		       :version version :info info :instance-size instance_size
-		       :ivars ivars 
-		       :method-lists methodlists ; FIXME: i d like to convert it
-		       :cache cache 
-		       :protocols protocols
-		       :ptr class-ptr))
+      (with-foreign-slots ((name info) class-ptr objc-class-cstruct) 
+	(or (gethash (append info (list name)) *objc-classes*)
+	    (with-foreign-slots ((isa super_class name
+				      version info instance_size
+				      ivars methodlists
+				      cache protocols)
+				 class-ptr objc-class-cstruct)
+	      (setf (gethash (append info (list name)) *objc-classes*)
+		    (make-instance 'objc-class
+				   :isa (unless (pointer-eq isa class-ptr) 
+					  (convert-from-foreign isa 'objc-class-pointer))
+				   :super-class super_class 
+				   :name name
+				   :version version 
+				   :info info 
+				   :instance-size instance_size
+				   :ivars ivars 
+				   :method-lists methodlists ; FIXME: i d like to convert it
+				   :cache cache 
+				   :protocols protocols
+				   :ptr class-ptr)))))
       objc-nil-class))
 
 ;; See the objc-class-cstruct definition to know about the aim of this method 
