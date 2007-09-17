@@ -58,13 +58,9 @@
 (defcfun ("sel_registerName" sel-register-name) objc-sel
   (str :string))
 
-(defcfun ("sel_getUid" %sel-get-uid) objc-sel
-  (str :string))
-
-;; defun needed for docstring. See objc-get-class
-(defun sel-get-uid (name)
+(defcfun ("sel_getUid" sel-get-uid) objc-sel
   "Returns the selector named `NAME`."
-  (%sel-get-uid name))
+  (str :string))
 
 ;;; Type Translators
 (defmethod translate-from-foreign (uid (type objc-selector-type))
@@ -444,11 +440,9 @@
   (count :int)
   (list :pointer))
 
-;; defined just to have a documentation string for the function as
-;; CFFI doesn't support docstring of defcfun
-(defun objc-get-class (class-name)
-  "Returns the Objective Class named `CLASS-NAME`"
-  (%objc-get-class class-name))
+(defcfun ("objc_getClass" objc-get-class) objc-class-pointer
+  "Returns the Objective Class named `NAME`"
+  (name :string))
 
 (defcfun ("objc_getClassList" objc-get-class-list) :int
   (buffer :pointer)
@@ -458,23 +452,15 @@
   (class objc-class-pointer)
   (variable-name :string))
 
-(defcfun ("class_getInstanceMethod" %class-get-instance-method) objc-method-pointer
-  (class objc-class-pointer)
-  (sel objc-sel))
-
-;; defun needed for docstring. See objc-get-class
-(defun class-get-instance-method (class sel)
+(defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
   "Return the instance method of `CLASS` binded to `SEL`"
-  (%class-get-instance-method class sel))
-
-(defcfun ("class_getClassMethod" %class-get-class-method) objc-method-pointer
   (class objc-class-pointer)
   (sel objc-sel))
 
-;; defun needed for docstring. See objc-get-class
-(defun class-get-class-method (class sel)
+(defcfun ("class_getClassMethod" class-get-class-method) objc-method-pointer
   "Return the class method binded of `CLASS` to `SEL`"
-  (%class-get-class-method class sel))
+  (class objc-class-pointer)
+  (sel objc-sel))
 
 (defcfun ("class_nextMethodList" class-next-method-list) objc-method-list-pointer
   (class-ptr objc-class-pointer)
