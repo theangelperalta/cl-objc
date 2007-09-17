@@ -7,7 +7,7 @@
 
 ** Support for Variadic ObjC methods
 
-** Remove warnings in test suite :runtime and in with-ivar-accessors
+** Remove warnings in test suite :runtime
 
 ** Remove unused functions
 

@@ -234,8 +234,10 @@ Return a new Objective C Method object."
       (let ((var-name (ivar-name (car vars))))
 	`(flet ((,(car (objc-selector-to-symbols var-name)) (obj)
 		  (get-ivar obj ,var-name)))
+	   (declare (ignorable (function ,(car (objc-selector-to-symbols var-name)))))
 	   (flet (((setf ,(car (objc-selector-to-symbols var-name))) (value obj)
 		    (set-ivar obj ,var-name value)))
+	     (declare (ignorable (function (setf ,(car (objc-selector-to-symbols var-name))))))
 	     (ivars-macrolet-forms ,(cdr vars) ,class ,@body))))
       `(progn
 	 ,@body)))
