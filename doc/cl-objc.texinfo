@@ -418,55 +418,7 @@ at-sign so (lisp-string-to-nsstring ``MainMenu'') becomes @@"MainMenu''
 @chapter CFFI Bindings
 
 @section API Reference
-
-@subsection Frameworks
-@include include/macro-objc-cffi-use-objc-framework.texinfo
-
-@subsection Structs
-@include include/fun-objc-cffi-objc-struct-slot-value.texinfo
-@include include/macro-objc-cffi-define-objc-struct.texinfo
-@include include/fun-objc-cffi-symbol-to-objc-class-name.texinfo
-@include include/fun-objc-cffi-objc-class-name-to-symbol.texinfo
-
-@subsection Classes
-@include include/fun-objc-cffi-get-class-list.texinfo
-@include include/fun-objc-cffi-objc-get-class.texinfo
-@include include/fun-objc-cffi-get-class-methods.texinfo
-@include include/fun-objc-cffi-get-instance-methods.texinfo
-@include include/fun-objc-cffi-class-get-class-method.texinfo
-@include include/fun-objc-cffi-class-get-instance-method.texinfo
-@include include/fun-objc-cffi-class-has-public-ivars.texinfo
-@include include/fun-objc-cffi-super-classes.texinfo
-@include include/var-objc-cffi-objc-nil-class.texinfo
-
-@subsection Instance Variables
-@include include/fun-objc-cffi-make-ivar.texinfo
-@include include/fun-objc-cffi-private-ivar-p.texinfo
-
-@subsection Defining methods and classes at runtime
-@include include/fun-objc-cffi-add-objc-class.texinfo
-@include include/fun-objc-cffi-ensure-objc-class.texinfo
-@include include/macro-objc-cffi-add-objc-method.texinfo
-
-@subsection Instanced Objects
-@include include/fun-objc-cffi-objc-nil-object-p.texinfo
-@include include/fun-objc-cffi-set-ivar.texinfo
-@include include/fun-objc-cffi-get-ivar.texinfo
-@include include/var-objc-cffi-objc-nil-object.texinfo
-@include include/class-objc-cffi-objc-object.texinfo
-
-@subsection Selectors
-@include include/fun-objc-cffi-sel-get-uid.texinfo
-
-@subsection Message Sending
-@include include/macro-objc-cffi-untyped-objc-msg-send.texinfo
-@include include/macro-objc-cffi-typed-objc-msg-send.texinfo
-
-@subsection Type Parsing
-@include include/var-objc-types-typemap.texinfo
-@include include/fun-objc-types-parse-objc-typestr.texinfo
-@include include/fun-objc-types-encode-types.texinfo
-@include include/fun-objc-types-encode-type.texinfo
+@include include/OBJC-CFFI.texinfo
 
 FIXME: exported accessors need documentation too!
 
@@ -474,30 +426,12 @@ FIXME: exported accessors need documentation too!
 @chapter Lisp Interface
 
 @section API Reference
-
-@subsection Name Translators
-@include include/fun-cl-objc-symbols-to-objc-selector.texinfo
-@include include/fun-cl-objc-objc-selector-to-symbols.texinfo
-@include include/var-cl-objc-star-acronyms-star.texinfo
-
-@subsection Macrology
-@include include/macro-cl-objc-with-object.texinfo
-@include include/macro-cl-objc-with-ivar-accessors.texinfo
-@include include/macro-cl-objc-slet.texinfo
-@include include/macro-cl-objc-slet-star.texinfo
-@include include/macro-cl-objc-objc-let.texinfo
-
-@subsection Message Calling
-@include include/macro-cl-objc-invoke.texinfo
-@include include/fun-cl-objc-selector.texinfo
-
-@subsection Defining method and classes at Runtime
-@include include/macro-cl-objc-define-objc-method.texinfo
-@include include/macro-cl-objc-define-objc-class.texinfo
+@include include/CL-OBJC.texinfo
 
 @node Reader Macro
 @chapter Reader Macro
 
+@section Introduction
 The reader macro allows the user to mix ObjectiveC and Common Lisp code.
 
 When the macro dispatch character ``[`` is readed, then the reader
@@ -508,13 +442,17 @@ readtable. In order to send methods to instance objects you can use the
 readtable. For the sake of convenience it is provided the @@ (at-sign)
 macro that build @var{NSString} objects.
 
-@include include/var-objc-reader-star-accept-untyped-call-star.texinfo
-@include include/fun-objc-reader-restore-readtable.texinfo
-@include include/fun-objc-reader-activate-objc-reader-macro.texinfo
+@section API Reference
+@include include/OBJC-READER.texinfo
 
 @node CLOS Wrappers
 @chapter CLOS Wrappers
-To be implemented
+
+@section Introduction
+FIXME: add documentation
+
+@section API Reference
+@include include/OBJC-CLOS.texinfo
 
 @node Implementation Notes
 @chapter Implementation Notes

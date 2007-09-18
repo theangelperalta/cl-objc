@@ -1,5 +1,0 @@
-@anchor{Variable objc-cffi:objc-nil-class}
-@defvr {Variable} objc-cffi:objc-nil-class
-@vindex objc-cffi:objc-nil-class
-The Objective @code{c} Class nil
-@end defvr

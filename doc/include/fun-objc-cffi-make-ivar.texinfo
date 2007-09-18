@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:make-ivar}
-@deffn {Function} objc-cffi:make-ivar name type
-@findex objc-cffi:make-ivar
-Returns a new instance variable object named `NAME` of `TYPE`
-@end deffn

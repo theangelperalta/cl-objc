@@ -1,5 +1,0 @@
-@anchor{Macro cl-objc:slet*}
-@deffn {Macro} cl-objc:slet* bindings &body body
-@findex cl-objc:slet*
-See documentation of `SLET`
-@end deffn

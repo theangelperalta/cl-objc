@@ -1,0 +1,1 @@
+To generate the doc, eval (asdf:oos 'asdf:load-op 'cl-objc.doc)

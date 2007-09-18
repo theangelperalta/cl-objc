@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:private-ivar-p}
-@deffn {Function} objc-cffi:private-ivar-p ivar
-@findex objc-cffi:private-ivar-p
-Returns @code{true} if the instance variable is private.
-@end deffn

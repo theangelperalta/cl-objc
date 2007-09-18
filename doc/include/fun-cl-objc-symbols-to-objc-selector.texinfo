@@ -1,5 +1,0 @@
-@anchor{Function cl-objc:symbols-to-objc-selector}
-@deffn {Function} cl-objc:symbols-to-objc-selector selector
-@findex cl-objc:symbols-to-objc-selector
-Translate a list of symbols to a string naming a translator
-@end deffn

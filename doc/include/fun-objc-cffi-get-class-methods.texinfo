@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:get-class-methods}
-@deffn {Function} objc-cffi:get-class-methods class
-@findex objc-cffi:get-class-methods
-Returns all the class methods of `CLASS`
-@end deffn

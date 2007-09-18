@@ -1,6 +1,0 @@
-@anchor{Macro objc-cffi:define-objc-framework}
-@deffn {Macro} objc-cffi:define-objc-framework framework-name &body cffi-definitions
-@findex objc-cffi:define-objc-framework
-Import definitions from `framework`. `framework` will be
-searched in @code{cffi:} @code{*darwin-framework-directories*}.
-@end deffn

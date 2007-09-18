@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:objc-get-class}
-@deffn {Function} objc-cffi:objc-get-class class-name
-@findex objc-cffi:objc-get-class
-Returns the Objective Class named `CLASS-NAME`
-@end deffn

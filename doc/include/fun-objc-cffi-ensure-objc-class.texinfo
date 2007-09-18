@@ -1,6 +1,0 @@
-@anchor{Function objc-cffi:ensure-objc-class}
-@deffn {Function} objc-cffi:ensure-objc-class class-name super-class &optional ivar-list
-@findex objc-cffi:ensure-objc-class
-Like add-objc-class but if a class with the same name already
-exists it just returns without adding the new class definition
-@end deffn

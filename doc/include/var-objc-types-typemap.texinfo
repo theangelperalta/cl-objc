@@ -1,6 +1,0 @@
-@anchor{Variable objc-types:typemap}
-@defvr {Variable} objc-types:typemap
-@vindex objc-types:typemap
-List of simple types and character code used by Objective @code{c}
-  runtime
-@end defvr

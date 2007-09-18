@@ -1,6 +1,0 @@
-@anchor{Macro cl-objc:with-object}
-@deffn {Macro} cl-objc:with-object obj &body actions
-@findex cl-objc:with-object
-Calls messages with `OBJ` as receveir. `ACTIONS` is a list of
-selector and arguments passed to invoke.
-@end deffn

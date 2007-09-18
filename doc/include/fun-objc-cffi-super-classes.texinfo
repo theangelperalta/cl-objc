@@ -1,6 +1,0 @@
-@anchor{Generic-Function objc-cffi:super-classes}
-@deffn {Generic Function} objc-cffi:super-classes item
-@findex objc-cffi:super-classes
-Get the Super Classes of an Objc Object or of a
-  class viewed as an instance of a Meta Class
-@end deffn

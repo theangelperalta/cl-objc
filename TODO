@@ -10,7 +10,7 @@
 ** Change accessors -> readers when a write is undefined, or write the appropriate writer
 
 * Docs & Examples
-** Update the docs to make it document each exported function, add a tutorial on the clos interface and a makefile to generate the doc (using sb-texinfo)
+** Update the docs: add a tutorial on the clos interface
 
 ** Add more examples (one using the clos interface)
 

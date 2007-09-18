@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:objc-nil-object-p}
-@deffn {Function} objc-cffi:objc-nil-object-p obj
-@findex objc-cffi:objc-nil-object-p
-Returns @code{true} if obj is a nil object
-@end deffn

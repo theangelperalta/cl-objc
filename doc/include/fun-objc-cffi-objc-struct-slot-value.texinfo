@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:objc-struct-slot-value}
-@deffn {Function} objc-cffi:objc-struct-slot-value ptr type slot-name
-@findex objc-cffi:objc-struct-slot-value
-Return the value of `SLOT-NAME` in the ObjC Structure `TYPE` at `PTR`.
-@end deffn

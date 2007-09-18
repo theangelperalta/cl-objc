@@ -1,5 +1,0 @@
-@anchor{Function cl-objc:objc-selector-to-symbols}
-@deffn {Function} cl-objc:objc-selector-to-symbols selector
-@findex cl-objc:objc-selector-to-symbols
-The inverse of @code{symbols-to-objc-selector}
-@end deffn

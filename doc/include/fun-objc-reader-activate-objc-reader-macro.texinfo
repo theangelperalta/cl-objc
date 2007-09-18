@@ -1,8 +1,0 @@
-@anchor{Function objc-reader:activate-objc-reader-macro}
-@deffn {Function} objc-reader:activate-objc-reader-macro &optional accept-untyped-call
-@findex objc-reader:activate-objc-reader-macro
-Installs a the Objective @code{c} readtable. If accept-untyped-call
-is nil method has to be invoked with input type parameters. It
-saves the current readtable to be later restored with
-@code{restore-readtable}
-@end deffn

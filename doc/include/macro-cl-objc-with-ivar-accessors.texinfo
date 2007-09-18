@@ -1,6 +1,0 @@
-@anchor{Macro cl-objc:with-ivar-accessors}
-@deffn {Macro} cl-objc:with-ivar-accessors symbol-class &body body
-@findex cl-objc:with-ivar-accessors
-Execute `BODY` with bindings to accessors of the
-form (`class-name`-`ivar-name`)
-@end deffn

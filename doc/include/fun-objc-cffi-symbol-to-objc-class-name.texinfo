@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:symbol-to-objc-class-name}
-@deffn {Function} objc-cffi:symbol-to-objc-class-name symbol
-@findex objc-cffi:symbol-to-objc-class-name
-The inverse of @code{objc-class-name-to-symbol}.
-@end deffn

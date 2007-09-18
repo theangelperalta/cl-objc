@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:class-get-instance-method}
-@deffn {Function} objc-cffi:class-get-instance-method class sel
-@findex objc-cffi:class-get-instance-method
-Return the instance method of `CLASS` binded to `SEL`
-@end deffn

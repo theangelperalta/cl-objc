@@ -1,5 +1,0 @@
-@anchor{Function objc-types:parse-objc-typestr}
-@deffn {Function} objc-types:parse-objc-typestr str
-@findex objc-types:parse-objc-typestr
-Parse a method type signature
-@end deffn

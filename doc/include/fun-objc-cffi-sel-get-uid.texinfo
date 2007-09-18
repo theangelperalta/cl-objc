@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:sel-get-uid}
-@deffn {Function} objc-cffi:sel-get-uid name
-@findex objc-cffi:sel-get-uid
-Returns the selector named `NAME`.
-@end deffn

@@ -22,7 +22,7 @@
 ;;; CLOS definitions
 (defclass objc-selector ()
   ((name :initarg :name 
-	 :accessor sel-name 
+	 :reader sel-name 
 	 :documentation "Returns the name of the specified selector object")
    (uid :initarg :uid)))
 
@@ -50,6 +50,7 @@
   (:documentation "Objective C SEL type"))
 
 (defcfun ("sel_isMapped" sel-is-mapped) :boolean
+  "Returns true if a selector is registered in the ObjC runtime."
   (sel objc-sel))
 
 (defcfun ("sel_getName" sel-get-name) :string
@@ -82,7 +83,7 @@
 ;;; CLOS definitions
 (defclass objc-method ()
   ((name :initarg :name 
-	 :accessor method-selector
+	 :reader method-selector
 	 :documentation "Returns the selector binded to the
 	 specified method")
    (types :initarg :types 

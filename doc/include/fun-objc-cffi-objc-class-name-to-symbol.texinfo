@@ -1,5 +1,0 @@
-@anchor{Function objc-cffi:objc-class-name-to-symbol}
-@deffn {Function} objc-cffi:objc-class-name-to-symbol name
-@findex objc-cffi:objc-class-name-to-symbol
-Returns a symbol that can be used in CL-Objc to identify the class named `NAME`.
-@end deffn

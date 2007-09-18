@@ -29,6 +29,30 @@
 								  "structs")))))
     :depends-on (:cffi :yacc :closer-mop :memoize))
 
+(defsystem cl-objc.examples
+  :components ((:module :examples
+			:components ((:file "hello-world")
+				     (:file "converter"))))
+  :depends-on (:cl-objc :swank))
+
+(defsystem cl-objc.doc
+  :components ((:module :doc
+			:components ((:file "docstrings"))))
+  :depends-on (:cl-objc))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *doc-dir* (append 
+			   (pathname-directory (or *load-pathname* *compile-file-pathname*))
+			   (list "doc" "include"))))
+
+(defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc.doc))))
+  (dolist (package (mapcar 'find-package '("OBJC-CFFI" "OBJC-CLOS" "OBJC-READER" "CL-OBJC")))
+    (funcall (intern "DOCUMENT-PACKAGE" "SB-TEXINFO") 
+	     package 
+	     (make-pathname :directory *doc-dir*
+			    :name (package-name package)
+			    :type "texinfo"))))
+
 (defsystem  cl-objc.test
   :components ((:module :t
 			:components ((:file "suite")
@@ -41,12 +65,6 @@
 				     (:file "cache" :depends-on ("suite"))
 				     (:file "clos" :depends-on ("suite")))))
   :depends-on (:cl-objc :FiveAM))
-
-(defsystem cl-objc.examples
-  :components ((:module :examples
-			:components ((:file "hello-world")
-				     (:file "converter"))))
-  :depends-on (:cl-objc :swank))
 
 ;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system 'cl-objc))))

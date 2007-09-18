@@ -1,6 +1,0 @@
-@anchor{Function cl-objc:selector}
-@deffn {Function} cl-objc:selector &rest symbols
-@findex cl-objc:selector
-Returns the selector object associated to symbols through
-@code{symbols-to-objc-selector}.
-@end deffn
