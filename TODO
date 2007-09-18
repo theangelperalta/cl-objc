@@ -13,6 +13,8 @@
 
 ** See the KNOWN_BUGS file for the WONTFIX bugs
 
+** Change accessors -> readers when a write is undefined, or write the appropriate writer
+
 * Docs & Examples
 ** Update the docs to make it document each exported function, add a tutorial on the clos interface and a makefile to generate the doc (using sb-texinfo)
 
@@ -22,6 +24,8 @@
 
 * New minor features
 
+** Cache protocol names per framework
+
 ** Make ensure-objc-class try to add the ivars to a class if the definition is the same as previous
 
 ** Add an objc-let* macro
@@ -29,8 +33,6 @@
 ** README file
 
 ** Better error signaling if wrong input to functions is passed
-
-** Makes objc reader produce objects that can be handled with the clos interface
 
 * New major features
 
@@ -40,10 +42,6 @@
 
 ** Support for the call to super
 
-** Let user add effective protocols at compile time (afaik at runtime it is not possible)
-
-** Exception management
-
-** Easy Deploy feature
+** Let user add effective protocols to classes
 
 ** Integration with XCode

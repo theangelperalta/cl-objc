@@ -147,6 +147,10 @@ E.g.
 	      (,greceiver (if (symbolp ,greceiver) 
 			      (objc-get-class (symbol-to-objc-class-name ,greceiver)) 
 			      ,greceiver)))
+	 (when (or
+		(eq ,greceiver objc-nil-class)
+		(objc-nil-object-p ,greceiver))
+	   (error "Can't send message to nil"))
 	 ,(if (typed-invocation-p selector-and-args)
 	      `(typed-objc-msg-send (,greceiver 
 				     ,(symbols-to-objc-selector selector)) 

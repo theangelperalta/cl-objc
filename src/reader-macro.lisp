@@ -6,6 +6,7 @@
   "The readtable used to read arguments of messages")
 (defparameter *accept-untyped-call* t
   "If nil, methods have to be invoked with input type parameters.")
+(defparameter *use-clos-interface* t)
 
 (defun end-selector-char-p (char)
   (member char '(#\Space #\])))
@@ -119,16 +120,26 @@ receiver-read)).
 The args will be read with the lisp readtable.
 "
   (declare (ignore char))
-  (with-objc-readtable 
-    (let ((id (read stream t nil t)))
-      (let ((receiver (or 
-		       (and (symbolp id) `(objc-get-class ,(symbol-name id))) 
-		       id)))
-	(destructuring-bind (args selector typed) 
-	    (read-args-and-selector stream)
-	  (if typed
-	      `(typed-objc-msg-send (,receiver ,selector) ,@args)
-	      `(untyped-objc-msg-send ,receiver ,selector ,@args)))))))
+  (flet ((starts-with-a-upcase-char-p (string)
+	   (let ((first-char (elt string 0)))
+	     (and (alpha-char-p first-char) 
+		  (char-equal (char-upcase first-char) first-char)))))
+    (with-objc-readtable 
+      (let ((id (read stream t nil t)))
+	(let ((receiver (if (and (symbolp id) (starts-with-a-upcase-char-p (symbol-name id)))
+			    (if *use-clos-interface*
+				`(objc-clos:meta (objc-class-name-to-symbol (class-name (objc-get-class ,(symbol-name id)))))
+				`(objc-get-class ,(symbol-name id))) 
+			 id)))
+	  (destructuring-bind (args selector typed) 
+	      (read-args-and-selector stream)
+	    (if typed
+		(if *use-clos-interface*
+		    `(objc-clos:convert-result-from-objc (typed-objc-msg-send ((objc:objc-id ,receiver) ,selector) ,@args))
+		    `(typed-objc-msg-send (,receiver ,selector) ,@args))
+		(if *use-clos-interface*
+		    `(objc-clos:convert-result-from-objc (untyped-objc-msg-send (objc:objc-id ,receiver) ,selector ,@args))
+		    `(untyped-objc-msg-send ,receiver ,selector ,@args)))))))))
 
 (defun read-at-sign (stream char n)
   (declare (ignore n))
@@ -143,13 +154,14 @@ The args will be read with the lisp readtable.
 ACTIVATE-OBJC-READER-MACRO."
   (setf *readtable* *old-readtable*))
 
-(defun activate-objc-reader-macro (&optional (accept-untyped-call nil))
+(defun activate-objc-reader-macro (&optional (accept-untyped-call nil) (use-clos-interface nil))
   "Installs a the Objective C readtable. If accept-untyped-call
 is nil method has to be invoked with input type parameters. It
 saves the current readtable to be later restored with
 RESTORE-READTABLE"
   (setf *old-readtable* (copy-readtable)
-	*accept-untyped-call* accept-untyped-call)
+	*accept-untyped-call* accept-untyped-call
+	*use-clos-interface* use-clos-interface)
   (set-macro-character #\] #'objc-read-right-square-bracket)
   (unless (get-macro-character #\@)
     (make-dispatch-macro-character #\@))

@@ -164,7 +164,10 @@ method binded to `SEL`.
 
 	       ;; big struct as return value passed by value
 	       ((big-struct-type-p ,greturn-type) 
-		(objc-msg-send-stret (or ,stret (foreign-alloc (extract-struct-name ,greturn-type))) ,gid ,gsel ,@args-and-types))
+		(objc-msg-send-stret (or ,stret 
+					 (foreign-alloc (extract-struct-name ,greturn-type))) 
+				     ,gid ,gsel ,@args-and-types))
+	       ;; small struct as return value passed by value
 	       ((small-struct-type-p ,greturn-type)
 		(objc-msg-send ,gid ,gsel ,@args-and-types)) 
 
@@ -196,18 +199,18 @@ method binded to `SEL`.
   (setf *methods-cache* (make-hash-table)
 	*untyped-methods-cache* (make-hash-table)))
 
-(defmacro untyped-objc-msg-send (receiver selector &rest args)
+(defun untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to `SELECTOR` to `RECEIVER` returning
 the value of the Objective C call with `ARGS`.
 
 This method invokes typed-objc-msg-send calculating the types of
 `ARGS` at runtime.
 "
-  (with-gensyms (greceiver gselector gmethod)
-    `(let* ((,greceiver ,receiver)
-	    (,gselector ,selector)
-	    (,gmethod (etypecase ,greceiver
-			(objc-class (class-get-class-method ,greceiver ,gselector))
-			(objc-object (class-get-instance-method (obj-class ,greceiver) ,gselector)))))
-       (funcall	(cache-compile-for-untyped ,gselector ,gmethod)
-	,greceiver ,@args))))
+  (let* ((method (etypecase receiver
+		   (objc-class (class-get-class-method receiver selector))
+		   (objc-object (class-get-instance-method (obj-class receiver) selector)))))
+    (if method
+	(apply (cache-compile-for-untyped selector method)	receiver args)
+	(error "ObjC method ~a not found for class ~a" selector (class-name (etypecase receiver
+									      (objc-class receiver)
+									      (objc-object (obj-class receiver))))))))

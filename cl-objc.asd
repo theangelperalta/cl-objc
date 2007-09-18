@@ -12,7 +12,7 @@
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:module :src
 			  :components ((:file "packages")
-				       (:file "reader-macro" :depends-on ("packages" "cffi" "msg-send"))
+				       (:file "reader-macro" :depends-on ("packages" "cffi" "msg-send" "clos"))
 				       (:file "utils" :depends-on ("packages"))
 				       (:file "framework" :depends-on ("packages" "clos"))
 				       (:file "cffi" :depends-on ("packages" "utils" "objc-types"))
