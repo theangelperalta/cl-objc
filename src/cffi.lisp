@@ -87,11 +87,11 @@
 	 :documentation "Returns the selector binded to the
 	 specified method")
    (types :initarg :types 
-	  :accessor method-type-signature
+	  :reader method-type-signature
 	  :documentation "Returns a string with the Objective C
 	  method type signature")
    (imp :initarg :imp)
-   (objc-method-ptr :initarg :ptr :accessor method-ptr)))
+   (objc-method-ptr :initarg :ptr :reader method-ptr)))
 
 ;;; printer
 (defmethod print-object ((method objc-method) stream)
@@ -206,11 +206,11 @@
 ;;; CLOS definitions
 (defclass objc-ivar ()
   ((name :initarg :name 
-	 :accessor ivar-name
+	 :reader ivar-name
 	 :documentation "Returns a string with the name of the
 	 specified instance variable")
    (type :initarg :type 
-	 :accessor ivar-type
+	 :reader ivar-type
 	 :documentation "Returns a list with the type
 	 specification of an instance variable")
    (offset :initarg :offset :accessor ivar-offset)
@@ -318,19 +318,19 @@
 ;;; CLOS definitions
 (defclass objc-class ()
   ((isa :initarg :isa 
-	:accessor metaclass
+	:reader metaclass
 	:documentation "Returns the metaclass of class")
-   (super-class :initarg :super-class :accessor super-class)
-   (name :initarg :name :accessor class-name)
+   (super-class :initarg :super-class :reader super-class)
+   (name :initarg :name :reader class-name)
    (version :initarg :version)
    (info :initarg :info)
-   (instance-size :initarg :instance-size :accessor instance-size)
+   (instance-size :initarg :instance-size :reader instance-size)
    (ivars :initarg :ivars 
-	  :accessor class-ivars 
+	  :reader class-ivars 
 	  :documentation "Returns the instance variables of class")
    (method-lists :initarg :method-lists)
    (cache :initarg :cache)
-   (protocols :initarg :protocols :accessor protocols)
+   (protocols :initarg :protocols :reader protocols)
    (class-ptr :initarg :ptr)))
 
 (defparameter objc-nil-class
@@ -566,17 +566,17 @@ of `class`"
 ;;; CLOS definitions
 (defclass objc-object ()
   ((isa :initarg :isa 
-	:accessor obj-class
+	:reader obj-class
 	:documentation "Returns the Objective C class of the
 	specified object")
    (id :initarg :id))
   (:documentation "Objective C Object Class"))
 
 (defclass objc-protocol (objc-object)
-  ((name :accessor protocol-name :initarg :name)
-   (class-methods :accessor protocol-class-methods :initarg :class-methods)
-   (instance-methods :accessor protocol-instance-methods :initarg :instance-methods)
-   (included-protocols :accessor protocol-included-protocols :initarg :included-protocols))
+  ((name :reader protocol-name :initarg :name)
+   (class-methods :reader protocol-class-methods :initarg :class-methods)
+   (instance-methods :reader protocol-instance-methods :initarg :instance-methods)
+   (included-protocols :reader protocol-included-protocols :initarg :included-protocols))
   (:default-initargs :isa (objc-get-class "Protocol")))
 
 (defvar objc-nil-object

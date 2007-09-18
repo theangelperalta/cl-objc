@@ -113,21 +113,23 @@
      (reduce #'+ (mapcar #'objc-foreign-type-size (caddr type))))
     (t (foreign-type-size type))))
 
-(defparameter *methods-cache* (make-hash-table))
+(defparameter *methods-cache* (make-hash-table :test #'equal))
 
 (defun cache-compile (sel return-type types)
-  (let ((sel-name (etypecase sel
-		    (objc-selector (sel-name sel))
-		    (string sel))))
-    (or (gethash sel-name *methods-cache*)
-	(setf (gethash sel-name *methods-cache*)
-	      (compile nil
-		       (let ((varargs (loop for i upto (length types) collecting (gensym))))
-			 `(lambda ,varargs
-			    (,(make-objc-msg-send-symbol return-type) 
-			      ,(first varargs) 
-			      ,sel
-			      ,(interpose types (cdr varargs))))))))))
+  (let* ((sel-name (etypecase sel
+		     (objc-selector (sel-name sel))
+		     (string sel))))
+    (macrolet ((cache (sel-name types)
+		 `(gethash (append (list ,sel-name) ,types) *methods-cache*)))
+      (or (cache sel-name types)
+	  (setf (cache sel-name types)
+		(compile nil
+			 (let ((varargs (loop for i upto (length types) collecting (gensym))))
+			   `(lambda ,varargs
+			      (,(make-objc-msg-send-symbol return-type) 
+				,(first varargs) 
+				,sel
+				,(interpose types (cdr varargs)))))))))))
 
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest args-and-types)
   "Send the message binded to selector `SEL` to the object `ID`

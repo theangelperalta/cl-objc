@@ -31,13 +31,16 @@ of `type` exists."
     `(if (cached-framework-p ,framework-name ',type)
 	 (load (compile-file-pathname ,pathname))
 	 (progn
-	   (with-open-file (out ,pathname
-				:direction :output :if-exists :supersede :if-does-not-exist :create)
-	     (format *trace-output* "~%Caching ~a definition for ~a framework in ~a~%"
-		     (symbol-name ',type)
-		     ,framework-name
-		     ,pathname)
-	     ,@body)
+	   (if (open ,pathname :direction :output :if-exists :supersede :if-does-not-exist :create)
+	       (with-open-file (out ,pathname
+				    :direction :output :if-exists :supersede :if-does-not-exist :create)
+		 (format *trace-output* "~%Caching ~a definition for ~a framework in ~a~%"
+			 (symbol-name ',type)
+			 ,framework-name
+			 ,pathname)
+		 ,@body)
+	       (let ((out nil))
+		 ,@body))
 	   (compile-file ,pathname :verbose nil :print nil)))))
 
 (defmacro use-objc-framework (framework-name &body cffi-definitions)

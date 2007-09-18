@@ -109,7 +109,8 @@ Return a new Objective C Method object."
 				   (callback ,callback)
 				   ,class-method)))
 	     (when objc-clos:*automatic-definitions-update*
-	       (objc-clos:add-clos-method ,new-method (objc-get-class ,class) :class-method ,class-method))))))))
+	       (objc-clos:add-clos-method ,new-method (objc-get-class ,class) :class-method ,class-method))
+	     ,new-method))))))
 
 ;;;; Adding Objective-C classes at runtime
 

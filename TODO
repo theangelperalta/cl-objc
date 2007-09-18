@@ -1,16 +1,7 @@
 ;; -*- outline -*-
 
-* Bugfix
-** Allow the working of cl-objc on a read-only installation (i.e. without framework caching)
-
-** Support for Variadic ObjC methods
-
-** Remove warnings in test suite :runtime
-
-** Change accessors -> readers when a write is undefined, or write the appropriate writer
-
 * Docs & Examples
-** Update the docs: add a tutorial on the clos interface
+** Update the docs: add a tutorial on the clos interface, extract a README file
 
 ** Add more examples (one using the clos interface)
 
@@ -18,15 +9,11 @@
 
 * New minor features
 
-** Cache protocol names per framework
-
 ** Make ensure-objc-class try to add the ivars to a class if the definition is the same as previous
 
 ** Add an objc-let* macro
 
-** README file
-
-** Better error signaling if wrong input to functions is passed
+** Support for Variadic ObjC methods
 
 * New major features
 
