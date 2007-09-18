@@ -119,14 +119,6 @@ value (CLOS instance or primitive type)"
 		lambda-list
 		(sel-name (method-selector objc-method)))))))
 
-(defun eval-lambda-in-list (list)
-  (mapcar (lambda (form) 
-	    (if (and (listp form)
-		     (eq (car form) 'lambda))
-		(eval form)
-		form))
-	  list))
-
 (defun canonicalize-slot-definition (slot)
   (let ((ret (remove :name (butlast slot 2))))
     (let ((position (position :readers ret)))

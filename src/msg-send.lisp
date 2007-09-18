@@ -113,9 +113,6 @@
      (reduce #'+ (mapcar #'objc-foreign-type-size (caddr type))))
     (t (foreign-type-size type))))
 
-(defun method-return-type-size (method)
-  (objc-foreign-type-size (method-return-type method)))
-
 (defparameter *methods-cache* (make-hash-table))
 
 (defun cache-compile (sel return-type types)

@@ -133,9 +133,11 @@
    "Objective C objc_method pointer"))
 
 (defcfun ("method_getNumberOfArguments" method-get-number-of-arguments) :unsigned-int
+  "Returns the arity of an ObjC method"
   (method objc-method-pointer))
 
 (defcfun ("method_getSizeOfArguments" method-get-size-of-arguments) :unsigned-int
+  "Returns the size of all the arguments of an ObjC method"
   (method objc-method-pointer))
 
 (defcfun ("method_getArgumentInfo" method-get-argument-info) :unsigned-int
@@ -449,6 +451,8 @@
   (bufferLen :int))
 
 (defcfun ("class_getInstanceVariable" class-get-instance-variable) objc-ivar-pointer
+  "Returns the instance variable definition with `variable-name`
+of `class`"
   (class objc-class-pointer)
   (variable-name :string))
 

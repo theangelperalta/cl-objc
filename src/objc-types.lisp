@@ -129,16 +129,6 @@
   "Parse a method type signature"
   (parse-with-lexer (typestr-lexer str) *objc-type-parser*))
 
-(defun parse-objc-method-signature (method)
-  (let* ((types (parse-objc-typestr (objc-cffi:method-type-signature method)))
-         (ret-val (nth 0 types))
-         (class-arg (nth 1 types))
-         (sel-arg (nth 2 types))
-         (arguments (cdddr types)))
-    `((:return ,ret-val)
-      (:required-args ,class-arg ,sel-arg)
-      (:args ,@arguments))))
-
 (defun encode-types (types &optional align)
   "Encode a type list to a method type signature"
   (format nil "~{~A~}" (mapcar (lambda (type) (encode-type type align)) types)))

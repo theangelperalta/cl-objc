@@ -3,15 +3,9 @@
 * Bugfix
 ** Allow the working of cl-objc on a read-only installation (i.e. without framework caching)
 
-** CLOS Definitions per framework. Actually we can't distinguish where methods/classes come from if we force the generation of clos definitions
-
 ** Support for Variadic ObjC methods
 
 ** Remove warnings in test suite :runtime
-
-** Remove unused functions
-
-** See the KNOWN_BUGS file for the WONTFIX bugs
 
 ** Change accessors -> readers when a write is undefined, or write the appropriate writer
 
