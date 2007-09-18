@@ -92,6 +92,7 @@
 	   "DEFINE-OBJC-CLASS"
 	   "WITH-IVAR-ACCESSORS"
 	   "OBJC-LET"
+	   "OBJC-LET*"
 	   "WITH-OBJECT"
 
 	   "*ACRONYMS*"

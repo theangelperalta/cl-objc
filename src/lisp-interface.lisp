@@ -271,6 +271,12 @@ without adding the new definition."
 					  `(make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
 						      ',(ensure-list (cadr ivar-def)))) 
 					ivars)))))
+(defun objc-let-bindings (bindings)
+  (mapcar (lambda (binding)
+	    (if  (cddr binding)
+		 `(,(first binding) (invoke (invoke ,(second binding) alloc) ,@(cddr binding)))
+		 `(,(first binding) (invoke ,(second binding) alloc))))
+	  bindings))
 
 (defmacro objc-let (bindings &body body)
     "objc-let create new variable bindings to new ObjectiveC
@@ -285,11 +291,12 @@ e.g.
  (objc-let ((num 'ns-number :number-with-float 3.0))
    (invoke float-value))
 "
-  `(let ,(mapcar (lambda (binding)
-		   (if  (cddr binding)
-			`(,(first binding) (invoke (invoke ,(second binding) alloc) ,@(cddr binding)))
-			`(,(first binding) (invoke ,(second binding) alloc))))
-		 bindings)
+  `(let ,(objc-let-bindings bindings)
+     ,@body))
+
+(defmacro objc-let* (bindings &body body)
+    "Serial version of OBJC-LET. See its documentation"
+  `(let* ,(objc-let-bindings bindings)
      ,@body))
 
 (defmacro with-object (obj &body actions)

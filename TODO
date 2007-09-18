@@ -11,8 +11,6 @@
 
 ** Make ensure-objc-class try to add the ivars to a class if the definition is the same as previous
 
-** Add an objc-let* macro
-
 ** Support for Variadic ObjC methods
 
 * New major features
