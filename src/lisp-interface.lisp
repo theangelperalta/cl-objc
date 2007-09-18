@@ -125,15 +125,15 @@ SYMBOLS-TO-OBJC-SELECTOR."
     (list selector args types-and-args)))
 
 (defmacro invoke (receiver &rest selector-and-args)
-  "Call an Objective C message to `RECEIVER`.
+  "Call an ObjectiveC message to RECEIVER.
 
-`RECEIVER` can be an Objective C object or class. For the sake of
-convenience if `RECEIVER` is a symbol it will be mapped to an
-Objective C class through the OBJC-CLASS-NAME-TO-SYMBOL translator.
+RECEIVER can be an ObjectiveC object or class. For the sake of
+convenience if RECEIVER is a symbol it will be mapped to an
+ObjectiveC class through the OBJC-CLASS-NAME-TO-SYMBOL translator.
 
-`SELECTOR-AND-ARGS` has the form {selector-part [cffi-type] value}*.
+SELECTOR-AND-ARGS has the form {selector-part [cffi-type] value}*.
 
-E.g.
+e.g.
  (invoke 'ns-number alloc)
  (invoke 'ns-value :value-with-number 3)
  (invoke 'ns-number :number-with-int :int 4)
@@ -170,19 +170,19 @@ E.g.
      (slet-macrolet-forms (cdr types)))))
 
 (defmacro slet (bindings &body body)
-  "slet and slet* create new variable bindings to Objective C
-structs and execute a series of forms in `BODY` that use these
+  "slet and slet* create new variable BINDINGS to ObjectiveC
+structs and execute a series of forms in BODY that use these
 bindings. slet performs the bindings in parallel and slet* does
 them sequentially.
 
-`BINDINGS` has the form: ((var struct-type [init-form])*).
+BINDINGS has the form: ((VAR STRUCT-TYPE [INIT-FORM])*).
 
-`VAR` will be binded to `INIT-FORM` if present otherwise to a new
-allocated struct of type `struct-type` (translated by
+VAR will be binded to `INIT-FORM` if present otherwise to a new
+allocated struct of type STRUCT-TYPE (translated by
 OBJC-CLASS-NAME-TO-SYMBOL).
 
-In body accessories of the form (`struct-name`-`slot-name`
-struct-obj) will be bound as utilities."
+In body accessories of the form (STRUCT-NAME`-`SLOT-NAME
+STRUCT-OBJ) will be bound as utilities."
   `(let ,(mapcar 
 	  (lambda (binding)
 	    (let ((name (car binding))
@@ -193,7 +193,7 @@ struct-obj) will be bound as utilities."
        ,@body)))
 
 (defmacro slet* (bindings &body body)
-  "See documentation of `SLET`"
+  "See documentation of SLET"
   (if bindings
     `(slet (,(car bindings))
        (slet* ,(cdr bindings) ,@body))
@@ -204,29 +204,29 @@ struct-obj) will be bound as utilities."
 			      (&key (return-type 'objc-id) (class-method nil)) 
 			      (&rest argument-list) 
 			      &body body)
-  "Add an Objective C method binded to a selector defined by
-`LIST-SELECTOR` (translated by SYMBOLS-TO-OBJC-SELECTOR),
-returning the CFFI `RETURN-TYPE`. 
+  "Add an ObjectiveC method binded to a selector defined by
+LIST-SELECTOR (translated by SYMBOLS-TO-OBJC-SELECTOR), returning
+the CFFI RETURN-TYPE.
 
-If `CLASS-METHOD` is true then a class method will be added.
+If CLASS-METHOD is true then a class method will be added.
 
-`ARGUMENT-LIST` is a list of list with two elements. The first
+ARGUMENT-LIST is a list of list with two elements. The first
 one is the name of the argument, while the second is its CFFI
 type. The first pair has to have as first element the symbol self
 and as second element the class which the method will be added to.
 
-In `BODY` is also bound the symbol `SEL` pointing to the
+In BODY is also bound the symbol `SEL` pointing to the
 selector.
 
 If a method binded to the same selector is already present it
 installs the new definition discarding the previous one.
 
-Return a new Objective C Method object."
+Return a new ObjectiveC Method object."
   (flet ((remove-symbol-with-name (symbol-name list)
 	   (remove symbol-name list :key (lambda (el) (symbol-name (car el))) :test #'string-equal)))
     `(add-objc-method (,(symbols-to-objc-selector (ensure-list list-selector))
 			,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
-							(error "You have to specify the `self` argument and the related type")))
+							(error "You have to specify the SELF argument and the related type")))
 			:return-type ,return-type
 			:class-method ,class-method)
 	 (,@(or (remove-symbol-with-name "self" (remove-symbol-with-name "sel" argument-list))
@@ -247,20 +247,20 @@ Return a new Objective C Method object."
 	 ,@body)))
 
 (defmacro with-ivar-accessors (symbol-class &body body)
-  "Execute `BODY` with bindings to accessors of the
-form (`class-name`-`ivar-name`)"
+  "Execute BODY with bindings to accessors of the
+form (CLASS-NAME`-`IVAR-NAME)"
   (let ((class (objc-get-class (symbol-to-objc-class-name symbol-class))))
     `(ivars-macrolet-forms ,(class-ivars class) ,symbol-class 
       ,@body)))
 
 (defmacro define-objc-class (symbol-name symbol-superclass (&rest ivars))
-  "Define and returns a new Objective C class `SYMBOL-NAME`
-deriving from `SYMBOL-SUPERCLASS`. Names are translated by
+  "Define and returns a new ObjectiveC class SYMBOL-NAME
+deriving from SYMBOL-SUPERCLASS. Names are translated by
 SYMBOL-TO-OBJC-CLASS-NAME.
 
-`IVARS` is a list of pairs where the first element is the
-variable name (translated by symbols-to-objc-selector) and the
-second on is the CFFI type of the variable.
+IVARS is a list of pairs where the first element is the variable
+name (translated by symbols-to-objc-selector) and the second on
+is the CFFI type of the variable.
 
 If a class with the same name already exists the method returns
 without adding the new definition."
@@ -273,13 +273,13 @@ without adding the new definition."
 					ivars)))))
 
 (defmacro objc-let (bindings &body body)
-    "objc-let create new variable bindings to new Objective C
+    "objc-let create new variable bindings to new ObjectiveC
 object, instantiated by the alloc method, and execute a series of
-forms in `BODY` that use these bindings.
+forms in BODY that use these bindings.
 
-`BINDINGS` has the form: ((var symbol-class-type [init-form])*).
+BINDINGS has the form: ((var symbol-class-type [init-form])*).
 
-`VAR` will be initialized calling INVOKE with `INIT-FORM` as arguments.
+VAR will be initialized calling INVOKE with `INIT-FORM` as arguments.
 
 e.g.
  (objc-let ((num 'ns-number :number-with-float 3.0))
@@ -293,7 +293,7 @@ e.g.
      ,@body))
 
 (defmacro with-object (obj &body actions)
-  "Calls messages with `OBJ` as receveir. `ACTIONS` is a list of
+  "Calls messages with OBJ as receveir. ACTIONS is a list of
 selector and arguments passed to invoke."
   `(progn 
      ,@(mapcar (lambda (action)

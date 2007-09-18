@@ -14,15 +14,15 @@
 	       (list "frameworks"))))
 
 (defun cache-pathname-for-framework (framework-name type)
-  "Returns the pathname of the definition of `type` related to
-`framework-name`. At the moment type can be 'clos or 'struct."
+  "Returns the pathname of the definition of TYPE related to
+FRAMEWORK-NAME. At the moment type can be 'clos or 'struct."
   (make-pathname :directory (pathname-directory (cache-root-dir))
 		 :name (format nil "~a-~a" framework-name (symbol-name type))
 		 :type "lisp"))
 
 (defun cached-framework-p (framework-name type)
-  "Returns true if a cache for `framework-name` on the definition
-of `type` exists."
+  "Returns true if a cache for FRAMEWORK-NAME on the definition
+of TYPE exists."
   (ensure-directories-exist (cache-root-dir))
   (probe-file (cache-pathname-for-framework framework-name type)))
 
@@ -44,7 +44,7 @@ of `type` exists."
 	   (compile-file ,pathname :verbose nil :print nil)))))
 
 (defmacro use-objc-framework (framework-name &body cffi-definitions)
-  "Import definitions from `framework`. `framework` will be
+  "Import definitions from FRAMEWORK-NAME. Frameworks will be
 searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*."
   (let ((name (intern (concatenate 'string (string-upcase framework-name) "-FRAMEWORK"))))
     `(progn 

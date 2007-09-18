@@ -155,9 +155,9 @@ ACTIVATE-OBJC-READER-MACRO."
   (setf *readtable* *old-readtable*))
 
 (defun activate-objc-reader-macro (&optional (accept-untyped-call nil) (use-clos-interface nil))
-  "Installs a the Objective C readtable. If accept-untyped-call
-is nil method has to be invoked with input type parameters. It
-saves the current readtable to be later restored with
+  "Installs a the ObjectiveC readtable. If ACCEPT-UNTYPED-CALL is
+NIL method has to be invoked with input type parameters. It saves
+the current readtable to be later restored with
 RESTORE-READTABLE"
   (setf *old-readtable* (copy-readtable)
 	*accept-untyped-call* accept-untyped-call

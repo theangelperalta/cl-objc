@@ -14,7 +14,7 @@
 	(t ret)))))
 
 (defun objc-class-name-to-symbol (name)
-  "Returns a symbol that can be used in CL-Objc to identify the class named `NAME`."
+  "Returns a symbol that can be used in CL-ObjC to identify the class named NAME."
   (let ((cl-objc:*acronyms* nil))
     (cond 
       ((string-equal "ns" (subseq name 0 2))
@@ -52,8 +52,8 @@
       (error "There is no CFFI struct binded to name ~a in the package ~a" name (package-name *package*))))
 
 (defun extract-struct-name (input-type)
-  "If `input-type` is a struct returns the type symbol used by
-CFFI, otherwise returns `input-type` unchanged"
+  "If INPUT-TYPE is a struct returns the type symbol used by
+CFFI, otherwise returns INPUT-TYPE unchanged"
   (if (struct-type-p input-type)
         (let ((struct-name (second input-type)))
 	  (canonicalize-objc-struct-name struct-name))
@@ -123,16 +123,17 @@ big struct types with the corresponding number of :int parameters"
 
 (defmacro define-objc-struct (name-and-objc-options &body doc-and-slots)
   "Wrapper for CFFI:DEFCSTRUCT allowing struct to be used as
-  type. `doc-and-slots` will be passed directly to
-  CFFI:DEFCSTRUCT while `name-and-objc-options` can be specified
-  in one of the followings format (e.g. for the NSRect struct):
-  ns-rect 
-  (ns-rect 16) 
-  (ns-rect \"_NSRect\") 
-  ((ns-rect 16)  \"_NSRect\"),
+  type. DOC-AND-SLOTS will be passed directly to CFFI:DEFCSTRUCT
+  while NAME-AND-OBJC-OPTIONS can be specified in one of the
+  followings format (e.g. for the NSRect STRUCT): 
+
+  NS-RECT
+  (NS-RECT 16) 
+  (NS-RECT \"_NSRect\") 
+  ((NS-RECT 16)  \"_NSRect\"),
 
 where _NSRect is the struct name used in ObjC methods, and
-ns-rect is the lisp name of the struct. If you don't specify the
+NS-RECT is the lisp name of the struct. If you don't specify the
 former the method will try to guess it automatically, but an
 error will be raised if the trial fails.
 "
@@ -152,7 +153,7 @@ error will be raised if the trial fails.
 	   ,@doc-and-slots)))))
 
 (defun objc-struct-slot-value (ptr type slot-name)
-  "Return the value of `SLOT-NAME` in the ObjC Structure `TYPE` at `PTR`."
+  "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."
   (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name))
 
 (defun set-objc-struct-slot-value (ptr type slot-name newval)

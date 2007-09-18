@@ -72,21 +72,20 @@
 
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
-  "Add an Objective C method to `CLASS` returning the CFFI
-`RETURN-TYPE` and binding it to a selector with `NAME`.
-If `CLASS-METHOD` is true then a class method will be added to `CLASS`.
+  "Add an ObjectiveC method to CLASS returning the CFFI
+RETURN-TYPE and binding it to a selector with NAME. If
+CLASS-METHOD is true then a class method will be added to CLASS.
 
-`ARGUMENT-LIST` is a list of list with two elements. The first
-one is the name of the argument, while the second is its CFFI
-type. 
+ARGUMENT-LIST is a list of list with two elements. The first one
+is the name of the argument, while the second is its CFFI type.
 
-In `BODY` are also bound the symbols `SELF` pointing to the
-receiver of the message and `SEL` pointing to the selector.
+In BODY are also bound the symbols SELF pointing to the receiver
+of the message and SEL pointing to the selector.
 
-If a method binded to `SEL` is already present in `CLASS` it
-installs the new definition discarding the previous one.
+If a method binded to SEL is already present in CLASS it installs
+the new definition discarding the previous one.
 
-Return a new Objective C Method object." 
+Return a new ObjectiveC Method object." 
   (multiple-value-bind (var-list type-list)
       (parse-argument-list argument-list)
     (let* ((callback (gentemp (format nil "~A-CALLBACK-" (remove #\: name))))
@@ -129,9 +128,9 @@ Return a new Objective C Method object."
 	     (format stream "A class named ~a already exists" (objc-class-name condition)))))
 
 (defun add-objc-class (class-name super-class &optional ivar-list)
-  "Adds and returns a new Objective C class `CLASS-NAME` deriving from `SUPER-CLASS`.
+  "Adds and returns a new ObjectiveC class CLASS-NAME deriving from SUPER-CLASS.
 
-`IVAR-LIST` is a list of instance variable object that will be
+IVAR-LIST is a list of instance variable object that will be
 added to the new class.
 
 If a class with the same name already exists the method raise an
@@ -210,7 +209,7 @@ exists it just returns without adding the new class definition"
 					 same-class))))
 
 (defun make-ivar (name type)
-  "Returns a new instance variable object named `NAME` of `TYPE`"
+  "Returns a new instance variable object named NAME of TYPE"
   (let ((ret (foreign-alloc 'objc-ivar-cstruct)))
     (convert-from-foreign  
      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)

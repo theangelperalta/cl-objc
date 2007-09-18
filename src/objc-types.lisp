@@ -20,7 +20,7 @@
     (#\# objc-cffi:objc-class-pointer)
     (#\: objc-cffi:objc-sel)
     (#\? objc-unknown-type))
-  "List of simple types and character code used by Objective C
+  "List of simple types and character code used by ObjectiveC
   runtime")
 
 (defun char-to-type (char)
@@ -140,8 +140,8 @@
   (first (find type method-code-map :key #'second)))
 
 (defun encode-type (type &optional align)
-  "Encode a type specification to a type string used by Objective
-C runtime."
+  "Encode a type specification to a type string used by
+ObjectiveC runtime."
   (cond 
     ((and (listp type) (eq :align (car type))) (format nil "~a~d" (encode-type (third type)) (second type)))
     ((lookup-type-char type) (if align (format nil "~a~d" (lookup-type-char type) 8) (lookup-type-char type)))

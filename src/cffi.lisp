@@ -60,7 +60,7 @@
   (str :string))
 
 (defcfun ("sel_getUid" sel-get-uid) objc-sel
-  "Returns the selector named `NAME`."
+  "Returns the selector named NAME."
   (str :string))
 
 ;;; Type Translators
@@ -190,7 +190,7 @@
 
 ;;; utilities
 (defun get-instance-methods (class)
-  "Returns all the instance methods of `CLASS`"
+  "Returns all the instance methods of CLASS"
   (with-foreign-object (itr :pointer)
     (setf (mem-ref itr :int) 0)
     (loop for mlist = (class-next-method-list class itr)
@@ -198,7 +198,7 @@
        append mlist)))
 
 (defun get-class-methods (class)
-  "Returns all the class methods of `CLASS`"
+  "Returns all the class methods of CLASS"
   (get-instance-methods (metaclass class)))
 
 ;;; Instance variables
@@ -310,7 +310,7 @@
   (string= "_" (ivar-name ivar) :end2 1))
 
 (defun class-has-public-ivars (class)
-  "Returns the public vars of `CLASS`"
+  "Returns the public vars of CLASS"
   (remove-if-not #'private-ivar-p (class-ivars class)))
 
 ;;; Classes and Protocols
@@ -444,7 +444,7 @@
   (list :pointer))
 
 (defcfun ("objc_getClass" objc-get-class) objc-class-pointer
-  "Returns the Objective Class named `NAME`"
+  "Returns the ObjectiveC Class named NAME"
   (name :string))
 
 (defcfun ("objc_getClassList" objc-get-class-list) :int
@@ -452,18 +452,18 @@
   (bufferLen :int))
 
 (defcfun ("class_getInstanceVariable" class-get-instance-variable) objc-ivar-pointer
-  "Returns the instance variable definition with `variable-name`
-of `class`"
+  "Returns the instance variable definition with VARIABLE-NAME
+of CLASS"
   (class objc-class-pointer)
   (variable-name :string))
 
 (defcfun ("class_getInstanceMethod" class-get-instance-method) objc-method-pointer
-  "Return the instance method of `CLASS` binded to `SEL`"
+  "Return the instance method of CLASS binded to SEL"
   (class objc-class-pointer)
   (sel objc-sel))
 
 (defcfun ("class_getClassMethod" class-get-class-method) objc-method-pointer
-  "Return the class method binded of `CLASS` to `SEL`"
+  "Return the class method binded of CLASS to SEL"
   (class objc-class-pointer)
   (sel objc-sel))
 
@@ -547,7 +547,7 @@ of `class`"
 
 ;;; utilities
 (defun get-class-list ()
-  "Returns the list of all the Objective Class available"
+  "Returns the list of all the ObjectiveC Class available"
   (let ((class-count (objc-get-class-list (null-pointer) 0)))
     (with-foreign-object (class-ptrs 'objc-class-pointer class-count)
       (objc-get-class-list class-ptrs class-count)
@@ -557,8 +557,8 @@ of `class`"
            class-ptr))))
 
 (defun get-class-ordered-list ()
-  "Returns the list of all the Objective C Class available
-  ordered by the number of superclass they have"
+  "Returns the list of all the ObjectiveC Class available ordered
+  by the number of superclass they have"
   (sort (get-class-list) #'< :key (lambda (class) (length (super-classes class)))))
 
 ;;; Objects
@@ -581,7 +581,7 @@ of `class`"
 
 (defvar objc-nil-object
   (make-instance 'objc-object :isa objc-nil-class :id (null-pointer))
-  "The Objective C Object instance nil")
+  "The ObjectiveC object instance nil")
 
 (defun objc-nil-object-p (obj)
   "Returns TRUE if obj is a nil object"
@@ -657,8 +657,8 @@ Class Methods: ~{~s ~}~%"
 	    (protocol-class-methods protocol))))
 
 (defun get-ivar (obj ivar-name)
-  "Returns the value of instance variable named `IVAR-NAME` of
-Objective C object `obj`"
+  "Returns the value of instance variable named IVAR-NAME of
+ObjectiveC object OBJ"
   (let* ((class (typecase obj
 		  (objc-object (obj-class obj))
 		  (objc-class obj)))
@@ -674,8 +674,8 @@ Objective C object `obj`"
       (t (mem-ref ret type)))))
 
 (defun set-ivar (obj ivar-name value)
-  "Set the value of instance variable named `IVAR-NAME` of
-Objective C object `OBJ` with `VALUE`"
+  "Set the value of instance variable named IVAR-NAME of OBJ with
+ VALUE"
   (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))

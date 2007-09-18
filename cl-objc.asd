@@ -40,16 +40,12 @@
 			:components ((:file "docstrings"))))
   :depends-on (:cl-objc))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *doc-dir* (append 
-			   (pathname-directory (or *load-pathname* *compile-file-pathname*))
-			   (list "doc" "include"))))
-
-(defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc.doc))))
+(defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc))))
+  (asdf:oos 'asdf:load-op 'cl-objc.doc)
   (dolist (package (mapcar 'find-package '("OBJC-CFFI" "OBJC-CLOS" "OBJC-READER" "CL-OBJC")))
     (funcall (intern "DOCUMENT-PACKAGE" "SB-TEXINFO") 
 	     package 
-	     (make-pathname :directory *doc-dir*
+	     (make-pathname :directory (symbol-value (intern "*DOC-DIR*" "CL-OBJC-UTILS"))
 			    :name (package-name package)
 			    :type "texinfo"))))
 

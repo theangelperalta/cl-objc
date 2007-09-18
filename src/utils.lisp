@@ -6,8 +6,8 @@
 
 (defun interpose (lst1 lst2)
   "Merge two lists in one having as (2*n-1)-th element the n-th
-element of `lst1` and as (2*n)-th element the n-th element of
-`lst2`"
+element of LST1 and as (2*n)-th element the n-th element of
+LST2"
  (loop 
     for var1 in lst1
     for var2 in lst2
@@ -19,8 +19,8 @@ element of `lst1` and as (2*n)-th element the n-th element of
 	  (loop for key being the hash-key of cffi::*type-parsers* collecting key)))
 
 (defun split-string (string separator &key (test-fn #'char-equal))
-  "Split `string` containing items separated by `separator` into
-a list."
+  "Split STRING containing items separated by SEPARATOR into a
+list."
   (let ((ret)
 	(part))
     (loop
@@ -36,7 +36,7 @@ a list."
     ret))
 
 (defun simple-replace-string (old new string)
-  "Replace `old` with `new` into `string`."
+  "Replace OLD with NEW into STRING."
   (loop
      with changed = t
      while changed
@@ -68,3 +68,8 @@ a list."
   (if (= 1 (length fns))
       `(mapcar ,(car fns) ,list)
       `(composite-mapcar (mapcar ,(car fns) ,list) ,@(cdr fns))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *doc-dir* (append 
+			   (butlast (pathname-directory (or *load-pathname* *compile-file-pathname*)))
+			   (list "doc" "include"))))

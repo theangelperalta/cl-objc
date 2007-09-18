@@ -132,19 +132,19 @@
 				,(interpose types (cdr varargs)))))))))))
 
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest args-and-types)
-  "Send the message binded to selector `SEL` to the object `ID`
-returning the value of the Objective C call.
+  "Send the message binded to selector SEL to the object ID
+returning the value of the ObjectiveC call.
 
-`ARGS-AND-TYPES` is a list of pairs. The first element of a pair
+ARGS-AND-TYPES is a list of pairs. The first element of a pair
 is the CFFI type and the second is the value of the argument
 passed to the method.
 
-If the method return type is an Objective C struct you can pass a
+If the method return type is an ObjectiveC struct you can pass a
 pointer to a an allocated struct that will retain the value
 returned, otherwise a new struct will be allocated.
 
-If `ID` is an Objective C class object it will call the class
-method binded to `SEL`.
+If ID is an ObjectiveC class object it will call the class method
+binded to SEL.
 "
   (with-gensyms (gsel gid gmethod greturn-type)
     `(let* ((,gsel ,sel)
@@ -199,11 +199,11 @@ method binded to `SEL`.
 	*untyped-methods-cache* (make-hash-table)))
 
 (defun untyped-objc-msg-send (receiver selector &rest args)
-  "Send the message binded to `SELECTOR` to `RECEIVER` returning
-the value of the Objective C call with `ARGS`.
+  "Send the message binded to SELECTOR to RECEIVER returning the
+value of the ObjectiveC call with ARGS.
 
 This method invokes typed-objc-msg-send calculating the types of
-`ARGS` at runtime.
+ARGS at runtime.
 "
   (let* ((method (etypecase receiver
 		   (objc-class (class-get-class-method receiver selector))
