@@ -75,25 +75,25 @@ and this notice are preserved.
 @chapter Introduction
 
 @section What is CL-ObjC?
-CL-ObjC is a Common Lisp library whose aims are to allow developers to
-use libraries written in the Objective C language, providing a lisp-like
+CL-ObjC is a Common Lisp library whose aim is to allow developers to use
+libraries written in the Objective C language, providing a lisp-like
 interface towards Objective C conventions.
 
 Actually it is made of 4 different interfaces. 
 
-The first one provided by the package @lw{OBJC-CFFI} expose the CFFI
-bindings to the users but allowing them to manage ObjC data through
-Common Lisp classes via the CFFI foreign type translators mechanism.
+The first one provided by the package @lw{OBJC-CFFI} exposes the CFFI
+bindings to the user and allows to handle Objective C objects through
+Common Lisp objects via the CFFI foreign type translators mechanism.
 
 The second one, you can find in the OBJC-READER package, provides a
-reader macro that allows user to mix ObjectiveC and Common Lisp syntax,
-but it doesn't support creation of ObjC classes and methods at runtime.
+reader macro that allows user to mix ObjectiveC and Common Lisp syntax
+just to call Objective C methods.
 
-The third one provided by the package @lw{CL-OBJC} gives to the users the
-ability to write application in a more Common Lisp-like way.
+The third one provided by the package @lw{CL-OBJC} gives to the users
+the ability to write application in a Common Lisp-like way.
 
-The last one provided by @lw{OBJC-CLOS} maps every Objective C class and
-methods to a CLOS class and method with names interned in the @lw{OBJC}
+The last one provided by @lw{OBJC-CLOS} maps every Objective C
+class/method to a CLOS class/method with names interned in the @lw{OBJC}
 package. So the user can code in a CLOS fashion mixing the strength of
 both object systems.
 
@@ -102,11 +102,11 @@ comprehending it please contact @email{cl-objc-devel@@common-lisp.net,
 the developers} with details.
 
 @section Status
-At the moment CL-ObjC has been tested mainly on x86/64 platform on
-Darwin with the last sbcl stable release. It is known also to work on
-Allegro 8.1. As CL-ObjC uses CFFI to link with the Objective C runtime
-foreign functions, it should not be a problem to use it portably on
-other platforms or OSs.
+At the moment CL-ObjC has been tested mainly on x86-64 platform on
+Darwin with the last stable release of sbcl. CL-ObjC is known also to
+work on Allegro 8.1. As CL-ObjC uses CFFI to link with the Objective C
+runtime foreign functions, it should not be a problem to use it portably
+on other platforms, compilers or OSs.
 
 @section Download and installation
 You can get the current development version of CL-ObjC from the darcs
@@ -182,7 +182,7 @@ can be equivalently be executed in CL-ObjC
 (invoke my-obj :do-something-cool-at now :with-this-param 5)
   @end lisp
 
-* using the CLOS interface (once enabled, it is disabled by default)
+* using the CLOS interface
   @lisp
 ;; you can alloc new instances with (make-instance 'objc:ns-foo)
 
@@ -193,7 +193,8 @@ can be equivalently be executed in CL-ObjC
 So every message call can be specified in a typed or untyped way, i.e.
 expliciting the CFFI type of the arguments or not, or mixing the two
 approach. Actually if types are available the compiler can optimize the
-message call.
+message call. The CLOS interface have to be enabled first because it is
+disabled by default.
 
 @section Loading Frameworks
 Once loaded CL-ObjC we can use existing Objective C classes and methods
@@ -212,6 +213,7 @@ definitions, usually useful to define better names for structs and
 fields, because it is not possible to get them at runtime.
 
 If you want to enable the CLOS interface you need to set the
+
 @ref{Variable objc-clos:*automatic-definitions-update*,,
 @code{objc-clos:*automatic-definitions-update*}} to @lw{t} before
 loading the framework. 
@@ -521,5 +523,6 @@ corresponding to the Objective C class @lw{NSCFString}.
 
 @node Index
 @unnumbered Index
-@printindex cp
+@printindex vr
+@printindex fn
 @bye
