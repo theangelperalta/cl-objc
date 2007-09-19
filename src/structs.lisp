@@ -26,37 +26,38 @@
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)
 
-(defun update-rect-cstruct-database (&key output-stream)
-  (let ((updated-structs
+(defun update-cstruct-database (&key output-stream)
+  (let ((updated-structs 
 	 (remove-duplicates 
-	  (remove "?"
-		  (mapcar #'cadr
-			  (remove-if-not (lambda (el) 
-					   (and (listp el) (eq (car el) :struct))) 
-					 (mapcar #'caddr 
-						 (mapcan #'objc-types:parse-objc-typestr 
-							 (mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list)))))))
-		  :test #'string-equal)
-	  :test #'string-equal)))
+	  (remove-if-not (lambda (type) 
+			   (and (struct-type-p type) 
+				(not (string-equal (struct-objc-name type) "?")))) 
+			 (mapcar #'caddr 
+				 (mapcan #'objc-types:parse-objc-typestr 
+					 (mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
+	  :test #'string-equal
+	  :key #'second)))    
     (when output-stream
       (let ((*package* (find-package "CL-OBJC-USER")))
 	(format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC-USER\")
-~%(dolist (struct-name (list ~{~s~}))
-~2t(pushnew struct-name ~s :test #'string-equal))~%~%"
-		(set-difference updated-structs *objc-struct-db*)
-		'*objc-struct-db*)))
+~%(dolist (struct-name (list ~{(quote ~s)~}))
+~2t(pushnew struct-name ~s :test #'string-equal :key #'second))~%~%"
+		(set-difference updated-structs *objc-struct-db* :key #'second :test #'string-equal)
+		'*objc-struct-db*)))    
     (setf *objc-struct-db* updated-structs)))
 
 (defun canonicalize-objc-struct-name (name)
   (or (cdr (assoc name *registered-structs* :test #'equal)) 
       (error "There is no CFFI struct binded to name ~a in the package ~a" name (package-name *package*))))
 
+(defun struct-objc-name (type)
+  (second type))
+
 (defun extract-struct-name (input-type)
   "If INPUT-TYPE is a struct returns the type symbol used by
 CFFI, otherwise returns INPUT-TYPE unchanged"
   (if (struct-type-p input-type)
-        (let ((struct-name (second input-type)))
-	  (canonicalize-objc-struct-name struct-name))
+      (canonicalize-objc-struct-name (struct-objc-name input-type))
       input-type))
 
 (defun struct-type-p (type)
@@ -121,6 +122,10 @@ big struct types with the corresponding number of :int parameters"
       (rplacd (assoc objc-name *registered-structs* :test #'equalp) lisp-name)
       (push (cons objc-name lisp-name) *registered-structs*)))
 
+(defun find-struct-definition (lisp-name)
+  (let ((objc-name (car (find lisp-name *registered-structs* :key #'cdr :test #'string-equal))))
+    (find objc-name *objc-struct-db* :key #'second :test #'string-equal)))
+
 (defmacro define-objc-struct (name-and-objc-options &body doc-and-slots)
   "Wrapper for CFFI:DEFCSTRUCT allowing struct to be used as
   type. DOC-AND-SLOTS will be passed directly to CFFI:DEFCSTRUCT
@@ -145,8 +150,8 @@ error will be raised if the trial fails.
 		(,private-name (concatenate 'string "_" ,gobjc-name)))
 	   (setf ,gobjc-name
 		 (cond 
-		   ((find ,gobjc-name *objc-struct-db* :test #'string-equal) ,gobjc-name)
-		   ((find ,private-name *objc-struct-db* :test #'string-equal) ,private-name)
+		   ((find ,gobjc-name *objc-struct-db* :test #'string-equal :key #'second) ,gobjc-name)
+		   ((find ,private-name *objc-struct-db* :test #'string-equal :key #'second) ,private-name)
 		   (t (error "There is no ObjC struct binded to ~a or ~a" ,gobjc-name ,private-name))))
 	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-name))
 	 (cffi:defcstruct ,name-and-options

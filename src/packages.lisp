@@ -124,7 +124,8 @@
            "OBJC-UNKNOWN-TYPE" 
 	   "TYPEMAP" 
 	   "ENCODE-TYPES" 
-	   "ENCODE-TYPE"))
+	   "ENCODE-TYPE"
+	   "OBJC-FOREIGN-TYPE-SIZE"))
 
 (defpackage "OBJC-READER"
   (:use "COMMON-LISP" "OBJC-CFFI" "CL-OBJC-UTILS")

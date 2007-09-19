@@ -140,16 +140,16 @@ e.g.
  (invoke (invoke 'ns-windo alloc) :init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)
  (invoke win :init-with-content-rect frame :style-mask :int 15 :backing :int 2 :defer 0)
 "
-  (let ((greceiver (gensym)))
+  (with-gensyms (greceiver greceiver-orig)
     (destructuring-bind (selector args types-and-args)
 	(parse-invoke-arguments selector-and-args)
-      `(let* ((,greceiver ,receiver)
-	      (,greceiver (if (symbolp ,greceiver) 
-			      (objc-get-class (symbol-to-objc-class-name ,greceiver)) 
-			      ,greceiver)))
-	 (when (or
-		(eq ,greceiver objc-nil-class)
-		(objc-nil-object-p ,greceiver))
+      `(let* ((,greceiver-orig ,receiver)
+	      (,greceiver (if (symbolp ,greceiver-orig) 
+			      (objc-get-class (symbol-to-objc-class-name ,greceiver-orig)) 
+			      ,greceiver-orig)))
+	 (when (eq ,greceiver objc-nil-class)
+	   (error "Class ~s not found" ,greceiver-orig))
+	 (when (objc-nil-object-p ,greceiver)
 	   (error "Can't send message to nil"))
 	 ,(if (typed-invocation-p selector-and-args)
 	      `(typed-objc-msg-send (,greceiver 
@@ -260,7 +260,8 @@ SYMBOL-TO-OBJC-CLASS-NAME.
 
 IVARS is a list of pairs where the first element is the variable
 name (translated by symbols-to-objc-selector) and the second on
-is the CFFI type of the variable.
+is the CFFI type of the variable or a name of an ObjC class/struct
+translated by objc-class-name-to-symbol.
 
 If a class with the same name already exists the method returns
 without adding the new definition."
@@ -268,8 +269,13 @@ without adding the new definition."
      (ensure-objc-class ,(symbol-to-objc-class-name symbol-name)
 			(objc-get-class ,(symbol-to-objc-class-name symbol-superclass))
 			(list ,@(mapcar (lambda (ivar-def)
-					  `(make-ivar ,(symbols-to-objc-selector (list (car ivar-def))) 
-						      ',(ensure-list (cadr ivar-def)))) 
+					  (let ((var-name (car ivar-def))
+						(var-type (cadr ivar-def)))
+					    (unless (eq objc-nil-class 
+							(objc-get-class (symbol-to-objc-class-name var-type)))
+					      (setf var-type 'objc-id))
+					    `(make-ivar ,(symbols-to-objc-selector (list var-name)) 
+							',var-type))) 
 					ivars)))))
 (defun objc-let-bindings (bindings)
   (mapcar (lambda (binding)

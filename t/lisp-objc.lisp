@@ -150,3 +150,18 @@ big struct as input parameter"
     (with-ivar-accessors test-derived-1
       (is (string-equal (invoke (var6 x) utf8-string) "foo"))
       (is (= (var4 x) 2.0)))))
+
+(define-objc-class ns-test-ivar-struct ns-object
+    ((point nspoint)))
+
+(test lisp-ivar-struct
+  (let ((random-x (float (random 10.0)))
+	(random-y (float (random 10.0))))
+    (objc-let ((obj 'ns-test-ivar-struct))
+      (slet ((p nspoint))
+	(setf (nspoint-x p) random-x
+	      (nspoint-y p) random-y)
+	(with-ivar-accessors ns-test-ivar-struct
+	  (setf (point obj) p)
+	  (is (and (= (objc-struct-slot-value (point obj) 'nspoint 'x) random-x)
+		   (= (objc-struct-slot-value (point obj) 'nspoint 'y) random-y))))))))

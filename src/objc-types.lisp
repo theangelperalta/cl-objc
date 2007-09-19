@@ -129,6 +129,12 @@
   "Parse a method type signature"
   (parse-with-lexer (typestr-lexer str) *objc-type-parser*))
 
+(defun objc-foreign-type-size (type)
+  (cond 
+    ((and (listp type) (eq (car type) :struct))
+     (reduce #'+ (mapcar #'objc-foreign-type-size (caddr type))))
+    (t (cffi:foreign-type-size type))))
+
 (defun encode-types (types &optional align)
   "Encode a type list to a method type signature"
   (format nil "~{~A~}" (mapcar (lambda (type) (encode-type type align)) types)))

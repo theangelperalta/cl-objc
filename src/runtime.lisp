@@ -210,14 +210,15 @@ exists it just returns without adding the new class definition"
 
 (defun make-ivar (name type)
   "Returns a new instance variable object named NAME of TYPE"
-  (let ((ret (foreign-alloc 'objc-ivar-cstruct)))
+  (let ((ret (foreign-alloc 'objc-ivar-cstruct))
+	(type (or (find-struct-definition type) type)))
     (convert-from-foreign  
      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)
        (setf ivar_name name
-	     ivar_type (objc-types:encode-types (if (listp type) type (list type)))
+	     ivar_type (objc-types:encode-types (list type))
 	     ; we initialize the offset with the type size of the
 	     ; variable. This should be adjusted of course during
 	     ; class creation
-	     ivar_offset (foreign-type-size type))
+	     ivar_offset (objc-types:objc-foreign-type-size type))
        ret)
      'objc-ivar-pointer)))

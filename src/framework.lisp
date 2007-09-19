@@ -57,7 +57,7 @@ searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*."
 	   (objc-clos:update-clos-definitions :output-stream out)))
 
        (with-framework-cache ,framework-name struct
-	 (update-rect-cstruct-database :output-stream out))
+	 (update-cstruct-database :output-stream out))
 
        ,@cffi-definitions
        t)))

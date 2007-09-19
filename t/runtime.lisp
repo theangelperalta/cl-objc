@@ -80,3 +80,18 @@
 	   (vars (mapcar #'make-ivar var-names types)))
       (is (equal types (mapcar #'car (mapcar #'ivar-type vars))))
       (is (equal var-names (mapcar #'ivar-name vars))))))
+
+(test ivars-with-struct-value
+  (let* ((random-x (random 10.0))
+	 (random-y (random 10.0))
+	 (class-name (temp-class-name))
+	 (ivar (make-ivar "struct" 'nspoint))
+	 (new-class (add-objc-class class-name (objc-get-class "NSObject") (list ivar)))
+	 (obj (untyped-objc-msg-send (objc-get-class class-name) "alloc")))
+    (cffi:with-foreign-object (p 'nspoint)
+      (cffi:with-foreign-slots ((x y) p nspoint)
+	(setf x random-x
+	      y random-y)
+	(set-ivar obj "struct" p)
+	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'nspoint 'x) random-x))
+	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'nspoint 'y) random-y))))))

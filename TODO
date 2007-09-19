@@ -13,6 +13,8 @@
 
 ** Support for Variadic ObjC methods
 
+** Remove warning from test suite :lisp-objc
+
 * New major features
 
 ** Define a variadic defun to call foreign functions instead of using a variadic macro
