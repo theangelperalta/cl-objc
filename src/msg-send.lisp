@@ -27,6 +27,17 @@
   (id objc-id)
   (class objc-class-pointer))
 
+(defcfun ("objc_msgSendSuper" objc-msg-send-super) :pointer
+  (id objc-super)
+  (sel objc-sel)
+  &rest)
+
+(defcfun ("objc_msgSendSuper_stret" objc-msg-send-super-stret) :pointer
+  (stret :pointer)
+  (id objc-super)
+  (sel objc-sel)
+  &rest)
+
 ;; Building foreign function declarations for each objc primitive type
 ;; e.g. char-objc-msg-send, unsigned-int-objc-msg-send, etc.
 
@@ -186,12 +197,18 @@ binded to SEL.
 
 		   ;; big struct as return value passed by value
 		   ((big-struct-type-p ,greturn-type) 
-		    (objc-msg-send-stret (or ,stret 
-					     (foreign-alloc (extract-struct-name ,greturn-type))) 
-					 ,gid ,gsel ,@args-and-types))
+		    (if *super-call*
+			(objc-msg-send-super-stret (or ,stret 
+						       (foreign-alloc (extract-struct-name ,greturn-type))) 
+						   ,gid ,gsel ,@args-and-types)
+			(objc-msg-send-stret (or ,stret 
+						 (foreign-alloc (extract-struct-name ,greturn-type))) 
+					     ,gid ,gsel ,@args-and-types)))
 		   ;; small struct as return value passed by value
 		   ((small-struct-type-p ,greturn-type)
-		    (objc-msg-send ,gid ,gsel ,@args-and-types)) 
+		    (if *super-call*
+			(objc-msg-send-super ,gid ,gsel ,@args-and-types)
+			(objc-msg-send ,gid ,gsel ,@args-and-types))) 
 
 		   ;; general case
 		   ((member ,greturn-type ',(allowed-simple-return-types)) 
