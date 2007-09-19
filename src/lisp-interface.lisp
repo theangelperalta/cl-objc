@@ -206,7 +206,8 @@ STRUCT-OBJ) will be bound as utilities."
 			      &body body)
   "Add an ObjectiveC method binded to a selector defined by
 LIST-SELECTOR (translated by SYMBOLS-TO-OBJC-SELECTOR), returning
-the CFFI RETURN-TYPE.
+the CFFI RETURN-TYPE. If the method get zero or one argument then
+LIST-SELECTOR can be specified with an atom.
 
 If CLASS-METHOD is true then a class method will be added.
 

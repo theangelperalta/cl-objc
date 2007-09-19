@@ -73,3 +73,6 @@ list."
   (defparameter *doc-dir* (append 
 			   (butlast (pathname-directory (or *load-pathname* *compile-file-pathname*)))
 			   (list "doc" "include"))))
+
+(defun gensym-list (n)
+  (loop for i upto n collecting (gensym)))

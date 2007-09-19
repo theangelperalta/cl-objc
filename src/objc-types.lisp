@@ -151,11 +151,14 @@ ObjectiveC runtime."
   (cond 
     ((and (listp type) (eq :align (car type))) (format nil "~a~d" (encode-type (third type)) (second type)))
     ((lookup-type-char type) (if align (format nil "~a~d" (lookup-type-char type) 8) (lookup-type-char type)))
-    ((eq :bitfield (car type)) (format nil "b~d" (second type)))
-    ((eq :union (car type)) (format nil "(~a=~{~a~})" (second type) (mapcar #'encode-type (caddr type))))
-    ((eq :struct (car type)) (format nil "{~a=~{~a~}}" (second type) (mapcar #'encode-type (caddr type))))
-    ((eq :pointer (car type)) (format nil "^~a" (encode-type (cadr type))))
-    ((eq :method (car type)) (format nil "~a~{~a~}" (lookup-method-char (second type)) (mapcar #'encode-type (cddr type))))
-    ((eq :array (car type)) (format nil "[~d~a]" (second type) (encode-type (third type))))
+    ((listp type) 
+     (cond 
+       ((eq :bitfield (car type)) (format nil "b~d" (second type)))
+       ((eq :union (car type)) (format nil "(~a=~{~a~})" (second type) (mapcar #'encode-type (caddr type))))
+       ((eq :struct (car type)) (format nil "{~a=~{~a~}}" (second type) (mapcar #'encode-type (caddr type))))
+       ((eq :pointer (car type)) (format nil "^~a" (encode-type (cadr type))))
+       ((eq :method (car type)) (format nil "~a~{~a~}" (lookup-method-char (second type)) (mapcar #'encode-type (cddr type))))
+       ((eq :array (car type)) (format nil "[~d~a]" (second type) (encode-type (third type))))
+       (t (error "can't encode type: ~s" type))))
     (t (error "can't encode type: ~s" type))))
 

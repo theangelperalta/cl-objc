@@ -23,6 +23,9 @@
   (sel objc-sel)
   &rest)
 
+(defcstruct objc-super 
+  (id objc-id)
+  (class objc-class-pointer))
 
 ;; Building foreign function declarations for each objc primitive type
 ;; e.g. char-objc-msg-send, unsigned-int-objc-msg-send, etc.
@@ -35,9 +38,9 @@
   (ensure-fun allowed-simple-return-types ()
     (remove 'objc-types:objc-unknown-type (mapcar #'cadr objc-types:typemap)))
 
-  (ensure-fun make-objc-msg-send-symbol (type)
+  (ensure-fun make-objc-msg-send-symbol (type superp)
     (intern 
-     (format nil "~a-OBJC-MSG-SEND" (string-upcase (symbol-name type))) 
+     (format nil "~a-OBJC-MSG-SEND~:[~;-SUPER~]" (string-upcase (symbol-name type)) superp) 
      (find-package "OBJC-CFFI")))
 
   (ensure-fun odd-positioned-elements (list)
@@ -48,28 +51,34 @@
     (when (> (length list) 1)
       (cons (car list) (even-positioned-elements (cddr list))))))
 
-(defmacro %objc-msg-send (return-type id sel args)
-  (let ((gensyms (loop repeat (+ 2 (/ (length args) 2)) collect (gensym))))
+(defmacro %objc-msg-send (return-type id sel args &optional superp)
+  (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
     (cffi::translate-objects gensyms 
 			     (append (list id sel) (odd-positioned-elements args))
-			     (append (list 'objc-id 'objc-sel) (even-positioned-elements args))
+			     (append (list (if superp 'objc-super 'objc-id) 'objc-sel) (even-positioned-elements args))
 			     return-type
-			     `(cffi-sys:%foreign-funcall ,(if (member return-type '(:float :double))
-							      "objc_msgSend_fpret"
-							      "objc_msgSend") 
-							 ,(append (list :pointer (first gensyms)
-									:pointer (second gensyms))
-								  (interpose (mapcar #'cffi::canonicalize-foreign-type 
-									      (even-positioned-elements args))
-									     (cddr gensyms))
-								  (list (cffi::canonicalize-foreign-type return-type)))
-							 :library :default :calling-convention :cdecl))))
+			     `(cffi-sys:%foreign-funcall 
+			       ,(cond
+				 ((member return-type '(:float :double)) "objc_msgSend_fpret")
+				 (superp "objc_msgSendSuper")
+				 (t "objc_msgSend")) 
+			       ,(append (list :pointer (first gensyms)
+					      :pointer (second gensyms))
+					(interpose (mapcar #'cffi::canonicalize-foreign-type 
+							   (even-positioned-elements args))
+						   (cddr gensyms))
+					(list (cffi::canonicalize-foreign-type return-type)))
+			       :library :default :calling-convention :cdecl))))
 
 (defmacro build-objc-msg-send ()
   `(progn
      ,@(mapcar (lambda (type)
-		 `(defmacro ,(make-objc-msg-send-symbol type) (id sel args)
+		 `(defmacro ,(make-objc-msg-send-symbol type nil) (id sel args)
 		    `(%objc-msg-send ,',type ,id ,sel ,args)))
+	       (allowed-simple-return-types))
+     ,@(mapcar (lambda (type)
+		 `(defmacro ,(make-objc-msg-send-symbol type t) (id sel args)
+		    `(%objc-msg-send ,',type ,id ,sel ,args t)))
 	       (allowed-simple-return-types))))
 
 (build-objc-msg-send)
@@ -115,21 +124,28 @@
 
 (defparameter *methods-cache* (make-hash-table :test #'equal))
 
-(defun cache-compile (sel return-type types)
+(defun cache-compile (sel return-type super-call-p types)
   (let* ((sel-name (etypecase sel
 		     (objc-selector (sel-name sel))
 		     (string sel))))
-    (macrolet ((cache (sel-name types)
-		 `(gethash (append (list ,sel-name) ,types) *methods-cache*)))
-      (or (cache sel-name types)
-	  (setf (cache sel-name types)
+    (macrolet ((cache (sel-name super-call-p types)
+		 `(gethash (append (list ,sel-name ,super-call-p) ,types) *methods-cache*)))
+      (or (cache sel-name super-call-p types)
+	  (setf (cache sel-name super-call-p types)
 		(compile nil
-			 (let ((varargs (loop for i upto (length types) collecting (gensym))))
+			 (let ((varargs (gensym-list (length types))))
 			   `(lambda ,varargs
-			      (,(make-objc-msg-send-symbol return-type) 
+			      (,(make-objc-msg-send-symbol return-type super-call-p) 
 				,(first varargs) 
 				,sel
 				,(interpose types (cdr varargs)))))))))))
+
+(defparameter *super-call* nil
+  "If this variable is set to t, the objc_msgSend will be translated to ")
+
+(defmacro with-super (&body body)
+  `(let ((objc-cffi::*super-call* t))
+     ,@body))
 
 (defmacro typed-objc-msg-send ((id sel &optional stret) &rest args-and-types)
   "Send the message binded to selector SEL to the object ID
@@ -146,36 +162,45 @@ returned, otherwise a new struct will be allocated.
 If ID is an ObjectiveC class object it will call the class method
 binded to SEL.
 "
-  (with-gensyms (gsel gid gmethod greturn-type)
+  (with-gensyms (gsel gid gmethod greturn-type super)
     `(let* ((,gsel ,sel)
 	    (,gid ,id)
 	    (,gmethod (etypecase ,gid
 			(objc-class (class-get-class-method ,gid ,gsel))
-			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel)))))
+			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
+	    (,gid (if *super-call*
+		      (let ((,super (foreign-alloc 'objc-super)))
+			(setf (foreign-slot-value ,super 'objc-super 'id) ,gid
+			      (foreign-slot-value ,super 'objc-super 'class) (second (super-classes ,gid)))
+			,super)
+		      ,gid)))
        (if ,gmethod
-	   (let ((,greturn-type (method-return-type ,gmethod)))
-	     (cond
-	       ;; big struct passed by value as argument
-	       ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
-		     (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
-			    ',(even-positioned-elements args-and-types)))
-		(untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
+	   (prog1
+	       (let ((,greturn-type (method-return-type ,gmethod)))
+		 (cond
+		   ;; big struct passed by value as argument
+		   ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
+			 (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
+				',(even-positioned-elements args-and-types)))
+		    (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
 
-	       ;; big struct as return value passed by value
-	       ((big-struct-type-p ,greturn-type) 
-		(objc-msg-send-stret (or ,stret 
-					 (foreign-alloc (extract-struct-name ,greturn-type))) 
-				     ,gid ,gsel ,@args-and-types))
-	       ;; small struct as return value passed by value
-	       ((small-struct-type-p ,greturn-type)
-		(objc-msg-send ,gid ,gsel ,@args-and-types)) 
+		   ;; big struct as return value passed by value
+		   ((big-struct-type-p ,greturn-type) 
+		    (objc-msg-send-stret (or ,stret 
+					     (foreign-alloc (extract-struct-name ,greturn-type))) 
+					 ,gid ,gsel ,@args-and-types))
+		   ;; small struct as return value passed by value
+		   ((small-struct-type-p ,greturn-type)
+		    (objc-msg-send ,gid ,gsel ,@args-and-types)) 
 
-	       ;; general case
-	       ((member ,greturn-type ',(allowed-simple-return-types)) 
-		(funcall 
-		 (cache-compile ,gsel ,greturn-type ',(even-positioned-elements args-and-types))
-		 ,gid ,@(odd-positioned-elements args-and-types)))
-	       (t (error "Unknown return type ~s" ,greturn-type))))
+		   ;; general case
+		   ((member ,greturn-type ',(allowed-simple-return-types)) 
+		    (funcall 
+		     (cache-compile ,gsel ,greturn-type *super-call* ',(even-positioned-elements args-and-types))
+		     ,gid ,@(odd-positioned-elements args-and-types)))
+		   (t (error "Unknown return type ~s" ,greturn-type))))
+	     (when *super-call*
+	       (foreign-free ,gid)))
 	   (error "ObjC method ~a not found" ,gsel)))))
 
 (defparameter *untyped-methods-cache* (make-hash-table :test #'equal))
@@ -187,7 +212,7 @@ binded to SEL.
     (or (gethash sel-name *untyped-methods-cache*)
 	(setf (gethash sel-name *untyped-methods-cache*)
 	      (compile nil
-		       (let ((varargs (loop for i upto (- (method-get-number-of-arguments method) 2) collecting (gensym))))
+		       (let ((varargs (gensym-list (- (method-get-number-of-arguments method) 2))))
 			 `(lambda ,varargs
 			    (typed-objc-msg-send (,(first varargs) ,sel) 
 						 ,@(interpose 

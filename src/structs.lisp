@@ -27,24 +27,23 @@
 (defvar *registered-structs* nil)
 
 (defun update-cstruct-database (&key output-stream)
-  (let ((updated-structs 
-	 (remove-duplicates 
-	  (remove-if-not (lambda (type) 
-			   (and (struct-type-p type) 
-				(not (string-equal (struct-objc-name type) "?")))) 
-			 (mapcar #'caddr 
-				 (mapcan #'objc-types:parse-objc-typestr 
-					 (mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
-	  :test #'string-equal
-	  :key #'second)))    
-    (when output-stream
-      (let ((*package* (find-package "CL-OBJC-USER")))
-	(format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC-USER\")
+  (setf *objc-struct-db*
+	(remove-duplicates 
+	 (remove-if-not (lambda (type) 
+			  (and (struct-type-p type) 
+			       (not (string-equal (struct-objc-name type) "?")))) 
+			(mapcar #'caddr 
+				(mapcan #'objc-types:parse-objc-typestr 
+					(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
+	 :test #'string-equal
+	 :key #'second))    
+  (when output-stream
+    (let ((*package* (find-package "CL-OBJC-USER")))
+      (format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC-USER\")
 ~%(dolist (struct-name (list ~{(quote ~s)~}))
 ~2t(pushnew struct-name ~s :test #'string-equal :key #'second))~%~%"
-		(set-difference updated-structs *objc-struct-db* :key #'second :test #'string-equal)
-		'*objc-struct-db*)))    
-    (setf *objc-struct-db* updated-structs)))
+	      *objc-struct-db*
+	      '*objc-struct-db*))))
 
 (defun canonicalize-objc-struct-name (name)
   (or (cdr (assoc name *registered-structs* :test #'equal)) 

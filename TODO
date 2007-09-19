@@ -1,7 +1,7 @@
 ;; -*- outline -*-
 
 * Docs & Examples
-** Update the docs: add a tutorial on the clos interface, extract a README file
+** Update the docs: Improve the clos section, call to super, add a tutorial on the clos interface, extract a README file
 
 ** Add more examples (one using the clos interface)
 
@@ -20,8 +20,6 @@
 ** Define a variadic defun to call foreign functions instead of using a variadic macro
 
 ** Complete the ObjC CLOS interface (objc ivars in slots, mixed slots, defmethod mixed)
-
-** Support for the call to super
 
 ** Let user add effective protocols to classes
 

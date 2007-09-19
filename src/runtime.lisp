@@ -211,7 +211,13 @@ exists it just returns without adding the new class definition"
 (defun make-ivar (name type)
   "Returns a new instance variable object named NAME of TYPE"
   (let ((ret (foreign-alloc 'objc-ivar-cstruct))
-	(type (or (find-struct-definition type) type)))
+	(type (cond
+		((find-struct-definition type))
+		((and (gethash type cffi::*type-parsers*)
+		      (eq (class-of (funcall (gethash type cffi::*type-parsers*)))
+			  (find-class 'cffi::foreign-typedef)))
+		 (cffi::type-keyword (cffi::actual-type (funcall (gethash type cffi::*type-parsers*)))))
+		(t type))))
     (convert-from-foreign  
      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)
        (setf ivar_name name

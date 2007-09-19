@@ -86,8 +86,7 @@
 	 (random-y (random 10.0))
 	 (class-name (temp-class-name))
 	 (ivar (make-ivar "struct" 'nspoint))
-	 (new-class (add-objc-class class-name (objc-get-class "NSObject") (list ivar)))
-	 (obj (untyped-objc-msg-send (objc-get-class class-name) "alloc")))
+	 (obj (untyped-objc-msg-send (add-objc-class class-name (objc-get-class "NSObject") (list ivar)) "alloc")))
     (cffi:with-foreign-object (p 'nspoint)
       (cffi:with-foreign-slots ((x y) p nspoint)
 	(setf x random-x
