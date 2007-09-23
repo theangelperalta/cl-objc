@@ -3,7 +3,6 @@
 ;;; Name translators
 (defparameter *acronyms* '("UTF"
 			   "FTP"
-			   "WEB"
 			   "HTTP")
   "Acronyms used in name translators")
 
@@ -97,7 +96,7 @@ SYMBOLS-TO-OBJC-SELECTOR."
 		(selector-part (car selectors-and-args) (car selectors-and-args))
 		(cffi-type (cadr selectors-and-args) (cadr selectors-and-args))
 		(arg (caddr selectors-and-args) (caddr selectors-and-args)))
-	       (selectors-and-args t)
+	       ((null selectors-and-args) t)
 	     (when (not (keywordp selector-part)) 
 	       (return nil))
 	     (when (not (cffi-type-p cffi-type)) 
