@@ -165,3 +165,19 @@ big struct as input parameter"
 	  (setf (point obj) p)
 	  (is (and (= (objc-struct-slot-value (point obj) 'nspoint 'x) random-x)
 		   (= (objc-struct-slot-value (point obj) 'nspoint 'y) random-y))))))))
+
+(define-objc-method magic-value (:return-type :int) ((self test-super-1))
+  1)
+
+(define-objc-method magic-value (:return-type :int) ((self test-derived-1))
+  2)
+
+(test call-to-super
+  (objc-let ((obj 'test-derived-1))
+    (is (= 2 (typed-objc-msg-send (obj "magicValue"))))
+    (is (= 2 (untyped-objc-msg-send obj "magicValue")))
+    (is (= 2 (invoke obj magic-value)))
+    (with-super
+      (is (= 1 (typed-objc-msg-send (obj "magicValue"))))
+      (is (= 1 (untyped-objc-msg-send obj "magicValue")))
+      (is (= 1 (invoke obj magic-value))))))
