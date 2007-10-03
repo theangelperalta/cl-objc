@@ -1,13 +1,15 @@
 ;; -*- outline -*-
 
 * Docs & Examples
-** Update the docs: Improve the clos section, call to super, add a tutorial on the clos interface, extract a README file, update the framework management documentation
+** Update the docs: Improve the clos section, call to super, add a tutorial on the clos interface, extract a README file, update the framework management documentation (change definition <-> bindings)
 
 ** Add other two examples: one using the clos interface, one with a cool Cocoa widget
 
 ** Use cl-launch for the examples
 
 * New minor features
+
+** Make the generation of clos bindings for framework faster using nsbundle
 
 ** when types of args are available, method should be specialized on the corresponding lisp types. actually they are just ignored
 

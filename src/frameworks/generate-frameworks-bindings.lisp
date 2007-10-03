@@ -3,11 +3,7 @@
 
 (in-package :cl-objc)
 
-(compile-framework ("Appkit" :clos-definition t)
-  (define-objc-function ("NSRectFill" ns-rect-fill) :void
-    (rect ns-rect)) )
-
-(compile-framework ("Foundation" :clos-definition t)
+(compile-framework ("Foundation")
   (define-objc-struct (ns-range "_NSRange") (location :unsigned-int) (length :unsigned-int))
   (define-objc-struct (ns-size "_NSSize") (width :float) (height :float))
   (define-objc-struct (ns-point "_NSPoint") (x :float) (y :float))
@@ -17,7 +13,11 @@
   (cffi:defcvar ("NSModalPanelRunLoopMode" *ns-modal-panel-run-loop-mode*) objc-id)
   (cffi:defcvar ("NSEventTrackingRunLoopMode" *ns-event-tracking-run-loop-mode*) objc-id))
 
-(compile-framework ("Cocoa" :clos-definition t)
+(compile-framework ("Appkit")
+  (define-objc-function ("NSRectFill" ns-rect-fill) :void
+    (rect ns-rect)) )
+
+(compile-framework ("Cocoa")
   (cffi:defcfun "NSApplicationMain" :int
     (argc :int)
     (argv :pointer)))

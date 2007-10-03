@@ -119,7 +119,7 @@ Return a new ObjectiveC Method object."
 				   (objc-types:encode-types (append (list ',return-type) ',(mapcar #'remove-typedef type-list)) t)
 				   (callback ,callback)
 				   ,class-method)))
-	     (when objc-clos:*automatic-definitions-update*
+	     (when objc-clos:*automatic-clos-bindings-update*
 	       (objc-clos:add-clos-method ,new-method (objc-get-class ,class) :class-method ,class-method))
 	     ,new-method))))))
 
@@ -203,7 +203,7 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 	    cache (null-pointer)
 	    protocols (null-pointer)))
     (objc-add-class new-class)
-    (when objc-clos:*automatic-definitions-update*
+    (when objc-clos:*automatic-clos-bindings-update*
       (objc-clos:add-clos-class (objc-get-class class-name)))
     (objc-get-class class-name)))
 

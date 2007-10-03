@@ -8,7 +8,7 @@
 (defsystem cl-objc
     :name "CL-OBJC"
     :author "Geoff Cant, Luigi Panzeri"
-    :version "0.0.3"
+    :version "0.5"
     :description "Common Lisp / ObjectiveC Interface"
     :components ((:module :src
 			  :components ((:file "packages")
@@ -27,7 +27,9 @@
 								  "msg-send"
 								  "lisp-interface"
 								  "structs"))
-				       (:module :frameworks)))
+				       (:module :frameworks
+						:components ((:file "generate-frameworks-bindings"))
+						:depends-on ("framework"))))
 		 (:module :doc
 			  :components ((:file "docstrings")
 				       (:module :include))))
@@ -40,14 +42,14 @@
 				     (:file "circle-view"))))
   :depends-on (:cl-objc :swank))
 
-(defparameter *framework-directory* nil)
-(export '*framework-directory*)
-
-(defmethod asdf:perform :before ((op asdf:load-op) (system (eql (find-system 'cl-objc))))
-  (setf *framework-directory* (asdf:component-pathname 
-			       (asdf:find-component 
-				(asdf:find-component system "src") 
-				"frameworks"))))
+(defmethod asdf:perform :before ((op asdf:load-op) (component (eql (asdf:find-component 
+								    (asdf:find-component 
+								     (asdf:find-component (asdf:find-system "cl-objc") 
+											  "src") 
+								     "frameworks")
+								    "generate-frameworks-bindings"))))
+  (setf (symbol-value (intern "*FRAMEWORK-DIRECTORY*" "OBJC-CFFI")) 
+	(asdf:component-pathname component)))
 
 (defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc))))
   ;; Compile documentation
@@ -80,6 +82,3 @@
   (asdf:oos 'asdf:load-op 'cl-objc.test)
   (funcall (intern (string :run!) (string :it.bese.FiveAM))
            :cl-objc))
-
-(defmethod operation-done-p ((op test-op) (system (eql (find-system 'cl-objc))))
-  nil)

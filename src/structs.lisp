@@ -39,7 +39,7 @@
 	 :key #'second))    
   (when output-stream
     (let ((*package* (find-package "CL-OBJC")))
-      (format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC\")
+      (format output-stream ";;; BINDINGS FOR NON RUNTIME-INSPECTABLE OBJECT~%;;; THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC\")
 ~%(dolist (struct-name (list ~{(quote ~s)~%~}))
 ~2t(pushnew struct-name ~s :test #'string-equal :key #'second))~%~%"
 	      *objc-struct-db*
