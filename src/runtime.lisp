@@ -70,6 +70,18 @@
 				  (first argument)
 				  argument)))))))
 
+(defun remove-typedef (type)
+  "TYPE is the lisp CFFI name. Returns an objc struct definition
+if TYPE names a struct, a primitive type if TYPE names a basic C
+typedef, else TYPE itself."
+  (cond
+    ((find-struct-definition type))
+    ((and (gethash type cffi::*type-parsers*)
+	  (eq (class-of (funcall (gethash type cffi::*type-parsers*)))
+	      (find-class 'cffi::foreign-typedef)))
+     (cffi::type-keyword (cffi::actual-type (funcall (gethash type cffi::*type-parsers*)))))
+    (t type)))
+
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
   "Add an ObjectiveC method to CLASS returning the CFFI
@@ -104,7 +116,7 @@ Return a new ObjectiveC Method object."
 	   (let ((,new-method
 		  (register-method ,class
 				   ,name
-				   (objc-types:encode-types (append (list ',return-type) ',type-list) t)
+				   (objc-types:encode-types (append (list ',return-type) ',(mapcar #'remove-typedef type-list)) t)
 				   (callback ,callback)
 				   ,class-method)))
 	     (when objc-clos:*automatic-definitions-update*
@@ -203,7 +215,7 @@ exists it just returns without adding the new class definition"
 	  ((objc-class-already-exists (lambda (c)
 					(invoke-restart 'use-the-same-class (objc-get-class (objc-class-name c))))))
 	(add-objc-class class-name super-class ivar-list))
-    (use-the-same-class (same-class) (prog2 
+    (use-the-same-class (&optional same-class) (prog2 
 					 (format *error-output* "Class named ~a already exists. Use the existing one.~%" 
 						 (class-name same-class)) 
 					 same-class))))
@@ -211,13 +223,7 @@ exists it just returns without adding the new class definition"
 (defun make-ivar (name type)
   "Returns a new instance variable object named NAME of TYPE"
   (let ((ret (foreign-alloc 'objc-ivar-cstruct))
-	(type (cond
-		((find-struct-definition type))
-		((and (gethash type cffi::*type-parsers*)
-		      (eq (class-of (funcall (gethash type cffi::*type-parsers*)))
-			  (find-class 'cffi::foreign-typedef)))
-		 (cffi::type-keyword (cffi::actual-type (funcall (gethash type cffi::*type-parsers*)))))
-		(t type))))
+	(type (remove-typedef type)))
     (convert-from-foreign  
      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)
        (setf ivar_name name

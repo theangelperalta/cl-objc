@@ -15,8 +15,9 @@ LST2"
 
 (defun cffi-type-p (symbol)
   ;; FIXME: do not use internal symbols of CFFI to check if a type is legal
-  (member symbol 
-	  (loop for key being the hash-key of cffi::*type-parsers* collecting key)))
+  (not (null 
+	(member symbol 
+		(loop for key being the hash-key of cffi::*type-parsers* collecting key)))))
 
 (defun split-string (string separator &key (test-fn #'char-equal))
   "Split STRING containing items separated by SEPARATOR into a

@@ -74,11 +74,14 @@
 value (CLOS instance or primitive type)"
   (typecase ret
     (objc-object 
-     (let ((new-ret 
-	    (make-instance (export-class-symbol (obj-class ret)))))
-       (setf (objc:objc-id new-ret) ret)
-       new-ret))
+     (if (objc-nil-object-p ret)
+	 ret
+	 (let ((new-ret 
+		(make-instance (export-class-symbol (obj-class ret)))))
+	   (setf (objc:objc-id new-ret) ret)
+	   new-ret)))
     (fixnum ret)
+    (string ret)
     (otherwise (error "Not yet supported ~s" (class-name (class-of ret))))))
 
 (defmethod closer-mop:compute-discriminating-function ((gf objc-generic-function))
@@ -192,9 +195,25 @@ value (CLOS instance or primitive type)"
     (when (fboundp symbol) (fmakunbound symbol))
     (unintern symbol "OBJC")))
 
-;; Fixme: when types of args are available, method should be
-;; specialized on the corresponding lisp types
-(defun update-clos-definitions (&key output-stream force)
+(defun framework-class (class-name)
+  "Find the framework short name handling CLASS-NAME"
+  (objc-cffi::load-framework "Foundation")
+  (let ((all-frameworks (invoke 'ns-bundle all-frameworks))
+	(class-name-string (invoke (invoke 'ns-string alloc) :init-with-utf8-string class-name)))
+    (loop 
+       for i below (invoke all-frameworks count)
+       for framework = (invoke all-frameworks :object-at-index i)
+       when (and 
+	     (not (objc-nil-object-p framework))
+	     (not (eq objc-nil-class (invoke framework :class-named class-name-string))))
+       do 
+	 (let ((bundle-id (invoke framework bundle-identifier)))
+	   (if (objc-nil-object-p bundle-id)
+	       (warn "Class ~a not binded to any framework" class-name)
+	       (let ((full-name (invoke bundle-id utf8-string)))
+		 (return (car (last (split-string full-name #\.))))))))))
+
+(defun update-clos-definitions (&key output-stream force for-framework)
   "Generate CLOS classes/generic function for each ObjC
 class/method. The default behavior is to not redefine a
 class/generic function if it is already defined, except if FORCE
@@ -205,8 +224,10 @@ OUTPUT-STREAM if provided."
 ~%(in-package \"CL-OBJC-USER\")~%~%"))
   (dolist (objc-class (get-class-ordered-list))
     ;; Adding Classes
-    (when (or force
-	    (not (find-class (export-class-symbol objc-class) nil)))
+    (when (and (or (not for-framework)
+		   (string-equal for-framework (framework-class (class-name objc-class)))) 
+	   (or force
+	       (not (find-class (export-class-symbol objc-class) nil))))
       (add-clos-class objc-class output-stream))
     ;; Adding Generic Functions for ObjC methods
     (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))

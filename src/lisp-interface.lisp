@@ -24,35 +24,36 @@
 	      (setf string new-string))))
       string)))
 
-(memoize:def-memoized-function objc-selector-to-symbols (selector)
-  "The inverse of SYMBOLS-TO-OBJC-SELECTOR"
-  (when (eq (find-class 'objc-selector) (class-of selector))
-    (setq selector (sel-name selector)))
-  (flet ((convert-selector-part (selector-part)
-	   (if selector-part
-	       (with-output-to-string (out)
-		 (when (upper-case-p (elt selector-part 0))
-		   (princ #\- out))
-		 (princ
-		  (if (= 1 (length selector-part))
-		      (string-upcase selector-part)
-		      (loop 
-			 for char across (subseq selector-part 1) 
-			 with old-char = (elt selector-part 0)
-			 finally (return (char-upcase char))
-			 do
-			 (princ (char-upcase old-char) out)
-			 (when (upper-case-p char)
-			   (princ "-" out))
-			 (setf old-char char))) out))
-	       "*")))
-    (mapcar (lambda (name) 
-	      (intern name       
-		      (if (zerop (count #\: selector))
-			  *package*
-			  (find-package "KEYWORD")))) 
-	    (mapcar #'replace-acronyms-1 
-		    (mapcar #'convert-selector-part (split-string selector #\:))))))
+(unless (fboundp 'objc-selector-to-symbols)
+  (memoize:def-memoized-function objc-selector-to-symbols (selector)
+    "The inverse of SYMBOLS-TO-OBJC-SELECTOR"
+    (when (eq (find-class 'objc-selector) (class-of selector))
+      (setq selector (sel-name selector)))
+    (flet ((convert-selector-part (selector-part)
+	     (if selector-part
+		 (with-output-to-string (out)
+		   (when (upper-case-p (elt selector-part 0))
+		     (princ #\- out))
+		   (princ
+		    (if (= 1 (length selector-part))
+			(string-upcase selector-part)
+			(loop 
+			   for char across (subseq selector-part 1) 
+			   with old-char = (elt selector-part 0)
+			   finally (return (char-upcase char))
+			   do
+			   (princ (char-upcase old-char) out)
+			   (when (upper-case-p char)
+			     (princ "-" out))
+			   (setf old-char char))) out))
+		 "*")))
+      (mapcar (lambda (name) 
+		(intern name       
+			(if (zerop (count #\: selector))
+			    *package*
+			    (find-package "KEYWORD")))) 
+	      (mapcar #'replace-acronyms-1 
+		      (mapcar #'convert-selector-part (split-string selector #\:)))))))
 
 (defun symbols-to-objc-selector (lst)
   "Translate a list of symbols to a string naming a translator"
@@ -224,13 +225,19 @@ installs the new definition discarding the previous one.
 
 Return a new ObjectiveC Method object."
   (flet ((remove-symbol-with-name (symbol-name list)
-	   (remove symbol-name list :key (lambda (el) (symbol-name (car el))) :test #'string-equal)))
+	   (remove symbol-name list :key (lambda (el) (symbol-name (car el))) :test #'string-equal))
+	 (replace-nsclass (arg-def) (if (and (listp arg-def) 
+					     (not (eq objc-nil-class (objc-get-class (symbol-to-objc-class-name (second arg-def))))))
+					(list (first arg-def) 'objc-id)
+					arg-def)))
     `(add-objc-method (,(symbols-to-objc-selector (ensure-list list-selector))
 			,(symbol-to-objc-class-name (or (lookup-same-symbol-name 'self argument-list)
 							(error "You have to specify the SELF argument and the related type")))
 			:return-type ,return-type
 			:class-method ,class-method)
-	 (,@(or (remove-symbol-with-name "self" (remove-symbol-with-name "sel" argument-list))
+	 (,@(or (remove-symbol-with-name "self" 
+					 (remove-symbol-with-name "sel"
+								  (mapcar #'replace-nsclass argument-list)))
 		()))
        ,@body)))
 
@@ -251,6 +258,8 @@ Return a new ObjectiveC Method object."
   "Execute BODY with bindings to accessors of the
 form (CLASS-NAME`-`IVAR-NAME)"
   (let ((class (objc-get-class (symbol-to-objc-class-name symbol-class))))
+    (when (eq class objc-nil-class)
+      (error "Can't find class ~a" symbol-class))
     `(ivars-macrolet-forms ,(class-ivars class) ,symbol-class 
       ,@body)))
 
@@ -271,12 +280,14 @@ without adding the new definition."
 			(objc-get-class ,(symbol-to-objc-class-name symbol-superclass))
 			(list ,@(mapcar (lambda (ivar-def)
 					  (let ((var-name (car ivar-def))
-						(var-type (cadr ivar-def)))
-					    (unless (eq objc-nil-class 
-							(objc-get-class (symbol-to-objc-class-name var-type)))
-					      (setf var-type 'objc-id))
+						(var-type 
+						 `(cond 
+						    ((not (eq objc-nil-class (objc-get-class 
+									      ,(symbol-to-objc-class-name (second ivar-def))))) 
+						     'objc-id)
+						   (t ',(cadr ivar-def)))))
 					    `(make-ivar ,(symbols-to-objc-selector (list var-name)) 
-							',var-type))) 
+							,var-type))) 
 					ivars)))))
 (defun objc-let-bindings (bindings)
   (mapcar (lambda (binding)
