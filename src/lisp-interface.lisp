@@ -210,10 +210,11 @@ LIST-SELECTOR can be specified with an atom.
 
 If CLASS-METHOD is true then a class method will be added.
 
-ARGUMENT-LIST is a list of list with two elements. The first
-one is the name of the argument, while the second is its CFFI
+ARGUMENT-LIST is a list of list with two elements. The first one
+is the name of the argument, while the second is its ObjectiveC
 type. The first pair has to have as first element the symbol self
-and as second element the class which the method will be added to.
+and as second element the class which the method will be added
+to.
 
 In BODY is also bound the symbol `SEL` pointing to the
 selector.
