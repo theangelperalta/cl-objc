@@ -65,23 +65,23 @@ value usign NSNumber#intValue"
 (test typed-light-struct-returning-values 
 "Test with method returning light struct value. Test also passing
 a light struct as input parameter"
-      (let ((range (cffi:foreign-alloc 'nsrange))
+      (let ((range (cffi:foreign-alloc 'ns-range))
 	    (intval1 (random (mod (get-universal-time) 1000)))
 	    (intval2 (random (mod (get-universal-time) 1000))))
-	(setf (cffi:foreign-slot-value range 'nsrange 'location) intval1
-	      (cffi:foreign-slot-value range 'nsrange 'length) intval2)
-	(let ((value-with-range (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRange:") nsrange range)))
-	  (is (= intval1 (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'location)))
-	  (is (= intval2 (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'nsrange 'length))))))
+	(setf (cffi:foreign-slot-value range 'ns-range 'location) intval1
+	      (cffi:foreign-slot-value range 'ns-range 'length) intval2)
+	(let ((value-with-range (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRange:") ns-range range)))
+	  (is (= intval1 (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'ns-range 'location)))
+	  (is (= intval2 (objc-struct-slot-value (typed-objc-msg-send (value-with-range "rangeValue")) 'ns-range 'length))))))
 
 (test typed-big-struct-returning-values 
 "Test with method returning big struct value. Test also passing a
 big struct as input parameter"
-      (cffi:with-foreign-object (rect 'nsrect)
+      (cffi:with-foreign-object (rect 'ns-rect)
 	(let ((floatval (random 4.0)))
-	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'nsrect 'size) 'nssize 'width) floatval)
-	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") nsrect rect)))
-	    (is (= floatval (cffi:foreign-slot-value (objc-struct-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'nsrect 'size) 'nssize 'width)))))))
+	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'ns-rect 'size) 'ns-size 'width) floatval)
+	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") ns-rect rect)))
+	    (is (= floatval (cffi:foreign-slot-value (objc-struct-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'ns-rect 'size) 'ns-size 'width)))))))
 
 (test typed-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"

@@ -67,20 +67,20 @@ value usign NSNumber#intValue"
 "Test with method returning light struct value. Test also passing
 a light struct as input parameter"
       (let ((intval (random (mod (get-universal-time) 1000))))
-	(slet ((range nsrange))
-	      (setf (nsrange-location range) intval)
+	(slet ((range ns-range))
+	      (setf (ns-range-location range) intval)
 	      (let ((value-with-range (invoke 'ns-value :value-with-range range)))
-		(is (= intval (nsrange-location (invoke value-with-range range-value))))))))
+		(is (= intval (ns-range-location (invoke value-with-range range-value))))))))
 
 (test lisp-big-struct-returning-values 
   "Test with method returning big struct value. Test also passing a
 big struct as input parameter"
-  (slet* ((rect nsrect)
-	  (size nssize (nsrect-size rect)))
+  (slet* ((rect ns-rect)
+	  (size ns-size (ns-rect-size rect)))
     (let ((floatval (random 4.0)))
-      (setf (nssize-width size) floatval)
+      (setf (ns-size-width size) floatval)
       (let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
-	(is (= floatval (nssize-width (nsrect-size (invoke value-with-rect rect-value)))))))))
+	(is (= floatval (ns-size-width (ns-rect-size (invoke value-with-rect rect-value)))))))))
 
 (test lisp-adding-instance-method-with-arg
   (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  
@@ -152,19 +152,19 @@ big struct as input parameter"
       (is (= (var4 x) 2.0)))))
 
 (define-objc-class ns-test-ivar-struct ns-object
-    ((point nspoint)))
+    ((point ns-point)))
 
 (test lisp-ivar-struct
   (let ((random-x (float (random 10.0)))
 	(random-y (float (random 10.0))))
     (objc-let ((obj 'ns-test-ivar-struct))
-      (slet ((p nspoint))
-	(setf (nspoint-x p) random-x
-	      (nspoint-y p) random-y)
+      (slet ((p ns-point))
+	(setf (ns-point-x p) random-x
+	      (ns-point-y p) random-y)
 	(with-ivar-accessors ns-test-ivar-struct
 	  (setf (point obj) p)
-	  (is (and (= (objc-struct-slot-value (point obj) 'nspoint 'x) random-x)
-		   (= (objc-struct-slot-value (point obj) 'nspoint 'y) random-y))))))))
+	  (is (and (= (objc-struct-slot-value (point obj) 'ns-point 'x) random-x)
+		   (= (objc-struct-slot-value (point obj) 'ns-point 'y) random-y))))))))
 
 (define-objc-method magic-value (:return-type :int) ((self test-super-1))
   1)

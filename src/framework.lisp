@@ -1,63 +1,72 @@
 (in-package :objc-cffi)
 
-(eval-when (:load-toplevel)
-  (defparameter *cl-objc-directory* (pathname-directory *load-pathname*)))
+(defun framework-root-dir ()
+  "Returns where framework declaration are stored. The default is
+the content of *CL-OBJC-DIRECTORY* if it is not null else
+~/.cl-objc"
+  (ensure-directories-exist 
+   (or cl-objc-asd:*framework-directory*
+       (make-pathname 
+	:directory (append 
+		    (pathname-directory (user-homedir-pathname))
+		    (list ".cl-objc"))))))
 
-(eval-when (:compile-toplevel)
-  (defparameter *cl-objc-directory* (pathname-directory *compile-file-pathname*)))
-
-(defun cache-root-dir ()
-  "Returns where framework definitions related caches are stored"
-  (make-pathname 
-   :directory (append 
-	       *cl-objc-directory*
-	       (list "frameworks"))))
-
-(defun cache-pathname-for-framework (framework-name type)
+(defun framework-definitions-pathname (framework-name type)
   "Returns the pathname of the definition of TYPE related to
-FRAMEWORK-NAME. At the moment type can be 'clos or 'struct."
-  (make-pathname :directory (pathname-directory (cache-root-dir))
+FRAMEWORK-NAME. At the moment type can be 'clos or 'static."
+  (make-pathname :directory (pathname-directory (framework-root-dir))
 		 :name (format nil "~a-~a" framework-name (symbol-name type))
 		 :type "lisp"))
 
-(defun cached-framework-p (framework-name type)
-  "Returns true if a cache for FRAMEWORK-NAME on the definition
-of TYPE exists."
-  (ensure-directories-exist (cache-root-dir))
-  (probe-file (cache-pathname-for-framework framework-name type)))
+(defun framework-definitions-exist-p (framework-name type)
+  "Returns true if a definitions file for FRAMEWORK-NAME of TYPE
+exists."
+  (ensure-directories-exist (framework-root-dir))
+  (probe-file (framework-definitions-pathname framework-name type)))
 
 (defmacro with-framework-cache (framework-name type &body body)
-  (let ((pathname (cache-pathname-for-framework framework-name type)))
-    `(if (cached-framework-p ,framework-name ',type)
-	 (load (compile-file-pathname ,pathname))
-	 (progn
-	   (if (open ,pathname :direction :output :if-exists :supersede :if-does-not-exist :create)
-	       (with-open-file (out ,pathname
-				    :direction :output :if-exists :supersede :if-does-not-exist :create)
-		 (format *trace-output* "~%Caching ~a definition for ~a framework in ~a~%"
-			 (symbol-name ',type)
-			 ,framework-name
-			 ,pathname)
-		 ,@body)
-	       (let ((out nil))
-		 ,@body))
-	   (compile-file ,pathname :verbose nil :print nil)))))
+  (let ((pathname (gensym)))
+    `(let ((,pathname (framework-definitions-pathname ,framework-name ',type)))
+       (with-open-file (out ,pathname
+			    :direction :output :if-exists :supersede :if-does-not-exist :create)
+	 (format *trace-output* "~%Compiling ~a definition for ~a framework in ~a~%"
+		 (symbol-name ',type)
+		 ,framework-name
+		 ,pathname)
+	 ,@body)
+       (compile-file ,pathname :verbose nil :print nil))))
 
-(defmacro use-objc-framework (framework-name &body cffi-definitions)
-  "Import definitions from FRAMEWORK-NAME. Frameworks will be
-searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*."
+(defparameter *frameworks* nil "The list of frameworks loaded")
+
+(defmacro import-framework (framework-name &optional clos)
+  "Import the ObjC framework FRAMEWORK-NAME. If CLOS or
+OBJC-CLOS:*AUTOMATIC-DEFINITIONS-UPDATE* is true then load also
+the CLOS definitions."
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (unless (member ,framework-name *frameworks* :test #'string-equal)
+       (objc-cffi::load-framework ,framework-name)
+       (load (compile-file-pathname (framework-definitions-pathname ,framework-name 'static)))
+       (when (or ,clos objc-clos:*automatic-definitions-update*)
+	 (load (compile-file-pathname (framework-definitions-pathname ,framework-name 'clos))))
+       (pushnew ,framework-name *frameworks* :test #'string-equal))))
+
+(defmacro compile-framework ((framework-name &key clos-definition) &body cffi-definitions)
+  "Create definitions file from FRAMEWORK-NAME. Frameworks will
+be searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*. Definitions
+will be automatically loaded." 
   (let ((name (intern (concatenate 'string (string-upcase framework-name) "-FRAMEWORK"))))
     `(progn 
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-	 (define-foreign-library ,name
-	   (t (:framework ,framework-name)))
-	 (use-foreign-library ,name))
-       (when objc-clos:*automatic-definitions-update*
+       (define-foreign-library ,name
+	 (t (:framework ,framework-name)))
+       (use-foreign-library ,name)
+       (when (or ,clos-definition objc-clos:*automatic-definitions-update*)
 	 (with-framework-cache ,framework-name clos
-	   (objc-clos:update-clos-definitions :output-stream out)))
+	   (objc-clos:update-clos-definitions :output-stream out 
+					      :force t 
+					      :for-framework ,framework-name)))
 
-       (with-framework-cache ,framework-name struct
-	 (update-cstruct-database :output-stream out))
-
+       (with-framework-cache ,framework-name static
+	 (update-cstruct-database :output-stream out)
+	 (format out "~{~s~%~}" (quote ,cffi-definitions)))
        ,@cffi-definitions
        t)))

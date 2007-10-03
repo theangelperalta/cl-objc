@@ -1,12 +1,8 @@
 (in-package :cl-objc-examples)
 
-(use-objc-framework "Foundation"
-  (define-objc-struct ns-size (width :float) (height :float))
-  (define-objc-struct ns-point (x :float) (y :float))
-  (define-objc-struct ns-rect (origin ns-point) (size ns-size)))
+(import-framework "Foundation")
 
-(use-objc-framework "AppKit"
-  (cffi:defcvar "NSApp" objc-id))
+(import-framework "AppKit")
 
 (define-objc-class app-delegate ns-object 
   ())

@@ -35,10 +35,14 @@
 				     (:file "converter"))))
   :depends-on (:cl-objc :swank))
 
-(defsystem cl-objc.doc
-  :components ((:module :doc
-			:components ((:file "docstrings"))))
-  :depends-on (:cl-objc))
+(defparameter *framework-directory* nil)
+(export '*framework-directory*)
+
+(defmethod asdf:perform :before ((op asdf:load-op) (system (eql (find-system 'cl-objc))))
+  (setf *framework-directory* (asdf:component-pathname 
+			       (asdf:find-component 
+				(asdf:find-component system "src") 
+				"frameworks"))))
 
 (defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc))))
   (asdf:oos 'asdf:load-op 'cl-objc.doc)
@@ -58,7 +62,6 @@
 				     (:file "reader" :depends-on ("suite"))
 				     (:file "runtime" :depends-on ("suite"))
 				     (:file "lisp-objc" :depends-on ("suite" "utils"))
-				     (:file "cache" :depends-on ("suite"))
 				     (:file "clos" :depends-on ("suite")))))
   :depends-on (:cl-objc :FiveAM))
 

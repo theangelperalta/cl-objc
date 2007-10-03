@@ -1,17 +1,10 @@
 (in-package :cl-objc-examples)
 
-(use-objc-framework "Foundation"
-  (define-objc-struct ns-size (width :float) (height :float))
-  (define-objc-struct ns-point (x :float) (y :float))
-  (define-objc-struct ns-rect (origin ns-point) (size ns-size)))
+(import-framework "Foundation")
 
-(use-objc-framework "AppKit"
-  (cffi:defcvar "NSApp" objc-id))
+(import-framework "AppKit")
 
-(use-objc-framework "Cocoa"
-  (cffi:defcfun "NSApplicationMain" :int 
-    (argc :int)
-    (argv :pointer)))
+(use-objc-framework "Cocoa")
 
 (define-objc-class converter ns-object
   ())

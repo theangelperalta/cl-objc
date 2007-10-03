@@ -38,9 +38,9 @@
 	 :test #'string-equal
 	 :key #'second))    
   (when output-stream
-    (let ((*package* (find-package "CL-OBJC-USER")))
-      (format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC-USER\")
-~%(dolist (struct-name (list ~{(quote ~s)~}))
+    (let ((*package* (find-package "CL-OBJC")))
+      (format output-stream ";;; Structure names cache~%~%(in-package \"CL-OBJC\")
+~%(dolist (struct-name (list ~{(quote ~s)~%~}))
 ~2t(pushnew struct-name ~s :test #'string-equal :key #'second))~%~%"
 	      *objc-struct-db*
 	      '*objc-struct-db*))))
@@ -153,6 +153,7 @@ error will be raised if the trial fails.
 		   ((find ,private-name *objc-struct-db* :test #'string-equal :key #'second) ,private-name)
 		   (t (error "There is no ObjC struct binded to ~a or ~a" ,gobjc-name ,private-name))))
 	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-name))
+	 (export ',lisp-name)
 	 (cffi:defcstruct ,name-and-options
 	   ,@doc-and-slots)))))
 
