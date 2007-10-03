@@ -20,4 +20,5 @@
 (compile-framework ("Cocoa")
   (cffi:defcfun "NSApplicationMain" :int
     (argc :int)
-    (argv :pointer)))
+    (argv :pointer))
+  (cffi:defcvar ("NSApp" *nsapp*) objc-id))

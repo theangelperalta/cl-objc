@@ -3,7 +3,7 @@
 
 (in-package "CL-OBJC-EXAMPLES")
 
-(import-framework "Foundation")
+(import-framework "Foundation" t)
 
 (defun make-range (location length)
   (slet ((range ns-range))
@@ -24,9 +24,9 @@
 (defun make-nsstring (string)
   (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
 
-(import-framework "AppKit")
+(import-framework "AppKit" t)
 
-(import-framework "Cocoa")
+(import-framework "Cocoa" t)
 
 (define-objc-class circle-view ns-view
   ((center ns-point)
@@ -69,7 +69,7 @@
   (declare (ignore rect))
   (invoke (invoke 'ns-color white-color) set)
   (with-ivar-accessors circle-view 
-    (ns-rect-fill (invoke self bounds))
+    (cl-objc::ns-rect-fill (invoke self bounds))
     (slet* ((glyph-range ns-range (invoke (layout-manager self) :glyph-range-for-text-container (text-container self)))
 	    (used-rect ns-rect (invoke (layout-manager self) :user-rect-for-text-container (text-container self)))
 	    (size ns-size (ns-rect-size used-rect)))
@@ -123,7 +123,7 @@
 (define-objc-method :set-color (:return-type :void) ((self circle-view) (color ns-color))
   (with-ivar-accessors circle-view
     (invoke (text-storage self) 
-	    :add-attribute *ns-foreground-color-attribute-name*
+	    :add-attribute cl-objc::*ns-foreground-color-attribute-name*
 	    :value color :range (make-range 0 (invoke (text-storage self) length)))
     (invoke self :set-needs-displays t)))
 
@@ -169,8 +169,8 @@
   (let ((timer (invoke 
 		(invoke 'ns-timer :scheduled-timer-with-time-interval (/ 1.0 30) :target self :selector (selector :perform-animation) :user-info objc-nil-class :repeats t)
 		retain)))
-    (invoke (invoke 'ns-run-loop current-run-loop) :add-timer timer :for-mode *ns-modal-panel-run-loop-mode*)
-    (invoke (invoke 'ns-run-loop current-run-loop) :add-timer timer :for-mode *ns-event-tracking-run-loop-mode*)
+    (invoke (invoke 'ns-run-loop current-run-loop) :add-timer timer :for-mode cl-objc::*ns-modal-panel-run-loop-mode*)
+    (invoke (invoke 'ns-run-loop current-run-loop) :add-timer timer :for-mode cl-objc::*ns-event-tracking-run-loop-mode*)
     (with-ivar-accessors circle-view 
       (setf (last-time self) (invoke 'ns-date time-interval-since-reference-date)))))
 
@@ -198,5 +198,7 @@
 
 (defun circle-view ()
   (invoke 'ns-application shared-application)
-  (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner *nsapp*)
-  (invoke *nsapp* run))
+  (invoke 'ns-bundle 
+	  :load-nib-named (invoke (invoke 'ns-string alloc) :init-with-utf8-string "MainMenu") 
+	  :owner cl-objc::*nsapp*)
+  (invoke cl-objc::*nsapp* run))

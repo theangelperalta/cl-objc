@@ -74,13 +74,14 @@
   "TYPE is the lisp CFFI name. Returns an objc struct definition
 if TYPE names a struct, a primitive type if TYPE names a basic C
 typedef, else TYPE itself."
-  (cond
-    ((find-struct-definition type))
-    ((and (gethash type cffi::*type-parsers*)
-	  (eq (class-of (funcall (gethash type cffi::*type-parsers*)))
-	      (find-class 'cffi::foreign-typedef)))
-     (cffi::type-keyword (cffi::actual-type (funcall (gethash type cffi::*type-parsers*)))))
-    (t type)))
+  (let ((interned-type (intern (symbol-name type) "CL-OBJC")))
+    (cond
+      ((find-struct-definition interned-type))
+      ((and (gethash interned-type cffi::*type-parsers*)
+	    (eq (class-of (funcall (gethash interned-type cffi::*type-parsers*)))
+		(find-class 'cffi::foreign-typedef)))
+       (cffi::type-keyword (cffi::actual-type (funcall (gethash interned-type cffi::*type-parsers*)))))
+      (t type))))
 
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)

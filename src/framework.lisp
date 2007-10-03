@@ -28,19 +28,25 @@ TYPE exists."
 	   ,@body)
 	 (compile-file ,pathname :verbose nil :print nil)))))
 
-(defparameter *frameworks* nil "The list of frameworks loaded")
+(defparameter *frameworks* nil "The list of frameworks loaded.
+Each element is a cons with car eq to the short name of the
+framework and cons is wheter or not its clos binding are been
+loaded.")
 
 (defmacro import-framework (framework-name &optional clos)
   "Import the ObjC framework FRAMEWORK-NAME. If CLOS or
 OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true then load also
 the CLOS bindings."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (unless (member ,framework-name *frameworks* :test #'string-equal)
-       (load-framework ,framework-name)
-       (load (compile-file-pathname (framework-bindings-pathname ,framework-name 'static)))
-       (when (or ,clos objc-clos:*automatic-clos-bindings-update*)
-	 (load (compile-file-pathname (framework-bindings-pathname ,framework-name 'clos))))
-       (pushnew ,framework-name *frameworks* :test #'string-equal))))
+     (flet ((framework-data-eq (el1 el2)
+	      (and (string-equal (car el1) (car el2))
+		   (eq (cdr el1) (cdr el2)))))
+       (unless (member (cons ,framework-name ,clos) *frameworks* :test #'framework-data-eq)
+	 (load-framework ,framework-name)
+	 (load (compile-file-pathname (framework-bindings-pathname ,framework-name 'static)))
+	 (when (or ,clos objc-clos:*automatic-clos-bindings-update*)
+	   (load (compile-file-pathname (framework-bindings-pathname ,framework-name 'clos))))
+	 (pushnew (cons ,framework-name ,clos) *frameworks* :test #'framework-data-eq)))))
 
 (defmacro compile-framework ((framework-name &key force (clos-bindings t)) &body other-bindings)
   "Create bindings for FRAMEWORK-NAME. Frameworks will be

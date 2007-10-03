@@ -4,7 +4,7 @@
 
 (import-framework "AppKit")
 
-(use-objc-framework "Cocoa")
+(import-framework "Cocoa")
 
 (define-objc-class converter ns-object
   ())
@@ -31,5 +31,5 @@
 
 (defun converter ()
   (invoke 'ns-application shared-application)
-  (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner *nsapp*)
-  (invoke *nsapp* run))
+  (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner cl-objc::*nsapp*)
+  (invoke cl-objc::*nsapp* run))

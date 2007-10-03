@@ -49,7 +49,7 @@ to be on the main thread."
 	       (adios 'ns-sound
 		      :init-with-contents-of-file (lisp-string-to-nsstring "/System/Library/Sounds/Basso.aiff" )
 		      :by-reference 1))
-      (invoke *nsapp* :set-delegate delegate)
+      (invoke cl-objc::*nsapp* :set-delegate delegate)
 					; setting up window
       (with-object win
 	(:init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)

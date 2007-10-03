@@ -156,9 +156,9 @@ big struct types with the corresponding number of :int parameters"
 							collect `(mem-aref ,name :int ,i))
 			       when (not struct-def) nconc (list name)))
 	 (lisp-args (mapcar #'car args)))
-    (if has-struct-arg
-	(multiple-value-bind (lisp-name foreign-name) 
-	    (cffi::parse-name-and-options name-and-options)
+    (multiple-value-bind (lisp-name foreign-name) 
+	(cffi::parse-name-and-options name-and-options)
+      (if has-struct-arg
 	  (let* ((new-name (intern (format nil "SPLAYED-~a" lisp-name)))
 		 (stret (gensym "STRET-"))
 		 (stret-val (gensym))
@@ -184,8 +184,11 @@ big struct types with the corresponding number of :int parameters"
 		   ((big-struct-type-p has-struct-return)
 		    `(let ((,stret-val (cffi:foreign-alloc ,return-type)))
 		       (,new-name ,stret-val ,@dereferenced-args)))
-		   (t (error "Struct nor small neither big?That shouldn't happen")))))))
-	`(cffi:defcfun ,name-and-options ,return-type ,@doc-and-args))))
+		   (t (error "Struct nor small neither big?That shouldn't happen"))))
+	       (export ',lisp-name)))
+	  `(progn 
+	     (cffi:defcfun ,name-and-options ,return-type ,@doc-and-args)
+	     (export ',lisp-name))))))
 
 (defmacro define-objc-struct (name-and-objc-options &body doc-and-slots)
   "Wrapper for CFFI:DEFCSTRUCT allowing struct to be used as
