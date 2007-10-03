@@ -317,6 +317,20 @@ e.g.
   `(let* ,(objc-let-bindings bindings)
      ,@body))
 
+(defmacro objc-letr (bindings &body body)
+  `(objc-let ,bindings
+     (prog1
+	 (progn
+	   ,@body)
+       ,@(mapcar (lambda (obj) `(invoke ,obj release)) (mapcar #'car bindings)))))
+
+(defmacro objc-letr* (bindings &body body)
+  `(objc-let* ,bindings
+     (prog1
+	 (progn
+	   ,@body)
+       ,@(mapcar (lambda (obj) `(invoke ,obj release)) (mapcar #'car bindings)))))
+
 (defmacro with-object (obj &body actions)
   "Calls messages with OBJ as receveir. ACTIONS is a list of
 selector and arguments passed to invoke."
