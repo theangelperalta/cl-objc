@@ -6,6 +6,9 @@
 
 (import-framework "Cocoa")
 
+(defun lisp-string-to-nsstring (string)
+  (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
+
 (define-objc-class converter ns-object
   ())
 

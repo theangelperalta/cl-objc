@@ -29,18 +29,28 @@
 								  "structs"))
 				       (:module :frameworks
 						:components ((:file "generate-frameworks-bindings"))
-						:depends-on ("framework"))))
-		 (:module :doc
-			  :components ((:file "docstrings")
-				       (:module :include))))
+						:depends-on ("framework")))))
     :depends-on (:cffi :yacc :closer-mop :memoize))
 
-(defsystem cl-objc.examples
+(defsystem cl-objc.examples.hello-world
   :components ((:module :examples
-			:components ((:file "hello-world")
-				     (:file "converter")
-				     (:file "circle-view"))))
+			:components ((:file "hello-world"))))
   :depends-on (:cl-objc :swank))
+
+(defsystem cl-objc.examples.converter
+  :components ((:module :examples
+			:components ((:file "converter"))))
+  :depends-on (:cl-objc :swank))
+
+(defsystem cl-objc.examples.circle-view
+  :components ((:module :examples
+			:components ((:file "circle-view"))))
+  :depends-on (:cl-objc :swank))
+
+(defsystem cl-objc.doc
+  :components ((:module :doc
+			:components ((:file "docstrings")
+				     (:module :include)))))
 
 (defmethod asdf:perform :before ((op asdf:load-op) (component (eql (asdf:find-component 
 								    (asdf:find-component 
@@ -51,7 +61,7 @@
   (setf (symbol-value (intern "*FRAMEWORK-DIRECTORY*" "OBJC-CFFI")) 
 	(asdf:component-pathname component)))
 
-(defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc))))
+(defmethod asdf:perform :after ((op asdf:load-op) (system (eql (find-system 'cl-objc.doc))))
   ;; Compile documentation
   (dolist (package (mapcar 'find-package '("OBJC-CFFI" "OBJC-CLOS" "OBJC-READER" "CL-OBJC")))
     (funcall (intern "DOCUMENT-PACKAGE" "SB-TEXINFO") 

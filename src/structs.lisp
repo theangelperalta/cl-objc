@@ -72,8 +72,9 @@ CFFI, otherwise returns INPUT-TYPE unchanged"
        (<= (objc-foreign-type-size type) 8)))
 
 (defun pack-struct-arguments-type (arguments-type)
-  "Returns a new list of types replacing in arguments-type the
-big struct types with the corresponding number of :int parameters"
+  "Given in input a list of types returns a new list of types
+replacing in arguments-type the big struct types with the
+corresponding number of :int parameters"
   (mapcan (lambda (type) 
 	    (cond 
 	      ((big-struct-type-p type)
@@ -82,10 +83,10 @@ big struct types with the corresponding number of :int parameters"
 	      (t (list type))))
 	  arguments-type))
 
-(defun pack-struct-arguments-val (arguments method)
+(defun pack-struct-arguments-val (arguments method-types)
   (loop
      for var in arguments
-     for type in (method-argument-types method)
+     for type in method-types
      when (big-struct-type-p type) 
      nconc (loop 
 	      for index below (ceiling (objc-foreign-type-size type) (foreign-type-size :int))
@@ -125,6 +126,19 @@ big struct types with the corresponding number of :int parameters"
   (let ((objc-name (car (find lisp-name *registered-structs* :key #'cdr :test #'string-equal))))
     (find objc-name *objc-struct-db* :key #'second :test #'string-equal)))
 
+(defun calculate-splayed-args (args)
+  (loop 
+     for arg-def in args
+     for name = (symbol-name (first arg-def))
+     for type = (second arg-def)
+     for struct-def = (find-struct-definition type)
+     when (not struct-def) nconc (list arg-def)
+     when  struct-def nconc (loop 
+			       for i below (ceiling (objc-foreign-type-size type) 
+						    (foreign-type-size :int))
+			       for arg = (intern (format nil "~a-~d" name i))
+			       collecting (list arg :int))))
+
 (defmacro define-objc-function (name-and-options return-type &rest doc-and-args)
   (let* ((doc-string)
 	 (args (if (stringp (car doc-and-args)) 
@@ -134,17 +148,7 @@ big struct types with the corresponding number of :int parameters"
 		   doc-and-args))
 	 (has-struct-arg (member-if #'find-struct-definition args :key #'second))
 	 (has-struct-return (find-struct-definition return-type))
-	 (splayed-args (loop 
-			  for arg-def in args
-			  for name = (symbol-name (first arg-def))
-			  for type = (second arg-def)
-			  for struct-def = (find-struct-definition type)
-			  when (not struct-def) nconc (list arg-def)
-			  when  struct-def nconc (loop 
-						    for i below (ceiling (objc-foreign-type-size type) 
-									 (foreign-type-size :int))
-						    for arg = (intern (format nil "~a-~d" name i))
-						    collecting (list arg :int))))
+	 (splayed-args (calculate-splayed-args args))
 	 (dereferenced-args (loop 
 			       for arg-def in args
 			       for name = (car arg-def)
@@ -205,6 +209,9 @@ where _NSRect is the struct name used in ObjC methods, and
 NS-RECT is the lisp name of the struct. If you don't specify the
 former the method will try to guess it automatically, but an
 error will be raised if the trial fails.
+
+The name of the struct and of the accessors will be exported in
+the CL-OBjC package.
 "
   (with-gensyms (private-name gobjc-name)
     (destructuring-bind (name-and-options objc-name lisp-name)
@@ -220,7 +227,8 @@ error will be raised if the trial fails.
 	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-name))
 	 (export ',lisp-name)
 	 (cffi:defcstruct ,name-and-options
-	   ,@doc-and-slots)))))
+	   ,@doc-and-slots)
+	 (export (cffi:foreign-slot-names ',lisp-name))))))
 
 (defun objc-struct-slot-value (ptr type slot-name)
   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."

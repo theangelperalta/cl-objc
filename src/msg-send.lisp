@@ -155,6 +155,8 @@
   "If this variable is set to t, the objc_msgSend will be translated to ")
 
 (defmacro with-super (&body body)
+  "Calls embedded in WITH-SUPER will be translated into calls to
+methods to the superclass of an instance of a class."
   `(let ((objc-cffi::*super-call* t))
      ,@body))
 
@@ -234,7 +236,7 @@ binded to SEL.
 			    (typed-objc-msg-send (,(first varargs) ,sel) 
 						 ,@(interpose 
 						    (pack-struct-arguments-type (method-argument-types method)) 
-						    (pack-struct-arguments-val (cdr varargs) method))))))))))
+						    (pack-struct-arguments-val (cdr varargs) (method-argument-types method)))))))))))
 
 (defun clear-method-caches ()
   (setf *methods-cache* (make-hash-table)

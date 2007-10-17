@@ -1,8 +1,8 @@
 (in-package :cl-objc-examples)
 
 (import-framework "Foundation")
-
 (import-framework "AppKit")
+(import-framework "Cocoa")
 
 (define-objc-class app-delegate ns-object 
   ())

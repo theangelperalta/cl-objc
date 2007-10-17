@@ -31,9 +31,9 @@
 @end macro
 
 @copying
-Documentation for the Common Lisp ObjC Interface, version 1.0.
+Documentation for the Common Lisp Objective C Interface, version 1.0.
 
-Copyright @copyright{} 2007 Geoff Cant, Luigi Panzeri
+Copyright @copyright{} 2007 Luigi Panzeri
 
 @quotation
 Copying and distribution of this file, with or without modification, are
@@ -43,7 +43,7 @@ and this notice are preserved.
 @end copying
 
 @titlepage
-@title Common Lisp ObjC Interface
+@title Common Lisp ObjectiveC Interface
 
 @page
 @vskip 0pt plus 1filll
@@ -65,7 +65,7 @@ and this notice are preserved.
 * CFFI Bindings::               Using simple wrappers of ObjC FFI
 * Lisp Interface::              Writing ObjC application using Common Lisp wrappers
 * Reader Macro::                Using the reader macro to write in ObjC style
-* CLOS Wrappers::               The CLOS wrapper to ObjC object system
+* CLOS Bindings::               The CLOS bindings to ObjC object system
 * Implementation Notes::        
 * Index::                       Complete index.
 
@@ -79,23 +79,50 @@ CL-ObjC is a Common Lisp library whose aim is to allow developers to use
 libraries written in the Objective C language, providing a lisp-like
 interface towards Objective C conventions.
 
-Actually it is made of 4 different interfaces. 
+Actually it is made of four different interfaces, i.e. four different
+style to use Objective C libraries in your Common Lisp program.
 
-The first one provided by the package @lw{OBJC-CFFI} exposes the CFFI
+The first one provided by the package @lw{CL-OBJC} gives to the users
+the ability to write application in a Lisp-like way with a functional
+interface in order to send message (e.g. call methods) to Objective C
+objects. E.g.:
+
+@lisp
+(let ((new-string (invoke 'ns-string alloc)))
+  (invoke new-string :init-with-utf8-string ``ciao''))
+
+(define-objc-class bank-account ns-object
+ ((amount :float)
+  (currency currency-type)))
+
+(define-objc-method withdraw ((self bank-account) (withdraw :float))
+  (with-ivar-accessors bank-account
+    (decf (amount self) withdraw)
+    self))
+@end lisp
+
+The second one provided by @lw{OBJC-CLOS} expose a CLOS object oriented
+interface to Objective C mapping every Objective C class/method to a
+CLOS class/method with names interned in a separate @lw{OBJC} package.
+So the user can code in a CLOS fashion mixing the strength of both
+object systems. Functions to create bindings for custom Objective C
+frameworks are provided. E.g.
+
+@lisp
+(let ((new-string (make-instance 'objc:ns-string)))
+  (init-with-utf8-string? new-string ``ciao''))
+@end lisp
+
+The third one provided by the package @lw{OBJC-CFFI} exposes the CFFI
 bindings to the user and allows to handle Objective C objects through
-Common Lisp objects via the CFFI foreign type translators mechanism.
+Common Lisp objects via the CFFI foreign type translators mechanism. It
+is mainly useful when you have to work with C-like construct of
+Objective C, like function returning C struct value and so on.
 
-The second one, you can find in the OBJC-READER package, provides a
+The last one, you can find in the @lw{OBJC-READER} package, provides a
 reader macro that allows user to mix ObjectiveC and Common Lisp syntax
-just to call Objective C methods.
-
-The third one provided by the package @lw{CL-OBJC} gives to the users
-the ability to write application in a Common Lisp-like way.
-
-The last one provided by @lw{OBJC-CLOS} maps every Objective C
-class/method to a CLOS class/method with names interned in the @lw{OBJC}
-package. So the user can code in a CLOS fashion mixing the strength of
-both object systems.
+just to call Objective C methods. It is designed just to be used for the
+sake of convenience from the REPL.
 
 This manual is a work in progress. If you have difficulty using or
 comprehending it please contact @email{cl-objc-devel@@common-lisp.net,
@@ -106,7 +133,7 @@ At the moment CL-ObjC has been tested mainly on x86-64 platform on
 Darwin with the last stable release of sbcl. CL-ObjC is known also to
 work on Allegro 8.1. As CL-ObjC uses CFFI to link with the Objective C
 runtime foreign functions, it should not be a problem to use it portably
-on other platforms, compilers or OSs.
+on other platforms, compilers or OSs. 
 
 @section Download and installation
 You can get the current development version of CL-ObjC from the darcs
@@ -116,6 +143,11 @@ CL-ObjC is packaged using the ASDF library, so once downloaded the code
 you should change the asdf:*central-registry* parameter to make asdf
 find the cl-objc.asd file, or you can make a symbolic link of it in a
 directory already in asdf:*central-registry*.
+
+@b{The first time you build CL-ObjC the asdf system will build the bindings
+for the standard frameworks present on your system. That operation can
+take a long time, until 5 minutes. Loot at the file
+generate-framework-bindings.lisp to configure this process.}
 
 To build CL-ObjC you need to get a recent (at least from February 2007)
 version of CFFI. You can get the development version from the darcs
@@ -162,14 +194,28 @@ impatient an ObjC call like:
 can be equivalently be executed in CL-ObjC
 
 @itemize
-* using the low level facility in the package OBJC-CFFI :
+
+* using the interface provided by the package CL-OBJC :
+  @lisp
+(invoke my-obj :do-something-cool-at now :with-this-param 5)
+  @end lisp
+
+* using CLOS bindings
+  @lisp
+;; you can alloc new instances with (make-instance 'objc:ns-foo)
+
+(objc:do-something-cool-at?-with-this-param? my-obj now 5)
+  @end lisp
+
+* using the low level facility in the package OBJC-CFFI (rarely needed):
   @lisp
 ; specifying argument types
 (typed-objc-msg-send (my-obj "doSomethingCoolAt:withThisParam") 
 		     'objc-id now 
 		     :int 5)
 ; without argument types
-(untyped-objc-msg-send my-obj "doSomethingCoolAt:withThisParam" now 5)
+(untyped-objc-msg-send my-obj 
+                       "doSomethingCoolAt:withThisParam" now 5)
   @end lisp
 
 * using the reader macro in the package OBJC-READER :
@@ -177,57 +223,42 @@ can be equivalently be executed in CL-ObjC
 [my-obj doSomethingCoolAt: now withThisParams 5]
   @end lisp
 
-* using the interface provided by the package CL-OBJC :
-  @lisp
-(invoke my-obj :do-something-cool-at now :with-this-param 5)
-  @end lisp
-
-* using the CLOS interface
-  @lisp
-;; you can alloc new instances with (make-instance 'objc:ns-foo)
-
-(objc:do-something-cool-at?-with-this-param? my-obj now 5)
-  @end lisp
 @end itemize
 
 So every message call can be specified in a typed or untyped way, i.e.
 expliciting the CFFI type of the arguments or not, or mixing the two
 approach. Actually if types are available the compiler can optimize the
-message call. The CLOS interface have to be enabled first because it is
-disabled by default.
+message call. CLOS bindings and the reader macro have to be enabled
+before use because they are disabled by default.
 
 @section Loading Frameworks
 Once loaded CL-ObjC we can use existing Objective C classes and methods
-loading frameworks with the macro 
-@ref{Macro objc-cffi:use-objc-framework,,@code{USE-OBJC-FRAMEWORK}}:
+loading frameworks with the macro @code{OBJC-CFFI:IMPORT-FRAMEWORK}:
 
-@example
-(use-objc-framework "Foundation"
-  (define-objc-struct ns-range 
-    (location :unsigned-int) 
-    (length :unsigned-int)))
-@end example
-
-In the body of this macro you can optionally include custom CFFI
-definitions, usually useful to define better names for structs and
-fields, because it is not possible to get them at runtime.
+@lisp
+(import-framework "Foundation")
+@end lisp
 
 If you want to enable the CLOS interface you need to set the
+@code{OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE*} to @lw{T} before
+loading the framework.
 
-@ref{Variable objc-clos:*automatic-definitions-update*,,
-@code{objc-clos:*automatic-definitions-update*}} to @lw{t} before
-loading the framework. 
+@xref{Variable objc-clos:*automatic-clos-bindings-update*} and
+@ref{Macro objc-cffi:import-framework} for details.
 
+@b{Please note that the first time you load CL-ObjC, bindings for standard
+Cocoa frameworks will be built. This process can take long time.}
 @section Type translations
 
 Objective C types are translated directly into Common Lisp types.
-Primitive C types (float, int, char *) are translated by CFFI in the
-common way. Struct values as in CFFI are always managed by a pointer to
-their data. The specific Objective C types (like @code{id}) are
-translated automatically by foreign type translators into lisp types and
-viceversa when needed. Several CLOS classes are added to handle them and
-custom @var{print-object} and @var{describe-object} are provided in the
-OBJC-CFFI package. The following types translators are installed:
+Primitive C types (@code{float}, @code{int}, @code{char *}) are
+translated by CFFI in the common way. Struct values as in CFFI are
+always managed by a pointer to their data. The specific Objective C
+types (like @code{id}) are translated automatically by foreign type
+translators into lisp types and viceversa when needed. Several CLOS
+classes are added to handle them and custom @lw{PRINT-OBJECT} and
+@lw{DESCRIBE-OBJECT} are provided in the OBJC-CFFI package. The
+following types translators are installed:
 
 
 @multitable @columnfractions .33 .33 .33
@@ -244,27 +275,29 @@ OBJC-CFFI package. The following types translators are installed:
 You can also use normal string to specify classes or selectors in the
 OBJC-CFFI package and they will be translated to the type needed.
 
-@xref{CLOS Wrappers} to read documentation about type translation with
-CLOS wrappers.
+@xref{CLOS Bindings} to read documentation about type translation with
+CLOS bindings.
 
 @section Name translators
 In the CL-OBJC package you don't specify class and selector by strings
 but with symbols. To see how a given ObjC or Lisp name will be
-translated by the bridge, you can use the following functions:
+translated by CL-ObjC, you can use the following functions:
 
 @lisp
-(objc-class-name-to-symbol string)
-(symbol-to-objc-class-name symbol)
-(objc-selector-to-symbols string)
-(symbols-to-objc-selector symbol-list-or-symbol)
+OBJC-CFFI:OBJC-CLASS-NAME-TO-SYMBOL
+OBJC-CFFI:SYMBOL-TO-OBJC-CLASS-NAME
+CL-OBJC:OBJC-SELECTOR-TO-SYMBOLS
+CL-OBJC:SYMBOLS-TO-OBJC-SELECTOR
 @end lisp
 
-So for example the class ``NSObject'' is translated to ns-object, the
-class ``VeryImportant'' to very-important and so on. You can add strings
-to the special variable @var{*acronyms*} in order to not espand acronyms
-like URL into u-r-l.
+So for example the class ``NSObject'' is translated to @lw{NS-OBJECT},
+the class ``VeryImportant'' to @lw{VERY-IMPORTANT} and so on. You can
+add strings to the special variable @lw{CL-OBJC:*ACRONYMS*} in order to
+not espand acronyms like URL into u-r-l.
 
-A selector name is translated in a list of symbols or a single symbol. 
+A selector name can be translated in a list of symbols or a single
+symbol depending on the number of parameters. The following examples
+explain its behavior:
 
 @table @code
 @item [NSObject alloc]
@@ -277,44 +310,45 @@ A selector name is translated in a list of symbols or a single symbol.
 (invoke 'ns-number :number-with-int 3)
 @end table
 
-@xref{CLOS Wrappers} to read documentation about name translations with
-CLOS wrappers.
+@xref{CLOS Bindings} to read documentation about name translations with
+CLOS bindings.
 
 @section Utilities
 Several macros are present for the sake of convenience. 
 
-@subsection The slet, slet* macro
+@subsection The @code{SLET}, @code{SLET*} macro
 
-The CL-OBJC:slet* and CL-OBJC:slet* macro are used to handle data stored
-in structs. They bind variable to new allocated (or not if you provide
-a value) structs and provide lisp accessor to their fields.
+The @lw{CL-OBJC:SLET*} and @lw{CL-OBJC:SLET*} macro are used to handle
+data stored in structs. They bind variable to new allocated (or not if
+you provide a value) structs and provide lisp accessor to their fields.
 
-@example
 @lisp
 (defun make-rect (x y width height)
-  (slet* ((rect ns-rect)
-	  (size ns-size (ns-rect-size rect))
-	  (point ns-point (ns-rect-origin rect)))
-    (setf (ns-point-x point) (coerce x 'float)
-	  (ns-point-y point) (coerce y 'float)
-	  (ns-size-width size) (coerce width 'float)
-	  (ns-size-height size) (coerce height 'float))
-    rect))
+  (destructuring-bind (x y width height) 
+   (mapcar #'float (list x y width height))
+    (slet* ((rect ns-rect)
+	    (size ns-size (ns-rect-size rect))
+	    (point ns-point (ns-rect-origin rect)))
+      (setf (ns-point-x point) x
+	    (ns-point-y point) y
+	    (ns-size-width size) width
+	    (ns-size-height size) height)
+      rect))
 @end lisp
-@end example
 
+@xref{Macro cl-objc:slet} for details.
 
-@subsection with-object and objc-let
+@subsection @code{WITH-OBJECT} and @code{OBJC-LET}
 As a common snippet Objective C code pattern is @code{[[MyClass alloc]
-initWithParam param]} it is provided the macro @var{CL-OBJC:objc-let}
-that binds variables to new allocated and initialized object. So the
-previous examples becomes @code{(objc-let ((obj my-class
-:init-with-param param)) ...)}.
+initWithParam: param]} it is provided the macros @lw{CL-OBJC:OBJC-LET}
+and @lw{CL-OBJC:OBJC-LET*} that binds variables to new allocated and
+initialized object.
 
 Another common situation is to call several methods with the same
 receiver (e.g. self). For the sake of convenience it is provided the
-@var{with-object} macro. So the Objective C code
+@lw{CL-OBJC:WITH-OBJECT} macro. So the Objective C code
 @example
+obj = [ [MyClass alloc] initWithParam: param
 [obj methodA]
 [obj methodB: param1 C: param2]
 [obj methodD: param1]
@@ -322,15 +356,20 @@ receiver (e.g. self). For the sake of convenience it is provided the
 
 becomes in the CL-ObjC syntax:
 
-@example
 @lisp
-(with-object obj
-  (method-a)
-  (:method-b param1)
-  (:method-c param1 :c param2)
-  (:method-d: param1))
+(objc-let ((obj my-class :init-with-param param))
+  (with-object obj
+    (method-a)
+    (:method-b param1)
+    (:method-c param1 :c param2)
+    (:method-d: param1)))
 @end lisp
-@end example
+hw
+@xref{Macro cl-objc:objc-let} and @ref{Macro cl-objc:with-object} for details.
+
+@subsection Super Calling
+In order to send message to the superclass of an instance of a class the
+macro @lw{WITH-SUPER} is provided. @xref{Macro objc-cffi:with-super}.
 
 @section Using Interface Builder: the Currency Converter Example
 This section concerns the construction of a Cocoa application using an
@@ -339,7 +378,7 @@ Builder tool to build the interface used in the example at
 
 @url{http://developer.apple.com/documentation/Cocoa/Conceptual/ObjCTutorial/}.
 
-A Cocoa application is usally deployed as a bundle. A bundle is just a
+A Cocoa application is usually deployed as a bundle. A bundle is just a
 directory containing all the resources (images, sounds, data) the
 application needs. Interface Builder saves descriptions of UI in
 serialized objects saved in file in the NIB file format stored in the
@@ -350,33 +389,28 @@ find in the directory project your bundle, namingly a folder with the
 .app extension.
 
 In order to have a Cocoa application using NIB files and integrated with
-OSX you have to put a link (symbolic or not) to sbcl and a script
-launching your Cocoa lisp application into the MacOS subfolder of your
-bundle. Usually the script execute sbcl to load and launch your code.
+OSX you have to link your common lisp compiler and a script launching
+your Cocoa lisp application into the ``MacOS'' subfolder of your bundle.
+Usually the script execute your compiler to load and launch your code.
+Otherwise if your lisp implementation supports the creation of a single
+binary with the image of your program, you can just copy it in the same
+subfolder.
 
 Note that in that script you can create a swank server you can attach to
 allowing live debugging of your application@footnote{You can find an
 example of this script in the cl-objc bundle}.
 
-Let's load the frameworks used in our applications:
+Now let's go through the classic Currency Converter example. First of
+all, we load the framework we need:
 
-@table @strong
-@item Objective C code
-Lisp code
+@lisp
+(import-framework "Foundation")
+(import-framework "AppKit)
+(import-framework "Cocoa")
+@end lisp
 
-@item #import "Foundation/foundation.h"
-@code{(define-objc-framework "Foundation")}
-
-@item #import "AppKit/AppKit.h"
-@code{(define-objc-framework "AppKit"
-   (cffi:defcvar "NSApp" objc-id))}
-
-@item #import "Cocoa/Cocoa.h"
-@code{(define-objc-framework "Cocoa")}
-@end table
-
-The @code{CFFI:defcvar} binds the variable @code{*nsapp*} to a static
-variabile used by the Cocoa framework.
+The second import statement binds the variable @code{*nsapp*} to a
+static variabile used by the Cocoa framework.
 
 Then we can define the class definitions for the model and for the
 controller of the GUI using the DEFINE-OBJC-CLASS macro found in the
@@ -386,25 +420,26 @@ CL-OBJC package.
   ())
 
 (define-objc-class converter-controller ns-object
-  ((converter objc-id)
-   (first-currency-field objc-id)
-   (other-currency-field objc-id)
-   (rate-field objc-id)))
+  ((converter converter)
+   (first-currency-field ns-text-field)
+   (other-currency-field ns-text-field)
+   (rate-field ns-text-field)))
 @end lisp
 
 The DEFINE-OBJC-CLASS macro gets three arguments, the name of the class
 and of the superclass transformed with the name translators cited
-before, and the a list of instance variable definitions.
+before, and the a list of instance variable definitions. Please note
+that you can specify the Objective C class of the instance variable, or
+just the ``true'' CFFI value, namingly objc-id.
 
-So the @var{converter-controller} class will be added to the Objective C
-runtime class list with the name ``ConverterController'' and defines 4
+So the @code{converter-controller} class will be added to the Objective
+C runtime class list with the name ``ConverterController'' and defines 4
 instance variables with ObjC names: ``converter'',
 ``firstCurrencyField'', ``otherCurrencyField'', ``rateField''.
 
-Then we can define the methods with the CL-OBJC:DEFINE-OBJC-METHOD
+Then we can define the methods with the @lw{CL-OBJC:DEFINE-OBJC-METHOD}
 macro:
 
-@example
 @lisp
 (define-objc-method :convert (:return-type :void)
     ((self converter-controller) (sender objc-id))
@@ -412,7 +447,8 @@ macro:
   (with-ivar-accessors converter-controller
     (let* ((currency (invoke (first-currency-field self) float-value))
 	   (rate (invoke (rate-field self) float-value))
-	   (amount (invoke (converter self) :convert-currency currency :at-rate rate)))
+	   (amount (invoke (converter self) :convert-currency currency 
+                                            :at-rate rate)))
       (invoke (other-currency-field self) :set-float-value amount)
       (invoke (rate-field self) :select-text self))))
 
@@ -420,20 +456,19 @@ macro:
     ((self converter) (currency :float) (rate :float))
   (* currency rate))
 @end lisp
-@end example
 
 This macro gets 3 arguments plus the body of the method. The name of the
 related selector specified with a symbol or a list of symbols, a list of
 option and a list of argument definition made of the argument name and
-its CFFI type. The argument named @emph{self} is mandatory and will
-binded to the receiver of the message. The body will be evaluated also
-with the symbol @emph{sel} binded to the selector object of the method.
+its type. The argument named @lw{SELF} is mandatory and will binded to
+the receiver of the message. The body will be evaluated also with the
+symbol @lw{SEL} binded to the selector object of the method.
 
 So the second definition in the example define the instance method named
 ``convertCurrency:atRate:'' returning a :float. It accepts 2 arguments
 and it is binded to the class converter.
 
-The @var{with-ivar-accessors} macro establishes useful accessors to read
+The @lw{WITH-IVAR-ACCESSORS} macro establishes useful accessors to read
 and modify instance variables of ObjectiveC objects.
 
 At last the main entry point of our application looks like:
@@ -441,12 +476,15 @@ At last the main entry point of our application looks like:
 @lisp
 (defun converter ()
   (invoke 'ns-application shared-application)
-  (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner *nsapp*)
+  (invoke 'ns-bundle 
+          :load-nib-named (lisp-string-to-nsstring "MainMenu") 
+          :owner *nsapp*)
   (invoke *nsapp* run))
 @end lisp
 
-If we activate the reader macro we can specify NSString object using the
-at-sign so (lisp-string-to-nsstring ``MainMenu'') becomes @@"MainMenu''
+If we activate the reader macro we can specify @code{NSString} object
+using the at-sign so @lw{(lisp-string-to-nsstring ``MainMenu'')} becomes
+@@"MainMenu''
 
 @node CFFI Bindings
 @chapter CFFI Bindings
@@ -479,36 +517,52 @@ macro that build @var{NSString} objects.
 @section API Reference
 @include include/OBJC-READER.texinfo
 
-@node CLOS Wrappers
-@chapter CLOS Wrappers
+@node CLOS Bindings
+@chapter CLOS Bindings
 
-@section Enabling and caching CLOS wrappers
+@section Enabling CLOS bindings and creating bindings for Objective C frameworks
 If you want to enable the CLOS interface you need to set the
-@ref{Variable objc-clos:*automatic-definitions-update*,,
-@code{objc-clos:*automatic-definitions-update*}} to @lw{t} before
-loading the framework.
+@code{OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE*} (@xref{Variable
+objc-clos:*automatic-clos-bindings-update*} for details) to @lw{T}
+before loading the framework.
 
-After setting the variable the call to @code{use-objc-framework} takes a
-bit of time to collect just at compile time informations and generate
-CLOS classes and methods. To help deploy and to make load of cl-objc
-based application faster these definitions are cached in a file for each
-framework.
+After setting the variable the call to @code{import-framework} takes few
+seconds to load thousands of methods typically included in an Objective
+C framework. In order to use non standard or not yet included frameworks
+you can use the macro @code{OBJC-CFFI:COMPILE-FRAMEWORK}(@ref{Macro
+objc-cffi:compile-framework}) that is able at compile time to collect
+informations and generate CLOS classes and methods definitions, saving
+them in a compiled form you can load with @code{IMPORT-FRAMEWORK}.
 
-if you want at any time sync the CLOS definitions without setting you
-can use @ref{Function objc-clos:update-clos-definitions,,
-@code{objc-clos:update-clos-definitions}}
+@code{OBJC-CFFI:COMPILE-FRAMEWORK} is also used (see the file
+generate-framework-bindings.lisp for details) the first time you load
+CL-ObjC when bindings for standard Cocoa framewors are built. This
+process can take long time.
+
+If you want at any time sync the CLOS bindings without setting you can
+use @code{objc-clos:update-clos-bindings}(@xref{Function
+objc-clos:update-clos-bindings} for details).
+
+Tipically in a @code{COMPILE-FRAMEWORK} form you should declare struct
+and any function returning struct by value. You can do that with the
+macro @code{DEFINE-OBJC-STRUCT} and @code{DEFINE-OBJC-FUNCTION}. Please
+note that these macros export the function and struct names and slot
+names into the @code{CL-OBJC} package.
+
+@xref{Macro objc-cffi:define-objc-struct} and @ref{Macro
+objc-cffi:define-objc-function} for details.
 
 @section Value Translation
 If you use the CLOS interface the return value of Objective C calls will
 be translated to CLOS instances of the corresponding class using
-@ref{Function objc-clos:convert-result-from-objc,, convert-result-from-objc}. So
-a call to
+@lw{CONVERT-RESULT-FROM-OBJC}(@ref{Function
+objc-clos:convert-result-from-objc}). So a call to
 @lisp
 (objc:init-with-utf8-string? s "foo")
 @end lisp
 
-returns a new instance of the CLOS class @lw{objc:ns-c-f-string}
-corresponding to the Objective C class @lw{NSCFString}.
+returns a new instance of the CLOS class @lw{OBJC:NS-C-F-STRING}
+corresponding to the ObjectiveC class @code{NSCFString}.
 
 @section API Reference
 @include include/OBJC-CLOS.texinfo

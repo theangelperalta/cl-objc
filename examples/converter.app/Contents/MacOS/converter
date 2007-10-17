@@ -12,5 +12,5 @@ if [ ! -e $LISPDIR/sbcl ]; then
     fi
 fi
 
-exec "$LISPDIR/sbcl" --eval "(asdf:oos 'asdf:load-op 'cl-objc)" --eval "(asdf:oos 'asdf:load-op 'swank)" --eval "(swank:create-server :port 5555 :dont-close t)" --eval "(asdf:oos 'asdf:load-op 'cl-objc.examples)" --eval "(cl-objc-examples:converter)"
+exec "$LISPDIR/sbcl" --eval "(asdf:oos 'asdf:load-op 'cl-objc)" --eval "(asdf:oos 'asdf:load-op 'swank)" --eval "(swank:create-server :port 5555 :dont-close t)" --eval "(asdf:oos 'asdf:load-op 'cl-objc.examples.converter)" --eval "(cl-objc-examples:converter)"
 

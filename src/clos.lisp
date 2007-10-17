@@ -117,7 +117,7 @@ value (CLOS instance or primitive type)"
 							:generic-function-class 'objc-generic-function
 							:lambda-list lambda-list)
       (when output-stream
-	(format output-stream "(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defgeneric ~s ~s
+	(format output-stream "(eval-when (:compile-toplevel :load-toplevel) (export (intern \"~a\" \"OBJC\") \"OBJC\"))~%(defgeneric ~s ~s
 ~2t(:documentation \"Invokes the ~a method\")
 ~2t(:generic-function-class objc-clos:objc-generic-function))~%~%"
 		method-symbol-name
@@ -164,7 +164,7 @@ value (CLOS instance or primitive type)"
     (when output-stream
       (let ((*package* (find-package "CL-OBJC-USER")))
 	(format output-stream
-		"(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defclass ~s ~s 
+		"(eval-when (:compile-toplevel :load-toplevel) (export (intern \"~a\" \"OBJC\") \"OBJC\"))~%(defclass ~s ~s 
 ~2t~s
 ~2t(:metaclass objc-clos-class))~%~%"
 		class-symbol-name
@@ -172,7 +172,7 @@ value (CLOS instance or primitive type)"
 		super-classes
 		(mapcar #'canonicalize-slot-definition slots))
 	(format output-stream
-		"(export (intern \"~a\" \"OBJC\") \"OBJC\")~%(defclass ~s ~s 
+		"(eval-when (:compile-toplevel :load-toplevel) (export (intern \"~a\" \"OBJC\") \"OBJC\"))~%(defclass ~s ~s 
 ~2t~s 
 ~2t(:metaclass objc-clos-class))~%~%"
 		metaclass-symbol-name

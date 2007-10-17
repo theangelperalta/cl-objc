@@ -38,15 +38,29 @@ loaded.")
 OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true then load also
 the CLOS bindings."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (flet ((framework-data-eq (el1 el2)
-	      (and (string-equal (car el1) (car el2))
-		   (eq (cdr el1) (cdr el2)))))
-       (unless (member (cons ,framework-name ,clos) *frameworks* :test #'framework-data-eq)
+     (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal))
+	    (clos-loaded (cdr framework-loaded-p)))
+       (unless framework-loaded-p
 	 (load-framework ,framework-name)
-	 (load (compile-file-pathname (framework-bindings-pathname ,framework-name 'static)))
-	 (when (or ,clos objc-clos:*automatic-clos-bindings-update*)
-	   (load (compile-file-pathname (framework-bindings-pathname ,framework-name 'clos))))
-	 (pushnew (cons ,framework-name ,clos) *frameworks* :test #'framework-data-eq)))))
+	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'static))))
+	   (unless (probe-file compiled-file)
+	     (compile-file (framework-bindings-pathname ,framework-name 'static) :verbose nil :print nil)
+	     (format *trace-output* "~%Compiling STATIC bindings for ~a framework in ~a~%"
+		     ,framework-name
+		     compiled-file))
+	   (load compiled-file))
+	 (push (cons ,framework-name nil) *frameworks*))
+       (when (and (not clos-loaded)
+		  (or ,clos objc-clos:*automatic-clos-bindings-update*))
+	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'clos))))
+	   (unless (probe-file compiled-file)
+	     (compile-file (framework-bindings-pathname ,framework-name 'clos) :verbose nil :print nil)
+	     (format *trace-output* "~%Compiling CLOS bindings for ~a framework in ~a~%"
+		     ,framework-name
+		     compiled-file))
+	   (load compiled-file))
+	 (rplacd (assoc ,framework-name *frameworks* :test #'string-equal) t)))
+     *frameworks*))
 
 (defmacro compile-framework ((framework-name &key force (clos-bindings t)) &body other-bindings)
   "Create bindings for FRAMEWORK-NAME. Frameworks will be

@@ -177,20 +177,21 @@ them sequentially.
 
 BINDINGS has the form: ((VAR STRUCT-TYPE [INIT-FORM])*).
 
-VAR will be binded to `INIT-FORM` if present otherwise to a new
+VAR will be binded to INIT-FORM if present otherwise to a new
 allocated struct of type STRUCT-TYPE (translated by
 OBJC-CLASS-NAME-TO-SYMBOL).
 
 In body accessories of the form (STRUCT-NAME`-`SLOT-NAME
 STRUCT-OBJ) will be bound as utilities."
-  `(let ,(mapcar 
-	  (lambda (binding)
-	    (let ((name (car binding))
-		  (type (cadr binding))
-		  (value (caddr binding)))
-	      `(,name (or ,value (cffi:foreign-alloc ',type))))) bindings)
-     (macrolet ,(slet-macrolet-forms (mapcar #'cadr bindings)) 
-       ,@body)))
+  (when (> (length bindings) 0)
+    `(let ,(mapcar 
+	    (lambda (binding)
+	      (let ((name (car binding))
+		    (type (cadr binding))
+		    (value (caddr binding)))
+		`(,name (or ,value (cffi:foreign-alloc ',type))))) bindings)
+       (macrolet ,(slet-macrolet-forms (mapcar #'cadr bindings)) 
+	 ,@body))))
 
 (defmacro slet* (bindings &body body)
   "See documentation of SLET"

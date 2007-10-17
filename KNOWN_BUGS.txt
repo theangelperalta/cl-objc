@@ -1,11 +1,14 @@
-* passing structs by value is not fully supported (we are using an
-  hack to overcome the actual limits of CFFI)
+* Passing structs by value is supported with an ugly hack to overcome
+  the actual limits of CFFI. We splay args in integer values, so it is
+  platform-dependent (only for x86 ABI)
 
-* As ObjC use a different convention to push arguments for variadic
-  functions (it doesn't do argument promotion), we can't use normal
-  defcfun but we are using internal methods of CFFI
+* Use of not exported symbols of CFFI. As ObjC use a different
+  convention to push arguments for variadic functions (it doesn't do
+  argument promotion), we can't use normal defcfun but we are using
+  internal methods of CFFI. We use not exported symbols also to get
+  info about foreign types.
 
 * Exception management is missing because we don't know how to catch
   SIGTRAP signals in a portable way
 
-
+* Circle View example doesn't work
