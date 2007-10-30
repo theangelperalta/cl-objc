@@ -140,6 +140,11 @@ corresponding number of :int parameters"
 			       collecting (list arg :int))))
 
 (defmacro define-objc-function (name-and-options return-type &rest doc-and-args)
+  "Define an ObjC function. Use it instead of common CFFI:DEFCFUN
+when you have to handle structs by value passing and returning.
+Arguments NAME-AND-OPTIONS RETURN-TYPE and DOC-AND-ARGS are
+passed to CFFI:DEFCFUN. The name of the function will be exported
+in the current package"
   (let* ((doc-string)
 	 (args (if (stringp (car doc-and-args)) 
 		   (progn

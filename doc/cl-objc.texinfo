@@ -153,6 +153,24 @@ To build CL-ObjC you need to get a recent (at least from February 2007)
 version of CFFI. You can get the development version from the darcs
 repository at @uref{http://common-lisp.net/project/cffi/darcs/cffi/}.
 
+Furthermore CL-ObjC depends on some Common Lisp libraries, namingly
+
+* cl-yacc @*
+  http://www.pps.jussieu.fr/~jch/software/files/ @*
+  darcs at http://www.pps.jussieu.fr/~jch/software/repos/cl-yacc @*
+  asdf-installable 
+
+* closer-mop @*
+  http://common-lisp.net/project/closer/ftp/ @*
+  darcs at http://common-lisp.net/project/closer/repos/closer-mop 
+
+*  memoize @*
+   http://www.common-lisp.net/project/asdf-packaging/memoize-latest.tar.gz @*
+   asdf-installable
+
+CL-ObjC is now alsow asdf-installable, so if you have asdf-install (),
+you can get it evaling (asdf-install:install 'cl-objc)
+
 In order to work CL-ObjC needs to find the libobjc library. By default
 it will search for it in /usr/lib. Change *foreign-library-directories*
 if you want to load libobjc from a different path.

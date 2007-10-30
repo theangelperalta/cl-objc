@@ -25,6 +25,11 @@
 
 (unless (fboundp 'objc-selector-to-clos-symbol)
   (memoize:def-memoized-function objc-selector-to-clos-symbol (selector)
+    "Returns a symbol identifying the generic function binded to
+SELECTOR. Basically : becomes ? and camel case style is replaced
+by dash style. E.g.
+initWithUTF8String: becomes init-with-utf8-string?
+setX:Y: becomes set-x?y?"
     (let* ((selector-symbols (objc-selector-to-symbols (sel-name selector)))
 	   (tmp (subseq (reduce (lambda (s e) (concatenate 'string s "?" e)) 
 				(mapcar #'symbol-name selector-symbols) :initial-value "") 
@@ -34,6 +39,7 @@
 	  tmp))))
 
 (defun clos-symbol-to-objc-selector (symbol)
+  "The inverse of OBJC-SELECTOR-TO-CLOS-SYMBOL."
   (let* ((tmp (split-string (symbol-name symbol) #\?))
 	 (selector-symbols (mapcar (lambda (part) (intern part
 						     (if (and (= 1 (length tmp)) 
