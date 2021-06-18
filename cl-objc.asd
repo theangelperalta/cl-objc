@@ -9,7 +9,9 @@
     :name "CL-OBJC"
     :author "Geoff Cant, Luigi Panzeri"
     :version "0.5"
-    :description "Common Lisp / ObjectiveC Interface"
+  :description "Common Lisp / ObjectiveC Interface"
+  :depends-on (#:cffi #:cffi-libffi #:yacc #:closer-mop #:org.tfeb.hax #:trivial-main-thread)
+  :defsystem-depends-on (#:cffi-grovel #:cffi-libffi)
     :components ((:module :src
 			  :components ((:file "packages")
 				       (:file "reader-macro" :depends-on ("packages" "cffi" "msg-send" "clos"))
@@ -29,8 +31,7 @@
 								  "structs"))
 				       (:module :frameworks
 						:components ((:file "generate-frameworks-bindings"))
-						:depends-on ("framework")))))
-    :depends-on (:cffi :yacc :closer-mop :memoize))
+						:depends-on ("framework"))))))
 
 (defsystem cl-objc.examples.hello-world
   :components ((:module :examples

@@ -24,7 +24,7 @@
   t)
 
 (unless (fboundp 'objc-selector-to-clos-symbol)
-  (memoize:def-memoized-function objc-selector-to-clos-symbol (selector)
+  (org.tfeb.hax.memoize:def-memoized-function objc-selector-to-clos-symbol (selector)
     "Returns a symbol identifying the generic function binded to
 SELECTOR. Basically : becomes ? and camel case style is replaced
 by dash style. E.g.

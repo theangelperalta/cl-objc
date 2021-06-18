@@ -25,7 +25,7 @@
       string)))
 
 (unless (fboundp 'objc-selector-to-symbols)
-  (memoize:def-memoized-function objc-selector-to-symbols (selector)
+  (org.tfeb.hax.memoize:def-memoized-function objc-selector-to-symbols (selector)
     "The inverse of SYMBOLS-TO-OBJC-SELECTOR"
     (when (eq (find-class 'objc-selector) (class-of selector))
       (setq selector (sel-name selector)))
@@ -166,7 +166,7 @@ e.g.
       (lambda (slot-name)
 	`(,(intern (format nil "~a-~a" (car types) slot-name)) (ptr) 
 	   `(objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
-      (cffi:foreign-slot-names (car types)))
+        (cffi:foreign-slot-names `(:struct ,(car `,types))))
      (slet-macrolet-forms (cdr types)))))
 
 (defmacro slet (bindings &body body)
@@ -189,7 +189,7 @@ STRUCT-OBJ) will be bound as utilities."
 	      (let ((name (car binding))
 		    (type (cadr binding))
 		    (value (caddr binding)))
-		`(,name (or ,value (cffi:foreign-alloc ',type))))) bindings)
+		`(,name (or ,value `,(cffi:foreign-alloc '(:struct ,type)))))) bindings)
        (macrolet ,(slet-macrolet-forms (mapcar #'cadr bindings)) 
 	 ,@body))))
 
@@ -290,6 +290,33 @@ without adding the new definition."
 					    `(make-ivar ,(symbols-to-objc-selector (list var-name)) 
 							,var-type))) 
 					ivars)))))
+
+(defmacro define-objc-class-inline (symbol-name symbol-superclass (&rest ivars))
+  "Define and returns a new ObjectiveC class SYMBOL-NAME
+deriving from SYMBOL-SUPERCLASS. Names are translated by
+SYMBOL-TO-OBJC-CLASS-NAME.
+
+IVARS is a list of pairs where the first element is the variable
+name (translated by symbols-to-objc-selector) and the second on
+is the CFFI type of the variable or a name of an ObjC class/struct
+translated by objc-class-name-to-symbol.
+
+If a class with the same name already exists the method returns
+without adding the new definition."
+  `(ensure-objc-class ,(symbol-to-objc-class-name symbol-name)
+			(objc-get-class ,(symbol-to-objc-class-name symbol-superclass))
+			(list ,@(mapcar (lambda (ivar-def)
+					  (let ((var-name (car ivar-def))
+						(var-type 
+						 `(cond 
+						    ((not (eq objc-nil-class (objc-get-class 
+									      ,(symbol-to-objc-class-name (second ivar-def))))) 
+						     'objc-id)
+						    (t ',(cadr ivar-def)))))
+					    `(make-ivar ,(symbols-to-objc-selector (list var-name)) 
+							,var-type))) 
+					ivars))))
+
 (defun objc-let-bindings (bindings)
   (mapcar (lambda (binding)
 	    (if  (cddr binding)

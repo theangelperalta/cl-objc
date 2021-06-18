@@ -76,7 +76,8 @@ will not be loaded."
 
      (with-framework-file ,framework-name static ,force
        (update-cstruct-database :output-stream out)
-       (format out "~{~s~%~}" (quote ,other-bindings)))
+       (format out "~{~s~%~}" (quote ,other-bindings))
+       (format out "~%~%)"))
      t))
 
 ;; Copyright (c) 2007, Luigi Panzeri

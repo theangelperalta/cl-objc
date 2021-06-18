@@ -2,6 +2,12 @@
 
 (in-package "OBJC-CFFI")
 
+(defcfun ("class_addMethod" class-add-method) :boolean
+  (class objc-class-pointer)
+  (name objc-sel)
+  (method_imp objc-method-pointer)
+  (types :string))
+
 (defcfun ("class_addMethods" class-add-methods) :void 
   (class objc-class-pointer) 
   (method-list objc-method-list-pointer))
@@ -31,28 +37,30 @@
       (class-remove-methods class method-list))))
 
 (defun register-method (class selector-name types callback class-method)
-  (let ((class (convert-from-foreign (convert-to-foreign class 'objc-class-pointer) 'objc-class-pointer)))
+;; (break)
+  (let ((class (objc-lookup-class class)))
     (assert (not (eq class objc-nil-class)))
     (let* ((selector (sel-register-name selector-name))
 	   (types (foreign-string-alloc types))
 	   (method-list (foreign-alloc 'objc-method-list-cstruct))
 	   (method (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)))
     
-      (unregister-method class selector-name class-method)
+      ;; (unregister-method class selector-name class-method)
 
-      (setf 
-       (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
+      ;; (setf
+      ;;  (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
 
-      (setf (foreign-slot-value method 'objc-method-cstruct 'method_name) selector
-	    (foreign-slot-value method 'objc-method-cstruct 'method_types) types
-	    (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
+      ;; (setf (foreign-slot-value method 'objc-method-cstruct 'method_name) selector
+	  ;;   (foreign-slot-value method 'objc-method-cstruct 'method_types) types
+	  ;;   (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
 
       (if class-method
 	  (progn
 	    (class-add-methods (metaclass class) method-list)
 	    (class-get-instance-method (metaclass class) selector))
 	  (progn 
-	    (class-add-methods class method-list)
+	    ;; (class-add-methods class method-list)
+	    (class-add-method class selector callback types)
 	    (class-get-instance-method class selector))))))
 
 (defun parse-argument-list (argument-list)
@@ -77,10 +85,10 @@ typedef, else TYPE itself."
   (let ((interned-type (intern (symbol-name type) "CL-OBJC")))
     (cond
       ((find-struct-definition interned-type))
-      ((and (gethash interned-type cffi::*type-parsers*)
-	    (eq (class-of (funcall (gethash interned-type cffi::*type-parsers*)))
+      ((and (gethash interned-type cffi::*default-type-parsers*)
+	    (eq (class-of (funcall (gethash interned-type cffi::*default-type-parsers*)))
 		(find-class 'cffi::foreign-typedef)))
-       (cffi::type-keyword (cffi::actual-type (funcall (gethash interned-type cffi::*type-parsers*)))))
+       (cffi::type-keyword (cffi::actual-type (funcall (gethash interned-type cffi::*default-type-parsers*)))))
       (t type))))
 
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
@@ -129,8 +137,44 @@ Return a new ObjectiveC Method object."
 (defcfun ("objc_addClass" objc-add-class) :void
   (class objc-class-pointer))
 
+;; The return value is the new class, or Nil if the class could not be created
+;; (for example, the desired name is already in use).
+
+;; You can get a pointer to the new metaclass by calling object_getClass(newClass)
+;; The metaclass is necessary if we want to add methods to the class
+(defcfun ("objc_allocateClassPair" new-objc-add-class) :pointer
+  (superclass objc-class-pointer)
+  (name :string)
+  ;; This should usally be 0
+  (extraBytes :int))
+
+
+;; This function must be called inorder to use the new class after all class's attributes have been added
+;; for example class_addMethod and class_addIvar
+;; Sort of let a commit for DB transactions
+(defcfun ("objc_registerClassPair" objc-register-class) :void 
+  (class objc-class-pointer))
+
 (defcfun ("objc_lookUpClass" objc-lookup-class) objc-class-pointer
   (class-name :string))
+
+;; The return value is a boolean, true if the instance variable was added successfully,
+;; otherwise false (for example, the class already contains an instance variable with that name).
+
+;; This function may be called after objc_allocateClassPair (objc-add-class) and before objc_registerClassPair (objc-register-class)
+;; Adding an instance variable to an existing class is not supported.
+
+;; NOTE: The class must not be a metaclass. Adding instance variable to metaclass is not supported.
+;; The instance variable's minimum aligntment in bytes is 1<<align. The minimum alignement of an
+;; instance variable depend on teh ivar's type and the machien architecture.
+;; variables of any pointer type, pass log2(sizeof(pointer_type))
+
+(defcfun ("objc_addIvar" objc-add-class-ivar) :boolean 
+  (class objc-class-pointer)
+  (name :string)
+  (size :int)
+  (alignment :uint)
+  (types :string))
 
 (defun find-root-class (class)
   (car (last (super-classes class))))
@@ -160,13 +204,8 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 
   ;; setup of the new class
   (let* ((root-class (find-root-class super-class))
-	 (new-class (foreign-alloc 'objc-class-cstruct))
-	 (meta-class (foreign-alloc 'objc-class-cstruct))
-	 (instance-size (instance-size super-class)))
-    (with-foreign-slots ((isa super_class name version 
-			      info instance_size ivars 
-			      methodLists cache protocols) 
-			 new-class objc-class-cstruct)
+     (instance-size (instance-size super-class))
+	 (new-class (new-objc-add-class super-class class-name 0)))
       ;; adjust ivar-offset
       (loop
 	 for ivar in ivar-list
@@ -175,38 +214,31 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 	 do 
 	   (setf increment (ivar-offset ivar))
 	   (incf instance-size increment)
-	   (setf (ivar-offset ivar) offset))
+	   (setf (ivar-offset ivar) offset)
+	   (objc-add-class-ivar new-class (ivar-name ivar) (ivar-size) (ivar-offset ivar) (ivar-type ivar))
+	)
 
-      (setf isa meta-class
-	    super_class (convert-to-foreign super-class 'objc-class-pointer)
-	    name class-name
-	    version 0
-	    info :class
-	    instance_size instance-size
-	    ivars (convert-to-foreign ivar-list 'objc-ivar-list-pointer)
-	    methodLists (foreign-alloc :pointer :initial-element (make-pointer #xffffffff)) 
-	    cache (null-pointer)
-	    protocols (null-pointer)))
-
+;; Note - this may not be necessary because the new add class should
+;; create the metaclass automatically
     ;; setup of the metaclass
-    (with-foreign-slots ((isa super_class name version 
-			      info instance_size ivars 
-			      methodLists cache protocols) 
-			 meta-class objc-class-cstruct)
-      (setf isa (convert-to-foreign (metaclass root-class) 'objc-class-pointer)
-	    super_class (convert-to-foreign (metaclass super-class) 'objc-class-pointer)
-	    name class-name
-	    version 0
-	    info :meta
-	    instance_size (instance-size (metaclass super-class))
-	    ivars (null-pointer)
-	    methodLists (foreign-alloc :pointer :initial-element (make-pointer #xffffffff))
-	    cache (null-pointer)
-	    protocols (null-pointer)))
-    (objc-add-class new-class)
+    ;; (with-foreign-slots ((isa super_class name version 
+	;; 		      info instance_size ivars 
+	;; 		      methodLists cache protocols) 
+	;; 		 meta-class objc-class-cstruct)
+    ;;   (setf isa (convert-to-foreign (metaclass root-class) 'objc-class-pointer)
+	;;     super_class (convert-to-foreign (metaclass super-class) 'objc-class-pointer)
+	;;     name class-name
+	;;     version 0
+	;;     info :meta
+	;;     instance_size (instance-size (metaclass super-class))
+	;;     ivars (null-pointer)
+	;;     methodLists (foreign-alloc :pointer :initial-element (make-pointer #xffffffff))
+	;;     cache (null-pointer)
+	;;     protocols (null-pointer)))
+    (objc-register-class new-class)
     (when objc-clos:*automatic-clos-bindings-update*
-      (objc-clos:add-clos-class (objc-get-class class-name)))
-    (objc-get-class class-name)))
+      (objc-clos:add-clos-class new-class))
+    new-class))
 
 (defun ensure-objc-class (class-name super-class &optional ivar-list)
   "Like add-objc-class but if a class with the same name already

@@ -44,7 +44,7 @@
 
 ;; What to do with the #\r type qualifier?
 (defun lex-typestr (typestr)
-  (declare (optimize (debug 3)))
+  ;; (declare (optimize (debug 3)))
   (with-input-from-string (s typestr)
     (loop for idx-char = (read-char s nil nil)
        while (not (null idx-char))
@@ -54,6 +54,8 @@
 	 (progn
 	     ; skip the const type qualifier
 	     (when (eql #\r idx-char) (setf idx-char (read-char s nil nil))) 
+       ; skip the _Atomic type specifier
+	     (when (eql #\A idx-char) (setf idx-char (read-char s nil nil)))
 	     (cond ((char-to-methodcode idx-char) (list 'methodcode (char-to-methodcode idx-char)))
 		   ((char-to-type idx-char) (list 'prim-type (char-to-type idx-char)))
 		   ((digit-char-p idx-char) (progn (unread-char idx-char s) (list 'alignment (read-num s))))
@@ -66,7 +68,7 @@
 		   ((eql #\) idx-char) (list 'end-union nil))
 		   ((eql #\} idx-char) (list 'end-struct nil))
 		   ((eql #\] idx-char) (list 'end-array nil))
-		   (t (error "Unknow code char ~c" idx-char)))))))
+		   (t (error "Unknown code char ~c" idx-char)))))))
 
 (defun typestr-lexer (typestr)
   (let ((tokens (lex-typestr typestr)))
@@ -78,7 +80,7 @@
                       (second v)))))))
 
 (defun read-num (stream)
-  (declare (optimize (debug 3)))
+  ;; (declare (optimize (debug 3)))
   (parse-integer
    (with-output-to-string (num)
      (loop for c = (read-char stream nil nil)
@@ -127,7 +129,10 @@
 
 (defun parse-objc-typestr (str)
   "Parse a method type signature"
-  (parse-with-lexer (typestr-lexer str) *objc-type-parser*))
+  (handler-case 
+      (parse-with-lexer (typestr-lexer str) *objc-type-parser*)
+  (t (c)
+      (format t "Failed to parse type string: ~a : ~a~%" str c))))
 
 (defun objc-foreign-type-size (type)
   (cond 

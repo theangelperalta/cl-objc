@@ -11,6 +11,9 @@
 
 (use-foreign-library libobjc)
 
+(defparameter *selector-cache* (make-hash-table :test 'equal))
+(defparameter *class-cache* (make-hash-table :test 'equal))
+
 ;;; The next section reports for every ObjC type:
 ;; 1) a Common Lisp class handling the type
 ;; 2) CFFI definitions of the type and foreign functions acting on it
@@ -80,6 +83,20 @@
 
 ;;; Methods
 
+(defcfun ("sel_isMapped" sel-is-mapped) :boolean
+  "Returns true if a selector is registered in the ObjC runtime."
+  (sel objc-sel))
+
+(defcfun ("sel_getName" sel-get-name) :string
+  (sel objc-sel))
+
+(defcfun ("sel_registerName" sel-register-name) objc-sel
+  (str :string))
+
+(defcfun ("sel_getUid" sel-get-uid) objc-sel
+  "Returns the selector named NAME."
+  (str :string))
+
 ;;; CLOS definitions
 (defclass objc-method ()
   ((name :initarg :name 
@@ -147,10 +164,21 @@
   (type :pointer)
   (offset :pointer))
 
+(defcfun ("method_getName" method-get-name) :pointer
+  (method objc-method-pointer))
+
+(defcfun ("method_getTypeEncoding" method-get-type-encoding) :string
+  (method objc-method-pointer))
+
+(defcfun ("method_getImplementation" method-get-implementation) :pointer
+  (method objc-method-pointer))
+
+
 ;;; Type Translators
+
 (defmethod translate-from-foreign (method-ptr (type objc-method-type))
   (if (not (null-pointer-p method-ptr))
-      (with-foreign-slots ((method_name method_types method_imp) method-ptr objc-method-cstruct)
+      (let ((method_name (convert-from-foreign (method-get-name method-ptr) 'objc-sel)) (method_types (method-get-type-encoding method-ptr)) (method_imp (method-get-implementation method-ptr)))
         (make-instance 'objc-method
                        :name method_name
                        :types method_types
@@ -167,6 +195,7 @@
 (defcstruct objc-method-list-cstruct
 	(obsolete :pointer)
 	(method_count :int)
+	(space :int)
 	(method_list objc-method-cstruct :count 1))
 
 (define-foreign-type objc-method-list-type () 
@@ -177,25 +206,19 @@
    "Objective C objc_method_list pointer"))
 
 ;;; Type Translators
-(defmethod translate-from-foreign (mlist-ptr (type objc-method-list-type))
-  (if (not (null-pointer-p mlist-ptr))
-      (with-foreign-slots ((method_count) mlist-ptr objc-method-list-cstruct)
-	(loop 
-	   for method-idx from 0 below method_count
-	   for method-ptr = (mem-aref (foreign-slot-pointer mlist-ptr 'objc-method-list-cstruct 'method_list) 
-				      'objc-method-cstruct
-				      method-idx)
-	   collect (convert-from-foreign method-ptr 'objc-method-pointer)))
-      nil))
+(defmethod translate-from-foreign (class-ptr (type objc-method-list-type))
+  (if (not (null-pointer-p class-ptr))
+      (with-foreign-object (method_count :int)
+        (let ((methods (objc-get-class-method-list class-ptr method_count)))
+	(loop
+	   for method-idx from 0 below (mem-ref method_count :int)
+	   for method-ptr = (mem-aref methods :pointer method-idx)
+	   collect (convert-from-foreign method-ptr 'objc-method-pointer)))) nil))
 
 ;;; utilities
 (defun get-instance-methods (class)
   "Returns all the instance methods of CLASS"
-  (with-foreign-object (itr :pointer)
-    (setf (mem-ref itr :int) 0)
-    (loop for mlist = (class-next-method-list class itr)
-       while mlist
-       append mlist)))
+  (slot-value class 'method-lists))
 
 (defun get-class-methods (class)
   "Returns all the class methods of CLASS"
@@ -214,6 +237,7 @@
 	 :documentation "Returns a list with the type
 	 specification of an instance variable")
    (offset :initarg :offset :accessor ivar-offset)
+   (size :initarg :size :accessor ivar-size)
    (ivar-ptr :initarg :ptr)))
 
 ;;; printer
@@ -238,7 +262,8 @@
 (defcstruct objc-ivar-cstruct
 	(ivar_name :string)
 	(ivar_type :string)
-	(ivar_offset :int))
+    (ivar_offset :int)
+    (size :int))
 
 (define-foreign-type objc-ivar-type () 
   () 
@@ -247,13 +272,22 @@
   (:documentation
    "A pointer to an objc_ivar struct."))
 
+(defcfun ("ivar_getName" ivar-get-name) :string
+  (ivar objc-ivar-pointer))
+
+(defcfun ("ivar_getTypeEncoding" ivar-get-type-encoding) :string
+  (ivar objc-ivar-pointer))
+
+(defcfun ("ivar_getOffset" ivar-get-offset) :int
+  (ivar objc-ivar-pointer))
+
 ;;; Type Translators
 (defmethod translate-from-foreign (ivar-ptr (type objc-ivar-type))
   (if (not (null-pointer-p ivar-ptr))
-      (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar-cstruct)
+      (let ((ivar_name (ivar-get-name ivar-ptr)) (ivar_type (ivar-get-type-encoding ivar-ptr)) (ivar_offset (ivar-get-offset ivar-ptr)))
         (make-instance 'objc-ivar
                        :name ivar_name
-                       :type (objc-types:parse-objc-typestr ivar_type)
+                       :type (if (not ivar_type) (objc-types:parse-objc-typestr ivar_type) "")
                        :offset ivar_offset
                        :ptr ivar-ptr))
       nil))
@@ -266,7 +300,8 @@
 ;;; CFFI definitions
 (defcstruct objc-ivar-list-cstruct
 	(ivar_count :int)
-	(ivar_list :pointer))
+	(space :int)
+	(ivar_list objc-ivar-cstruct :count 1))
 
 (define-foreign-type objc-ivar-list-type () 
   () 
@@ -275,13 +310,19 @@
   (:documentation
    "A pointer to an objc_ivar_list struct."))
 
+(defcfun (objc-get-class-ivar-list "class_copyIvarList") :pointer
+  "Describes the instance variables declared by a class."
+  (class :pointer)
+  (count (:pointer :int)))
+
 ;;; Type Translators
-(defmethod translate-from-foreign (ilist-ptr (type objc-ivar-list-type))
-  (if (not (null-pointer-p ilist-ptr))
-      (with-foreign-slots ((ivar_count ivar_list) ilist-ptr objc-ivar-list-cstruct)
-        (loop for ivar-idx from 0 below ivar_count
-           for ivar-ptr = (mem-aref (foreign-slot-pointer ilist-ptr 'objc-ivar-list-cstruct 'ivar_list) 'objc-ivar-cstruct ivar-idx)
-           collect (convert-from-foreign ivar-ptr 'objc-ivar-pointer)))
+(defmethod translate-from-foreign (class-ptr (type objc-ivar-list-type))
+  (if (not (null-pointer-p class-ptr))
+      (with-foreign-object (ivar_count :int)
+        (let ((ilist-ptr (objc-get-class-ivar-list class-ptr ivar_count)))
+        (loop for ivar-idx from 0 below (mem-ref ivar_count :int)
+           for ivar-ptr = (mem-aref ilist-ptr :pointer ivar-idx)
+              collect (convert-from-foreign ivar-ptr 'objc-ivar-pointer))))
       nil))
 
 (defmethod translate-to-foreign ((var-list list) (type objc-ivar-list-type))
@@ -375,7 +416,7 @@
             (pointer-address isa) (pointer-address super-class)
             info))))
 
-;;;CFFI definitions
+;; CFFI definitions
 (defbitfield objc-class-flags
   (:CLASS #x1)
   (:META #x2)
@@ -391,7 +432,10 @@
   (:INITIALIZING #x800)
   (:FROM_BUNDLE #x1000)
   (:HAS_CXX_STRUCTORS #x2000)
-  (:NO_METHOD_ARRAY #x4000))
+  (:NO_METHOD_ARRAY #x4000)
+  (:HAS_LOAD_METHOD #x8000)
+  (:CONSTRUCTING #x10000)
+  (:EXT #x20000))
 
 (define-foreign-type objc-class-type () 
   () 
@@ -420,19 +464,12 @@
 		       ;  loop in translation. We translate these
 		       ;  values in the shared-initialize :after
 		       ;  method of the related CLOS object
-	(super_class :pointer)
-	(name :string)
-	(version :long)
-	(info objc-class-flags)
-	(instance_size :long)
-	(ivars objc-ivar-list-pointer)
-	(methodLists :pointer)
-	(cache :pointer)
-	(protocols objc-protocol-list-pointer))
+	)
+
 
 (defcstruct objc-protocol-list-cstruct
   (next :pointer)
-  (count :int)
+  (count :uint)
   (protocols :pointer))
 
 (defcstruct objc-method-description
@@ -443,8 +480,46 @@
   (count :int)
   (list :pointer))
 
+(defcfun (objc-get-class-name-test "class_getName") :string
+  "Returns the name of class."
+  (class :pointer))
+
+(defcfun (objc-get-class-name "class_getName") :string
+  "Returns the name of class."
+  (class objc-class-pointer))
+
+(defcfun ("class_getSuperclass" objc-get-class-superclass) :pointer
+  "Returns the superclass of class."
+  (class :pointer))
+
+(defcfun (objc-get-class-version "class_getVersion") :int
+  "Returns the version number of a class definition."
+  (class objc-class-pointer))
+
+(defcfun (objc-get-class-instance-size "class_getInstanceSize") :int
+  "Returns the size of instances of a class."
+  (class objc-class-pointer))
+
+(defcfun ("class_copyMethodList" objc-get-class-method-list) :pointer
+  "Describes the instance methods implemented by a class."
+  (class objc-class-pointer)
+  (count (:pointer :int)))
+
+(defcfun (objc-get-class-protocol-list "class_copyProtocolList") objc-protocol-list-pointer
+  "Describes the protocols adopted by a class."
+  (class objc-class-pointer)
+  (count :int))
+
 (defcfun ("objc_getClass" objc-get-class) objc-class-pointer
   "Returns the ObjectiveC Class named NAME"
+  (name :string))
+
+(defcfun ("objc_getMetaClass" objc-get-meta-class) objc-class-pointer
+  "Returns the ObjectiveC MetaClass named NAME"
+  (name :string))
+
+(defcfun ("objc_getMetaClass" objc-get-meta-class-ptr) :pointer 
+  "Returns the ObjectiveC MetaClass named NAME"
   (name :string))
 
 (defcfun ("objc_getClassList" objc-get-class-list) :int
@@ -471,32 +546,55 @@ of CLASS"
   (class-ptr objc-class-pointer)
   (iterator :pointer))
 
+(defcfun (objc-get-protocol "objc_getProtocol") objc-protocol-pointer
+  (name :string))
+
+(defcfun (objc-get-protocol-name "protocol_getName") :string
+  (protocol-ptr objc-protocol-pointer))
+
 (defparameter *objc-classes* (make-hash-table :test #'equal))
 
 ;;; Type Translators
+
+(defun private-method-p (method)
+  (char-equal #\_ (elt (sel-name (method-selector method)) 0)))
+
 (defmethod translate-from-foreign (class-ptr (type objc-class-type))
   (if (not (null-pointer-p class-ptr))
-      (with-foreign-slots ((name info) class-ptr objc-class-cstruct) 
-	(or (gethash (append info (list name)) *objc-classes*)
-	    (with-foreign-slots ((isa super_class name
-				      version info instance_size
-				      ivars methodlists
-				      cache protocols)
+      (handler-case
+          (or (gethash (objc-get-class-name class-ptr) *objc-classes*)
+              (with-foreign-slots ((isa)
 				 class-ptr objc-class-cstruct)
-	      (setf (gethash (append info (list name)) *objc-classes*)
+	    (let* ((super_class (objc-get-class-superclass class-ptr))
+                (name (objc-get-class-name class-ptr))
+                (new-isa (objc-get-meta-class-ptr name))
+                (version (objc-get-class-version class-ptr))
+               (instance_size (objc-get-class-instance-size class-ptr))
+               (ivars (convert-from-foreign class-ptr 'objc-ivar-list-pointer))
+               (methodlists
+                  (append 
+                     (convert-from-foreign class-ptr 'objc-method-list-pointer)
+                       (convert-from-foreign (objc-get-meta-class-ptr name) 'objc-method-list-pointer)))
+              ;; (methodlists
+              ;;         (remove-if #'private-method-p (convert-from-foreign class-ptr 'objc-method-list-pointer)))
+              ;;  (methodlists (convert-from-foreign class-ptr 'objc-method-list-pointer))
+				 (protocols (null-pointer) #+(or) (objc-get-class-protocol-list class-ptr (null-pointer))))
+	      (setf (gethash name *objc-classes*)
 		    (make-instance 'objc-class
-				   :isa (unless (pointer-eq isa class-ptr) 
-					  (convert-from-foreign isa 'objc-class-pointer))
+				  :isa (unless (pointer-eq new-isa class-ptr)
+					  (convert-from-foreign new-isa 'objc-class-pointer))
 				   :super-class super_class 
 				   :name name
 				   :version version 
-				   :info info 
+				   :info '(:class)
 				   :instance-size instance_size
 				   :ivars ivars 
-				   :method-lists methodlists ; FIXME: i d like to convert it
-				   :cache cache 
+				   :method-lists methodLists ; FIXME: i d like to convert it
+				   :cache (null-pointer)
 				   :protocols protocols
 				   :ptr class-ptr)))))
+        (t (c)
+          objc-nil-class))
       objc-nil-class))
 
 ;; See the objc-class-cstruct definition to know about the aim of this method 
@@ -520,19 +618,6 @@ of CLASS"
 	      for protocol = (mem-ref protocol-ptr 'objc-protocol-pointer)
 	      collecting protocol)))
 
-(defmethod translate-to-foreign ((protocol-list list) (type objc-protocol-list-type))
-  (let ((ret (foreign-alloc 'objc-protocol-list-cstruct))
-	(length (length protocol-list)))
-    (setf (foreign-slot-value ret 'objc-protocol-list-cstruct 'count) length
-	  (foreign-slot-value ret 'objc-protocol-list-cstruct 'protocols) (foreign-alloc 'objc-class-cstruct :count length)
-	  (foreign-slot-value ret 'objc-protocol-list-cstruct 'next) (null-pointer))
-    (loop 
-       for idx below length
-       for protocol-ptr = (foreign-slot-pointer ret 'objc-protocol-list-cstruct 'list) then (inc-pointer protocol-ptr (foreign-type-size 'objc-class-cstruct))
-       for protocol in protocol-list
-       do (setf (mem-aref protocol-ptr :pointer idx) (slot-value protocol 'class-ptr)))
-    ret))
-
 ;; FIXME: Translate to foreign for protocol is in msg-send.lisp because it depends on it
 
 (defgeneric super-classes (item)
@@ -546,15 +631,20 @@ of CLASS"
               (super-classes super-class)))))
 
 ;;; utilities
+(defun private-class-p (class)
+  "Returns TRUE if the class is private."
+  (string= "_" (class-name class) :end2 1))
+
 (defun get-class-list ()
-  "Returns the list of all the ObjectiveC Class available"
+  "Returns the list of all the public ObjectiveC Class available"
+  (remove-if #'private-class-p
   (let ((class-count (objc-get-class-list (null-pointer) 0)))
     (with-foreign-object (class-ptrs 'objc-class-pointer class-count)
       (objc-get-class-list class-ptrs class-count)
       (loop for class-idx from 0 below class-count
          for class-ptr = (mem-aref class-ptrs 'objc-class-pointer class-idx)
          collect
-           class-ptr))))
+           class-ptr)))))
 
 (defun get-class-ordered-list ()
   "Returns the list of all the ObjectiveC Class available ordered
@@ -619,10 +709,8 @@ of CLASS"
   (ivar-name :string)
   (value :pointer))
 
-(defcfun ("object_getInstanceVariable" object-get-instance-variable) objc-ivar-pointer
-  (id objc-id)
-  (ivar-name :string)
-  (ref :pointer))
+(defcfun ("object_getClass" object-get-class) objc-class-pointer
+  (id objc-id))
 
 ;;; Probably unwanted - better to use the class alloc method.
 (defcfun ("class_createInstance" class-create-instance) objc-id
@@ -631,6 +719,7 @@ of CLASS"
 
 ;;; describer
 (defmethod describe-object ((obj objc-object) stream)
+ #+(or)
   (with-slots (isa id) obj
     (format stream "~&~S is an Objective C object at ~8,'0X.~
                       ~%Class ~A~%Instance variables:~%~{~a: ~s~%~}"
@@ -642,6 +731,7 @@ of CLASS"
 		    (class-ivars isa)))))
 
 (defmethod describe-object ((protocol objc-protocol) stream)
+  #+(or)
   (with-slots (isa id) protocol
     (format stream "~&~S is an Objective C Protocol at ~8,'0X.~
                       ~%Class ~A~%~%Name ~a
@@ -686,10 +776,9 @@ ObjectiveC object OBJ"
 ;;; Type Translators
 (defmethod translate-from-foreign (id (type objc-object-type))
   (if (not (null-pointer-p id))
-      (with-foreign-slots ((isa) id objc-object-cstruct)
         (make-instance 'objc-object
-                       :isa isa
-                       :id id))
+                       :isa (object-get-class id) 
+                       :id id)
       objc-nil-object))
 
 (defmethod translate-to-foreign ((obj objc-object) (type objc-object-type))
