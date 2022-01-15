@@ -8,55 +8,23 @@
   (method_imp objc-method-pointer)
   (types :string))
 
-(defcfun ("class_addMethods" class-add-methods) :void 
-  (class objc-class-pointer) 
-  (method-list objc-method-list-pointer))
-
-(defcfun ("class_removeMethods" class-remove-methods) :void 
-  (class objc-class-pointer) 
-  (method-list objc-method-list-pointer))
-
-(defun unregister-method (class selector class-method)
-  (assert (not (eq (convert-from-foreign (convert-to-foreign class 'objc-class-pointer) 'objc-class-pointer) 
-		   objc-nil-class)))
-  (let* ((method-list (foreign-alloc 'objc-method-list-cstruct))
-	 (method (convert-to-foreign 
-		  (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)
-		  'objc-method-list-pointer))
-	 (old-method (convert-to-foreign 
-		      (if class-method
-			  (class-get-class-method class selector)
-			  (class-get-instance-method class selector))
-		      'objc-method-pointer)))
-    (when old-method
-      (with-foreign-slots ((method_name method_types method_imp) method objc-method-cstruct)
-	(setf (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1
-	      method_name selector 
-	      method_types (foreign-slot-value old-method 'objc-method-cstruct 'method_types)
-	      method_imp (foreign-slot-value old-method 'objc-method-cstruct 'method_imp)))
-      (class-remove-methods class method-list))))
+(defcfun ("class_replaceMethod" class-replace-method) :void 
+  (class objc-class-pointer)
+  (name objc-sel)
+  (method_imp objc-method-pointer)
+  (types :string))
 
 (defun register-method (class selector-name types callback class-method)
 ;; (break)
   (let ((class (objc-lookup-class class)))
     (assert (not (eq class objc-nil-class)))
     (let* ((selector (sel-register-name selector-name))
-	   (types (foreign-string-alloc types))
-	   (method-list (foreign-alloc 'objc-method-list-cstruct))
-	   (method (foreign-slot-pointer method-list 'objc-method-list-cstruct 'method_list)))
+	   (types (foreign-string-alloc types)))
     
-      ;; (unregister-method class selector-name class-method)
-
-      ;; (setf
-      ;;  (foreign-slot-value method-list 'objc-method-list-cstruct 'method_count) 1)
-
-      ;; (setf (foreign-slot-value method 'objc-method-cstruct 'method_name) selector
-	  ;;   (foreign-slot-value method 'objc-method-cstruct 'method_types) types
-	  ;;   (foreign-slot-value method 'objc-method-cstruct 'method_imp) callback)
-
       (if class-method
 	  (progn
-	    (class-add-methods (metaclass class) method-list)
+	  ;; Use replace instead of add
+	    (class-replace-method (metaclass class) selector callback types)
 	    (class-get-instance-method (metaclass class) selector))
 	  (progn 
 	    ;; (class-add-methods class method-list)
@@ -169,11 +137,11 @@ Return a new ObjectiveC Method object."
 ;; instance variable depend on teh ivar's type and the machien architecture.
 ;; variables of any pointer type, pass log2(sizeof(pointer_type))
 
-(defcfun ("objc_addIvar" objc-add-class-ivar) :boolean 
+(defcfun ("class_addIvar" class-add-class-ivar) :boolean 
   (class objc-class-pointer)
   (name :string)
   (size :int)
-  (alignment :uint)
+  (alignment :uint8)
   (types :string))
 
 (defun find-root-class (class)
@@ -215,7 +183,8 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 	   (setf increment (ivar-offset ivar))
 	   (incf instance-size increment)
 	   (setf (ivar-offset ivar) offset)
-	   (objc-add-class-ivar new-class (ivar-name ivar) (ivar-size) (ivar-offset ivar) (ivar-type ivar))
+	   ;; Initial offset is the size of the ivar type
+	   (class-add-class-ivar new-class (ivar-name ivar) offset (round (log offset 2)) (ivar-type ivar))
 	)
 
 ;; Note - this may not be necessary because the new add class should
@@ -257,16 +226,15 @@ exists it just returns without adding the new class definition"
   "Returns a new instance variable object named NAME of TYPE"
   (let ((ret (foreign-alloc 'objc-ivar-cstruct))
 	(type (remove-typedef type)))
-    (convert-from-foreign  
-     (with-foreign-slots ((ivar_name ivar_type ivar_offset) ret objc-ivar-cstruct)
-       (setf ivar_name name
-	     ivar_type (objc-types:encode-types (list type))
-	     ; we initialize the offset with the type size of the
-	     ; variable. This should be adjusted of course during
-	     ; class creation
-	     ivar_offset (objc-types:objc-foreign-type-size type))
-       ret)
-     'objc-ivar-pointer)))
+	;; TODO: Create objc-ivar-struct with size and no ptr
+	(make-instance 'objc-ivar
+                       :name name
+                       :type (objc-types:encode-types (list type))
+	     		; we initialize the offset with the type size of the
+	     		; variable. This should be adjusted of course during
+			; class creation
+                       :offset (objc-types:objc-foreign-type-size type)
+                       :ptr nil)))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 

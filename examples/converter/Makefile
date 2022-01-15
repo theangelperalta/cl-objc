@@ -35,4 +35,4 @@ mkapp: demo-app demo-app.iconset
 
 clean:
 	rm -f demo-app
-	rm -f hello_world.fasl
+	rm -f convert.fasl

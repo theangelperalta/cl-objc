@@ -19,17 +19,9 @@
 ;;   (format t "Hello again, World!~%")
 ;;   (fresh-line))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-(defconstant +cgfloat-zero+
-  #+(and (or apple-objc-2.0 cocotron-objc) 64-bit-target) 0.0d0
-  #-(and (or apple-objc-2.0 cocotron-objc) 64-bit-target) 0.0f0)
-
-  (defun wrap-cg-float (x)
-    (float x +cgfloat-zero+)))
 
 (defun lisp-string-to-nsstring (string)
   (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
-
 
 (defun struct-make-cg-rect (x y w h)
   (check-type x real)
@@ -39,52 +31,10 @@
   (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x x :y y) :size (cl-objc::make-cg-size :width w :height h)))
 
 (defun make-rect (x y width height)
-  ;; declare (optimize (debug 3)))
-  ;; (declare (optimize (speed 3) (compilation-speed 0) (debug 0)))
-  ;; (slet* ((rect cg-rect)
-	;;   (size cg-size (cg-rect-size rect))
-  ;;     (point cg-point (cg-rect-origin rect)))
-  ;;   ;; (break)
-  ;;   (setf (cg-point-x point) (coerce x 'double-float)
-	;;   (cg-point-y point) (coerce y 'double-float)
-	;;   (cg-size-width size) (coerce width 'double-float)
-	;;   (cg-size-height size) (coerce height 'double-float))
-
-	;;     (setf (cg-point-x point) (coerce x 'single-float)
-	;;   (cg-point-y point) (coerce y 'single-float)
-	;;   (cg-size-width size) (coerce width 'single-float)
-	;;   (cg-size-height size) (coerce height 'single-float))
-
-	;;       (setf (cg-point-x point) (wrap-cg-float x)
-	;;   (cg-point-y point) (wrap-cg-float y)
-	;;   (cg-size-width size) (wrap-cg-float width)
-	;;   (cg-size-height size) (wrap-cg-float height))
   (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x (coerce x 'double-float) :y (coerce y 'double-float)) :size (cl-objc::make-cg-size :width (coerce width 'double-float) :height (coerce height 'double-float))))
-    ;; (cl-objc::make-struct-cg-rect :origin (cl-objc::make-struct-cg-point :x (coerce x 'double-float) :y (coerce y 'double-float)) :size (cl-objc::make-struct-cg-size :width (coerce width 'double-float) :height (coerce height 'double-float))))
-    ;;  (cffi:convert-from-foreign rect '(:struct cg-rect))))
-
-;; (defun make-point (x y)
-;;   (slet ((p cg-point))
-;;     (setf (cg-point-x p) (coerce x 'double-float)
-;; 	  (cg-point-y p) (coerce y 'double-float))
-;;     p))
 
 (defun make-point (x y)
   (cl-objc::make-cg-point :x (coerce x 'double-float) :y (coerce y 'double-float)))
-
-
-;; (defun load-nib (name)
-;;   ;; find and activate the nib
-;;   (let* ((bundle [#@NSBundle @(mainBundle)])
-;;          (nib [[#@NSNib @(alloc)] @(initWithNibNamed:bundle:)
-;;                :pointer (objc-runtime::make-nsstring name)
-;;                :pointer bundle]))
-;;     (cffi:with-foreign-object (p :pointer)
-;;       ;; TODO: is dropping p a problem here? The docs say something relevant.
-;;       ;;       must investigate.
-;;       [nib @(instantiateWithOwner:topLevelObjects:)
-;;            :pointer objc-runtime::ns-app
-;;       :pointer p])))
 
 (defun load-nib (name app)
   ;; find and activate the nib
@@ -103,28 +53,21 @@
 to be on the main thread."
 ;; for floating point error on NSWindow
 ;;  #+sbcl
-;;   (sb-int:set-floating-point-modes :traps '())
- #+sbcl
-  (sb-int:set-floating-point-modes :TRAPS '(:DIVIDE-BY-ZERO) :ROUNDING-MODE :NEAREST :CURRENT-EXCEPTIONS
- nil :ACCRUED-EXCEPTIONS nil :FAST-MODE NIL)
-;;  #+ccl
-;;  (ccl:set-fpu-mode :overflow nil)
+;;   (sb-int:set-floating-point-modes :TRAPS '(:DIVIDE-BY-ZERO) :ROUNDING-MODE :NEAREST :CURRENT-EXCEPTIONS
+;;  nil :ACCRUED-EXCEPTIONS nil :FAST-MODE NIL)
+#+sbcl
+ (sb-int:set-floating-point-modes :traps nil)
+ #+ccl
+ (ccl:set-fpu-mode :overflow nil)
 
 ;;; App Delegate needs to be defined and modfied during runtime for complied exectuables to function
-  (define-objc-class app-delegate ns-object 
+(define-objc-class app-delegate ns-object 
   ())
 
-(define-objc-method :application-did-finish-launching (:return-type :void) 
+(define-objc-method :application-did-finish-launching (:return-type :void)
     ((self app-delegate) (a-notification objc-id))
   (declare (ignore a-notification))
   (format t "Hello, World!~%")
-  ;; (format t "Number of Windows: ~A~%"  (invoke (invoke (invoke 'ns-application shared-application) windows) count))
-  ;; (format t "Current Window Frame: ~A~%" (cffi:convert-from-foreign (invoke (invoke (invoke (invoke (invoke 'ns-application shared-application) windows) first-object) content-view) frame) '(:struct cg-rect)))
-  ;; (format t "First Object Class: ~A~%" (invoke (invoke (invoke 'ns-application shared-application) windows) first-object))
-  ;; (format t "Last Window Title: ~A~%" (invoke (invoke (invoke (invoke (invoke 'ns-application shared-application) windows) last-object) title) utf8-string))
-  ;; (format t "First Window Title: ~A~%" (invoke (invoke (invoke (invoke (invoke 'ns-application shared-application) windows) first-object) title) utf8-string))
-  ;; (format t "Setting new frame: ~A~%" (invoke (invoke (invoke (invoke 'ns-application shared-application) windows) last-object) :set-frame (make-rect 0 0 360 480) :display 1))
-  ;; (format t "Current Window Frame: ~A~%" (cffi:convert-from-foreign (invoke (invoke (invoke (invoke (invoke 'ns-application shared-application) windows) first-object) content-view) frame) '(:struct cg-rect)))
 
 
   (fresh-line))
@@ -167,8 +110,8 @@ to be on the main thread."
 			;; (invoke menubar autorelease)
 			;; (invoke appMenuItem autorelease)
 			(invoke menubar :add-item appMenuItem)
-			(invoke app :set-main-menu menubar)
-      (invoke app :set-delegate delegate)
+			(invoke cl-objc::*nsapp* :set-main-menu menubar)
+      (invoke cl-objc::*nsapp* :set-delegate delegate)
 					; setting up window
       (with-object win
 	(:init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)
@@ -183,7 +126,8 @@ to be on the main thread."
 	(:set-title (lisp-string-to-nsstring "Hello"))
 	(:set-target (invoke app delegate))
 	(:set-action (selector :say-hello))
-	(:set-sound beep))
+	;; (:set-sound beep))
+      )
 					; setting up bye button
       (invoke (invoke win content-view) :add-subview bye)
       (with-object bye
@@ -191,7 +135,8 @@ to be on the main thread."
 	(:set-action (selector :stop))
 	(:set-enabled 1)
 	(:set-title (lisp-string-to-nsstring "Goodbye!"))
-	(:set-sound adios))
+	;; (:set-sound adios))
+  )
 		  
       (invoke win display)
       (invoke win :make-key-and-order-front (cffi:null-pointer))

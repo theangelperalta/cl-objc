@@ -192,11 +192,6 @@
 ;;; Method List
 
 ;;; CFFI defintions
-(defcstruct objc-method-list-cstruct
-	(obsolete :pointer)
-	(method_count :int)
-	(space :int)
-	(method_list objc-method-cstruct :count 1))
 
 (define-foreign-type objc-method-list-type () 
   () 
@@ -272,10 +267,16 @@
   (:documentation
    "A pointer to an objc_ivar struct."))
 
+(defcfun ("ivar_getName" ivar-get-name-test) :pointer
+  (ivar objc-ivar-pointer))
+
 (defcfun ("ivar_getName" ivar-get-name) :string
   (ivar objc-ivar-pointer))
 
 (defcfun ("ivar_getTypeEncoding" ivar-get-type-encoding) :string
+  (ivar objc-ivar-pointer))
+
+(defcfun ("ivar_getTypeEncoding" ivar-get-type-encoding-test) :pointer
   (ivar objc-ivar-pointer))
 
 (defcfun ("ivar_getOffset" ivar-get-offset) :int
