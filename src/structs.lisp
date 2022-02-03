@@ -26,19 +26,13 @@
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)
 
-(defun debugCADDR (signature)
-	(handler-case 
-	(car (cdr (cdr signature)))
-	(t (c)
-		nil)))
-
 (defun update-cstruct-database (&key output-stream)
   (setf *objc-struct-db*
 	(remove-duplicates 
 	 (remove-if-not (lambda (type) 
 			  (and (struct-type-p type) 
 			       (not (string-equal (struct-objc-name type) "?")))) 
-			(mapcar #'debugCADDR 
+			(mapcar #'caddr 
 				(mapcan #'objc-types:parse-objc-typestr
 					(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
 	 :test #'string-equal

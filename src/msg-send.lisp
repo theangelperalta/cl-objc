@@ -28,13 +28,13 @@
   (class objc-class-pointer))
 
 (defcfun ("objc_msgSendSuper" objc-msg-send-super) :pointer
-  (id (:pointer (:struct objc-super)))
+  (id objc-id)
   (sel objc-sel)
   &rest)
 
 (defcfun ("objc_msgSendSuper_stret" objc-msg-send-super-stret) :pointer
   (stret :pointer)
-  (id (:pointer (:struct objc-super)))
+  (id objc-id)
   (sel objc-sel)
   &rest)
 
@@ -189,7 +189,8 @@ binded to SEL.
 	    (,gmethod (etypecase ,gid
 			(objc-class (class-get-class-method ,gid ,gsel))
 			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
-	    (,gid (if *super-call*
+            (,gid (if *super-call*
+                      ;; FIXME: I don't believe slot access is possible anymore.
 		      (let ((,super (foreign-alloc '(:struct objc-super))))
 			(setf (foreign-slot-value ,super '(:struct objc-super) 'id) ,gid
 			      (foreign-slot-value ,super '(:struct objc-super) 'class) (second (super-classes ,gid)))
@@ -199,14 +200,26 @@ binded to SEL.
            (prog1
                (let ((,greturn-type (method-return-type ,gmethod)))
 		 (cond
+		   ;; big struct passed by value as argument
+           ;; FIXME: May not be necessary anymore
+		   ;; ((and (some #'big-struct-type-p (method-argument-types ,gmethod))
+		   ;;   (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
+           ;;          ',(even-positioned-elements args-and-types)))
+		   ;;  (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
+
+		   ;; struct as return value passed by value
 		   ((struct-type-p ,greturn-type)
-		   (let ((splicedParams '(,greturn-type ,gid ,gsel args-and-type ,(if *super-call* t nil))))
-			`(%objc-msg-send ,splicedParams)))
-		    
+		    (if *super-call*
+			(objc-msg-send-super-stret (or ,stret
+						       (foreign-alloc (extract-struct-name ,greturn-type)))
+						   ,id ,sel ,@args-and-types)
+			(objc-msg-send-stret (or ,stret
+						 (foreign-alloc (extract-struct-name ,greturn-type)))
+					     ,id ,sel ,@args-and-types)))
 
 		   ;; general case
-		   ((member ,greturn-type ',(allowed-simple-return-types)) 
-		    (funcall 
+		   ((member ,greturn-type ',(allowed-simple-return-types))
+		    (funcall
 		     (cache-compile ,gsel ,greturn-type *super-call* ',(even-positioned-elements args-and-types))
 		     ,gid ,@(odd-positioned-elements args-and-types)))
 		   (t (error "Unknown return type ~s" ,greturn-type))))
