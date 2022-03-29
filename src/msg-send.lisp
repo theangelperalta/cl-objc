@@ -71,8 +71,8 @@
 			     `,(append
 				     (list 'cffi:foreign-funcall)
 			       (cond
-				 ((member return-type '(:float :double)) "objc_msgSend_fpret")
-				 (superp "objc_msgSendSuper")
+				 ((member return-type '(:float :double)) (list "objc_msgSend_fpret"))
+				 (superp (list "objc_msgSendSuper"))
 				 (t (list "objc_msgSend")))
 			       (append (list :pointer (first gensyms)
 					      :pointer (second gensyms))
@@ -191,9 +191,9 @@ binded to SEL.
 			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
             (,gid (if *super-call*
                       ;; FIXME: I don't believe slot access is possible anymore.
-		      (let ((,super (foreign-alloc '(:struct objc-super))))
-			(setf (foreign-slot-value ,super '(:struct objc-super) 'id) ,gid
-			      (foreign-slot-value ,super '(:struct objc-super) 'class) (second (super-classes ,gid)))
+		      (let ((,super (super-classes ,gid)))
+			(setf (slot-value (first ,super) 'class-ptr) ,gid
+			      ,super (slot-value (second (super-classes ,gid)) 'class-ptr))
 			,super)
 		      ,gid)))
        (if ,gmethod
@@ -209,7 +209,12 @@ binded to SEL.
 
 		   ;; struct as return value passed by value
 		   ((struct-type-p ,greturn-type)
-		    (if *super-call*
+            ;; FIXME: Currently CFFI variadic functions cannot at present accept or return structures by value.
+            ;; Need to implement macro that builds defcfun macro for the specified function
+            ;; this is currently throwing errors during macroexpansion
+            ;; https://cffi.common-lisp.dev/manual/cffi-manual.html#defcfun
+            ;; https://github.com/cffi/cffi/issues/290
+            (if *super-call*
 			(objc-msg-send-super-stret (or ,stret
 						       (foreign-alloc (extract-struct-name ,greturn-type)))
 						   ,id ,sel ,@args-and-types)

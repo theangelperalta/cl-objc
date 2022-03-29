@@ -26,13 +26,19 @@
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)
 
+(defun safeCADDR (signature)
+	(handler-case
+	(car (cdr (cdr signature)))
+	(t (c)
+		nil)))
+
 (defun update-cstruct-database (&key output-stream)
   (setf *objc-struct-db*
 	(remove-duplicates 
 	 (remove-if-not (lambda (type) 
 			  (and (struct-type-p type) 
 			       (not (string-equal (struct-objc-name type) "?")))) 
-			(mapcar #'caddr 
+			(mapcar #'safeCADDR
 				(mapcan #'objc-types:parse-objc-typestr
 					(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
 	 :test #'string-equal
@@ -79,8 +85,6 @@ replacing in arguments-type the big struct types with the
 corresponding number of :int parameters"
   (mapcan (lambda (type) 
 	    (cond 
-	    ;;   ((big-struct-type-p type)
-	    ;;    (loop for i below (ceiling (objc-foreign-type-size type) (foreign-type-size :int)) collecting :int))
 	      ((struct-type-p type) (list (append (list :struct) (list (extract-struct-name type)))))
 	      (t (list type))))
 	  arguments-type))

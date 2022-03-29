@@ -288,7 +288,7 @@
       (let ((ivar_name (ivar-get-name ivar-ptr)) (ivar_type (ivar-get-type-encoding ivar-ptr)) (ivar_offset (ivar-get-offset ivar-ptr)))
         (make-instance 'objc-ivar
                        :name ivar_name
-                       :type (if (not ivar_type) (objc-types:parse-objc-typestr ivar_type) "")
+                       :type (if (stringp ivar_type) (objc-types:parse-objc-typestr ivar_type) "")
                        :offset ivar_offset
                        :ptr ivar-ptr))
       nil))
@@ -705,6 +705,11 @@ of CLASS"
   (:documentation
    "Objective C id - pointer to an objc_object struct"))
 
+(defcfun ("object_getInstanceVariable" object-get-instance-variable) objc-ivar-pointer
+  (id objc-id)
+  (ivar-name :string)
+  (value :pointer))
+
 (defcfun ("object_setInstanceVariable" object-set-instance-variable) objc-ivar-pointer
   (id objc-id)
   (ivar-name :string)
@@ -753,7 +758,7 @@ ObjectiveC object OBJ"
   (let* ((class (typecase obj
 		  (objc-object (obj-class obj))
 		  (objc-class obj)))
-	 (var (find ivar-name (class-ivars class) :key #'ivar-name :test #'equal))
+	 (var (find ivar-name (append (class-ivars class) (class-ivars (second (super-classes class)))) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))
 		   :pointer))
@@ -767,7 +772,10 @@ ObjectiveC object OBJ"
 (defun set-ivar (obj ivar-name value)
   "Set the value of instance variable named IVAR-NAME of OBJ with
  VALUE"
-  (let* ((var (find ivar-name (class-ivars (obj-class obj)) :key #'ivar-name :test #'equal))
+  (let* ((class (typecase obj
+		  (objc-object (obj-class obj))
+		  (objc-class obj)))
+         (var (find ivar-name (append (class-ivars class) (class-ivars (second (super-classes class)))) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))
 		   :pointer))
@@ -794,7 +802,6 @@ calling"
 (defmethod super-classes ((obj objc-object))
   (let ((class (obj-class obj)))
     (super-classes class)))
-
 
 ;;; Framework loading
 (defmacro load-framework (framework-name)
