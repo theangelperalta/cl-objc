@@ -284,7 +284,7 @@ without adding the new definition."
 						(var-type 
 						 `(cond 
 						    ((not (eq objc-nil-class (objc-get-class 
-									      ,(symbol-to-objc-class-name (second ivar-def))))) 
+									      ,(symbol-to-objc-class-name (second ivar-def)))))
 						     'objc-id)
 						    (t ',(cadr ivar-def)))))
 					    `(make-ivar ,(symbols-to-objc-selector (list var-name)) 

@@ -218,7 +218,7 @@ exists it just returns without adding the new class definition"
 					(invoke-restart 'use-the-same-class (objc-get-class (objc-class-name c))))))
 	(add-objc-class class-name super-class ivar-list))
     (use-the-same-class (&optional same-class) (prog2 
-					 (format *error-output* "Class named ~a already exists. Use the existing one.~%" 
+					 (format *error-output* "~%Class named ~a already exists. Use the existing one.~%" 
 						 (class-name same-class)) 
 					 same-class))))
 

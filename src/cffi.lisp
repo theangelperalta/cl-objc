@@ -632,9 +632,19 @@ of CLASS"
               (super-classes super-class)))))
 
 ;;; utilities
+(defparameter *forbidden-class-list*
+  '("AURATranslator"
+    "admHardwareVolumeDelegate"
+    "admGraphVolumeDelegate"
+    "MCTeslaConfiguration"
+    "CPCompositorWatcher"
+    "TNSheetStyle"
+    "TSWPRenderer"
+    "TSWPDropCapStyle"))
+
 (defun private-class-p (class)
   "Returns TRUE if the class is private."
-  (string= "_" (class-name class) :end2 1))
+  (or (string= "_" (class-name class) :end2 1) (find #\_ (class-name class) :test #'equal) (find (class-name class) *forbidden-class-list* :test #'equal)))
 
 (defun get-class-list ()
   "Returns the list of all the public ObjectiveC Class available"

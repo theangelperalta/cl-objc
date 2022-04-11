@@ -10,7 +10,7 @@
     :author "Geoff Cant, Luigi Panzeri"
     :version "0.5"
   :description "Common Lisp / ObjectiveC Interface"
-  :depends-on (#:cffi #:cffi-libffi #:yacc #:closer-mop #:org.tfeb.hax #:trivial-main-thread)
+  :depends-on (#:cffi #:cffi-libffi #:yacc #:closer-mop #:org.tfeb.hax #:trivial-main-thread #:verbose)
   :defsystem-depends-on (#:cffi-grovel #:cffi-libffi)
     :components ((:module :src
 			  :components ((:file "packages")
@@ -33,17 +33,17 @@
 						:components ((:file "generate-frameworks-bindings"))
 						:depends-on ("framework"))))))
 
-(defsystem cl-objc.examples.hello-world
+(defsystem cl-objc/examples/hello-world
   :components ((:module :examples
 			:components ((:file "hello-world"))))
   :depends-on (:cl-objc :swank))
 
-(defsystem cl-objc.examples.converter
+(defsystem cl-objc/examples/converter
   :components ((:module :examples
 			:components ((:file "converter"))))
   :depends-on (:cl-objc :swank))
 
-(defsystem cl-objc.examples.circle-view
+(defsystem cl-objc/examples/circle-view
   :components ((:module :examples
 			:components ((:file "circle-view"))))
   :depends-on (:cl-objc :swank))
@@ -76,7 +76,7 @@
 			    :name (package-name package)
 			    :type "texinfo"))))
 
-(defsystem  cl-objc.test
+(defsystem  cl-objc/test
   :components ((:module :t
 			:components ((:file "suite")
 				     (:file "utils" :depends-on ("suite"))
@@ -85,11 +85,10 @@
 				     (:file "reader" :depends-on ("suite"))
 				     (:file "runtime" :depends-on ("suite"))
 				     (:file "lisp-objc" :depends-on ("suite" "utils"))
-				     (:file "clos" :depends-on ("suite")))))
-  :depends-on (:cl-objc :FiveAM))
+                         (:file "clos" :depends-on ("suite")))))
+  :depends-on (:cl-objc :fiveam))
 
 ;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system 'cl-objc))))
-  (asdf:oos 'asdf:load-op 'cl-objc.test)
   (funcall (intern (string :run!) (string :it.bese.FiveAM))
            :cl-objc))

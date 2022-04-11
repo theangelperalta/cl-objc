@@ -129,10 +129,10 @@
 
 (defun parse-objc-typestr (str)
   "Parse a method type signature"
-  (handler-case 
+  (handler-case
       (parse-with-lexer (typestr-lexer str) *objc-type-parser*)
   (t (c)
-      (format t "Failed to parse type string: ~a : ~a~%" str c))))
+    (v:debug :objc-types "Failed to parse type string: |~a| : |~a|~%" str c))))
 
 (defun objc-foreign-type-size (type)
   (cond 
