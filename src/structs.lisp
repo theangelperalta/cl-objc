@@ -340,7 +340,7 @@ the CL-OBjC package.
 
 (defun objc-struct-slot-value (ptr type slot-name)
   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."
-  (cffi:foreign-slot-pointer (coerce ptr 'cffi:foreign-pointer) `(:struct ,type) slot-name))
+  (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) `(:struct ,type) slot-name))
 
 (defun set-objc-struct-slot-value (ptr type slot-name newval)
 (format t "Type: ~A - newValue: ~A~%" type newval)
