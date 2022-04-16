@@ -15,21 +15,22 @@
   (types :string))
 
 (defun register-method (class selector-name types callback class-method)
-;; (break)
   (let ((class (objc-lookup-class class)))
     (assert (not (eq class objc-nil-class)))
     (let* ((selector (sel-register-name selector-name))
-	   (types (foreign-string-alloc types)))
-    
-      (if class-method
+           (types (foreign-string-alloc types))
+           (class-type (if class-method (metaclass class) class)))
 	  (progn
 	  ;; Use replace instead of add
-	    (class-replace-method (metaclass class) selector callback types)
-	    (class-get-instance-method (metaclass class) selector))
-	  (progn 
-	    ;; (class-add-methods class method-list)
-	    (class-add-method class selector callback types)
-	    (class-get-instance-method class selector))))))
+        (handler-case
+            (unless (class-add-method class-type selector callback types)
+              (progn
+                (format t "Failed to add method: ~A to class: ~A. Attempting to replace method...~%" selector class)
+                (error "Failed to add method: ~A to class: ~A~%" selector class)))
+          (t (c)
+            (unless (class-replace-method class-type selector callback types))
+                (error "Failed to replace method: ~A to class: ~A~%" selector class)))
+	    (class-get-instance-method (metaclass class) selector)))))
 
 (defun parse-argument-list (argument-list)
   (let ((types '(objc-id objc-sel))
@@ -80,7 +81,7 @@ Return a new ObjectiveC Method object."
     (let* ((callback (gentemp (format nil "~A-CALLBACK-" (remove #\: name))))
 	   (new-method (gensym)))
       (let ((has-declare))
-	`(progn 
+	`(progn
 	   (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
 	     ,(when (and (listp (first body)) (eq (car (first body)) 'cl:declare))
 		    (setf has-declare t)

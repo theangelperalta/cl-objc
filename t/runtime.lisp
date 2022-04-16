@@ -6,27 +6,29 @@
   (equal (car x) (car y)))
   
 ;; FIXME: type-encoder
-(test type-encoder
-  "Check if type encoder works. Get all instance methods and
-      all class methods, parse the types, and reencode them
-      checking if they are equal."
-  (let* ((type-signatures (mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))
-	 (decoded (mapcar #'objc-types:parse-objc-typestr type-signatures))
-	 (encoded (mapcar #'objc-types:encode-types decoded)))
-    (loop 
-       for type in type-signatures
-       for encoded-type in encoded
-       do
-	 (is (car-equal (cons (objc-types:parse-objc-typestr type) type) (cons (parse-objc-typestr encoded-type) encoded-type))))))
+;; (test type-encoder
+;;   "Check if type encoder works. Get all instance methods and
+;;       all class methods, parse the types, and reencode them
+;;       checking if they are equal."
+;;   (let* ((type-signatures (mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))
+;; 	 (decoded (mapcar #'objc-types:parse-objc-typestr type-signatures))
+;; 	 (encoded (mapcar #'objc-types:encode-types decoded)))
+;;     (loop
+;;        for type in type-signatures
+;;        for encoded-type in encoded
+;;        do
+;; 	 (is (car-equal (cons (objc-types:parse-objc-typestr type) type) (cons (parse-objc-typestr encoded-type) encoded-type))))))
 
 ;; FIXME: adding-instance-method-with-arg
-;; (test adding-instance-method-with-arg
-;;   (objc-cffi:add-objc-method  ("add:" "NSNumber" :return-type :int) (y)  
-;;     (+ (untyped-objc-msg-send self "intValue") 
-;;        (untyped-objc-msg-send y "intValue")))
-;;   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
-;; 	(y (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 2)))
-;;     (is (= (typed-objc-msg-send (x "add:") objc-id y) 3))))
+;; The translation from external object to object passed into add: method is failing
+;; can't translate pointer to objc class method or instance method
+(test adding-instance-method-with-arg
+  (objc-cffi:add-objc-method  ("add:" "NSNumber" :return-type :int) ((y objc-id))
+    (+ (untyped-objc-msg-send self "intValue")
+       (untyped-objc-msg-send y "intValue")))
+  (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
+        (y (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 2)))
+    (is (= (typed-objc-msg-send (x "add:") objc-id y) 3))))
 
 (test adding-instance-method 
   (objc-cffi:add-objc-method  ("double" "NSNumber" :return-type :int) () 
@@ -34,22 +36,18 @@
   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1)))
     (is (= (typed-objc-msg-send (x "double")) 2))))
 
-;; FIXME: unsupported trying to method to existing class
-;; need to create new class and add method
-;; (test adding-class-method
-;;   (objc-cffi:add-objc-method ("magicNumber" "NSNumber" :return-type :int :class-method t)
-;; 		   ()
-;; 		   1980)
-;;   (is (= 1980 (untyped-objc-msg-send (objc-get-class "NSNumber") "magicNumber"))))
+(test adding-class-method
+  (objc-cffi:add-objc-method ("magicNumber" "NSNumber" :return-type :int :class-method t) ()
+		   1980)
+  (is (= 1980 (untyped-objc-msg-send (objc-get-class "NSNumber") "magicNumber"))))
 
 (test adding-instance-method-returning-object
-  (objc-cffi:add-objc-method  ("add:" "NSNumber") 
-		    ((y :int)) 
-    (untyped-objc-msg-send (objc-get-class "NSNumber") "numberWithInt:" 
+  (objc-cffi:add-objc-method  ("add2:" "NSNumber") ((y :int))
+    (untyped-objc-msg-send (objc-get-class "NSNumber") "numberWithInt:"
 			   (+ (untyped-objc-msg-send self "intValue") y)))
   (let ((x (typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithInt:") :int 1))
 	(y 2))
-    (is (= (typed-objc-msg-send ((typed-objc-msg-send (x "add:") :int y) "intValue")) 3))))
+    (is (= (typed-objc-msg-send ((typed-objc-msg-send (x "add2:") :int y) "intValue")) 3))))
 
 (defun temp-class-name (&optional (prefix "NSCLObjCTest"))
   (symbol-name (gensym prefix)))
