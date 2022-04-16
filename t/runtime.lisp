@@ -19,9 +19,6 @@
 ;;        do
 ;; 	 (is (car-equal (cons (objc-types:parse-objc-typestr type) type) (cons (parse-objc-typestr encoded-type) encoded-type))))))
 
-;; FIXME: adding-instance-method-with-arg
-;; The translation from external object to object passed into add: method is failing
-;; can't translate pointer to objc class method or instance method
 (test adding-instance-method-with-arg
   (objc-cffi:add-objc-method  ("add:" "NSNumber" :return-type :int) ((y objc-id))
     (+ (untyped-objc-msg-send self "intValue")
@@ -52,45 +49,42 @@
 (defun temp-class-name (&optional (prefix "NSCLObjCTest"))
   (symbol-name (gensym prefix)))
 
+(test adding-class-to-nsobject-hierarchy
+  (let* ((super-class-name "NSNumber")
+	 (super-class (objc-get-class super-class-name))
+	 (class-name (temp-class-name))
+	 (class (add-objc-class class-name super-class)))
+    (is (not (eq objc-nil-class class)))
+    (is (string-equal class-name (class-name class)))
+    (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))
 
-;; FIXME: adding-class-to-nsobject-hierarchy
-;; (test adding-class-to-nsobject-hierarchy
-;;   (let* ((super-class-name "NSNumber")
-;; 	 (super-class (objc-get-class super-class-name))
-;; 	 (class-name (temp-class-name))
-;; 	 (class (add-objc-class class-name super-class)))
-;;     (is (not (eq objc-nil-class class)))
-;;     (is (string-equal class-name (class-name class)))
-;;     (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))
+(test adding-class-and-creating-instances
+  (let* ((super-class-name "NSNumber")
+	 (super-class (objc-get-class super-class-name))
+	 (class-name (temp-class-name))
+	 (class (add-objc-class class-name super-class))
+	 (instance (invoke class alloc)))
+    (is (not (eq objc-nil-object instance)))
+    (is (string-equal class-name (class-name class)))
+    (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))
 
-;; FIXME: adding-class-and-creating-instances
-;; (test adding-class-and-creating-instances
-;;   (let* ((super-class-name "NSNumber")
-;; 	 (super-class (objc-get-class super-class-name))
-;; 	 (class-name (temp-class-name))
-;; 	 (class (add-objc-class class-name super-class))
-;; 	 (instance (invoke class alloc)))
-;;     (is (not (eq objc-nil-object instance)))
-;;     (is (string-equal class-name (class-name class)))
-;;     (is (string-equal super-class-name (class-name (cadr (super-classes class)))))))
-
-;; FIXME: making-ivars
-;; (test making-ivars
-;;   (flet ((choose-randomly (list) (nth (random (length list)) list)))
-;;     (let* ((var-count 5)
-;; 	   (var-names (mapcar #'symbol-name (mapcar #'gensym (loop for i upto var-count collecting "foo"))))
-;; 	   (types (loop 
-;; 		     for i upto var-count
-;; 		     collecting (choose-randomly  (remove-if (lambda (el) (member el '(:void objc-unknown-type))) 
-;; 							     (mapcar #'cadr objc-types:typemap)))))
-;; 	   (vars (mapcar #'make-ivar var-names types)))
-;;       (is (equal types (mapcar #'car (mapcar #'ivar-type vars))))
-;;       (is (equal var-names (mapcar #'ivar-name vars))))))
+(test making-ivars
+  (flet ((choose-randomly (list) (nth (random (length list)) list)))
+    (let* ((var-count 5)
+	   (var-names (mapcar #'symbol-name (mapcar #'gensym (loop for i upto var-count collecting "foo"))))
+	   (types (loop
+		     for i upto var-count
+		     collecting (choose-randomly  (remove-if (lambda (el) (member el '(:void objc-unknown-type)))
+							     (mapcar #'cadr objc-types:typemap)))))
+	   (vars (mapcar #'make-ivar var-names types)))
+      (is (equal types (mapcar #'car (mapcar #'ivar-type vars))))
+      (is (equal var-names (mapcar #'ivar-name vars))))))
 
 ;; FIXME: ivars-with-struct-value
+;; (declaim (optimize (speed 0) (space 0) (debug 3)))
 ;; (test ivars-with-struct-value
-;;   (let* ((random-x (random 10.0))
-;; 	 (random-y (random 10.0))
+;;   (let* ((random-x (coerce (random 10.0) 'double-float))
+;; 	 (random-y (coerce (random 10.0) 'double-float))
 ;; 	 (class-name (temp-class-name))
 ;; 	 (ivar (make-ivar "struct" 'struct-cg-point))
 ;; 	 (obj (untyped-objc-msg-send (add-objc-class class-name (objc-get-class "NSObject") (list ivar)) "alloc")))

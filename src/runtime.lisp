@@ -185,7 +185,7 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 	   (incf instance-size increment)
 	   (setf (ivar-offset ivar) offset)
 	   ;; Initial offset is the size of the ivar type
-	   (class-add-class-ivar new-class (ivar-name ivar) offset (round (log offset 2)) (ivar-type ivar))
+	   (class-add-class-ivar new-class (ivar-name ivar) offset (round (log offset 2)) (objc-types:encode-types (ivar-type ivar)))
 	)
 
 ;; Note - this may not be necessary because the new add class should
@@ -208,7 +208,7 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
     (objc-register-class new-class)
     (when objc-clos:*automatic-clos-bindings-update*
       (objc-clos:add-clos-class new-class))
-    new-class))
+    (objc-get-class class-name)))
 
 (defun ensure-objc-class (class-name super-class &optional ivar-list)
   "Like add-objc-class but if a class with the same name already
@@ -230,7 +230,7 @@ exists it just returns without adding the new class definition"
 	;; TODO: Create objc-ivar-struct with size and no ptr
 	(make-instance 'objc-ivar
                        :name name
-                       :type (objc-types:encode-types (list type))
+                       :type (list type)
 	     		; we initialize the offset with the type size of the
 	     		; variable. This should be adjusted of course during
 			; class creation
