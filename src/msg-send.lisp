@@ -23,7 +23,7 @@
   (sel objc-sel)
   &rest)
 
-(defcstruct objc-super 
+(defcstruct objc-super
   (id objc-id)
   (class objc-class-pointer))
 
@@ -80,6 +80,25 @@
 							   (even-positioned-elements args))
 						   (cddr gensyms))
 					(list (cffi-foreign-type return-type)))
+			       ))))
+
+(defmacro %objc-msg-send-stret (return-type id sel args &optional superp)
+  (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
+    (cffi::translate-objects gensyms
+			     (append (list id sel) (odd-positioned-elements args))
+			     (append (list (if superp 'objc-super 'objc-id) 'objc-sel) (even-positioned-elements args))
+                 :pointer
+			     `,(append
+				     (list 'cffi:foreign-funcall)
+			       (cond
+				 (superp (list "objc_msgSendSuper"))
+				 (t (list "objc_msgSend")))
+			       (append (list :pointer (first gensyms)
+					      :pointer (second gensyms))
+					(interpose (mapcar #'cffi-foreign-type
+							   (even-positioned-elements args))
+						   (cddr gensyms))
+					(list (cffi-foreign-type `(:struct ,return-type))))
 			       ))))
 
 (defun cffi-foreign-type (type)
@@ -200,27 +219,27 @@ binded to SEL.
            (prog1
                (let ((,greturn-type (method-return-type ,gmethod)))
 		 (cond
-		   ;; big struct passed by value as argument
-           ;; FIXME: May not be necessary anymore
-		   ;; ((and (some #'big-struct-type-p (method-argument-types ,gmethod))
-		   ;;   (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
-           ;;          ',(even-positioned-elements args-and-types)))
-		   ;;  (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
-
-		   ;; struct as return value passed by value
-		   ((struct-type-p ,greturn-type)
+           ;; big struct as return value passed by value
+           ((big-struct-type-p ,greturn-type)
             ;; FIXME: Currently CFFI variadic functions cannot at present accept or return structures by value.
             ;; Need to implement macro that builds defcfun macro for the specified function
             ;; this is currently throwing errors during macroexpansion
             ;; https://cffi.common-lisp.dev/manual/cffi-manual.html#defcfun
             ;; https://github.com/cffi/cffi/issues/290
-            (if *super-call*
+		    (if *super-call*
 			(objc-msg-send-super-stret (or ,stret
 						       (foreign-alloc (extract-struct-name ,greturn-type)))
-						   ,id ,sel ,@args-and-types)
+						   ,gid ,gsel ,@args-and-types)
 			(objc-msg-send-stret (or ,stret
 						 (foreign-alloc (extract-struct-name ,greturn-type)))
-					     ,id ,sel ,@args-and-types)))
+                                 ,gid ,gsel ,@args-and-types)))
+
+		   ;; small struct as return value passed by value
+           ;; FIXME: This is currently generates a custom defcfun like for objc-msg with concrete struct return type
+           ;; without, which cast would crash
+		   ((small-struct-type-p ,greturn-type)
+            (eval
+            `(%objc-msg-send-stret ,(extract-struct-name ,greturn-type) ,,gid ,,gsel ,,args-and-types ,,*super-call*)))
 
 		   ;; general case
 		   ((member ,greturn-type ',(allowed-simple-return-types))
@@ -230,7 +249,7 @@ binded to SEL.
 		   (t (error "Unknown return type ~s" ,greturn-type))))
 	     (when *super-call*
 	       (foreign-free ,gid)))
-	   (error "ObjC method ~a not found" ,gsel)))))
+	   (error "ObjC method ~a not found on class ~a" ,gsel ,gid)))))
 
 (defparameter *untyped-methods-cache* (make-hash-table :test #'equal))
 

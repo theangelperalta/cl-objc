@@ -73,11 +73,11 @@ CFFI, otherwise returns INPUT-TYPE unchanged"
 
 (defun big-struct-type-p (type)
   (and (struct-type-p type)
-       (> (objc-foreign-type-size type) 8)))
+       (> (objc-foreign-type-size type) 16)))
 
 (defun small-struct-type-p (type)
   (and (struct-type-p type)
-       (<= (objc-foreign-type-size type) 8)))
+       (<= (objc-foreign-type-size type) 16)))
 
 (defun pack-struct-arguments-type (arguments-type)
   "Given in input a list of types returns a new list of types

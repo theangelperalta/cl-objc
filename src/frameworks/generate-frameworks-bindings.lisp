@@ -4,7 +4,7 @@
 (in-package :cl-objc)
 
 (compile-framework ("Foundation")
-  (define-objc-struct ((ns-range :class c-ns-range) "_NSRange") (location :unsigned-int) (length :unsigned-int))
+  (define-objc-struct ((ns-range :class c-ns-range) "_NSRange") (location :unsigned-long-long) (length :unsigned-long-long))
   ;; These "structs" are typealias for the CG structs
   (define-objc-struct ((cg-size :class c-cg-size) "CGSize") (width :DOUBLE) (height :DOUBLE))
   (define-objc-struct ((cg-point :class c-cg-point) "CGPoint") (x :DOUBLE) (y :DOUBLE))
