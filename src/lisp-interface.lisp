@@ -189,7 +189,7 @@ STRUCT-OBJ) will be bound as utilities."
 	      (let ((name (car binding))
 		    (type (cadr binding))
 		    (value (caddr binding)))
-		`(,name (or ,value `,(cffi:foreign-alloc '(:struct ,type)))))) bindings)
+		`(,name (or ,value `,(cffi:convert-from-foreign `,(cffi:foreign-alloc '(:struct ,type)) '(:struct ,type)))))) bindings)
        (macrolet ,(slet-macrolet-forms (mapcar #'cadr bindings)) 
 	 ,@body))))
 

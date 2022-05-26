@@ -74,24 +74,14 @@ a light struct as input parameter"
 	  (is (= intval1 (cl-objc::ns-range-location (typed-objc-msg-send (value-with-range "rangeValue")))))
           (is (= intval2 (cl-objc::ns-range-length (typed-objc-msg-send (value-with-range "rangeValue"))))))))
 
-;; (test typed-big-struct-returning-values
-;; "Test with method returning big struct value. Test also passing a
-;; big struct as input parameter"
-;;       (let ((rect (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x (coerce 0 'double-float) :y (coerce 0 'double-float)) :size (cl-objc::make-cg-size :width (coerce 0 'double-float) :height (coerce 0 'double-float)))))
-;; 	(let ((floatval (coerce (random 4.0) 'double-float)))
-;; 	  (setf (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)) floatval)
-;; 	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") (:struct cg-rect) rect)))
-;; 	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (cffi:convert-from-foreign (typed-objc-msg-send (value-with-rect "rectValue")) '(:struct cg-rect))))))))))
-(declaim (optimize (speed 0) (space 0) (debug 3)))
-(test typed-big-struct-returning-values 
+(test typed-big-struct-returning-values
 "Test with method returning big struct value. Test also passing a
 big struct as input parameter"
-      (cffi:with-foreign-object (rect 'cg-rect)
+      (let ((rect (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x (coerce 0 'double-float) :y (coerce 0 'double-float)) :size (cl-objc::make-cg-size :width (coerce 0 'double-float) :height (coerce 0 'double-float)))))
 	(let ((floatval (coerce (random 4.0) 'double-float)))
-	  (setf (cffi:foreign-slot-value (cffi::foreign-slot-value rect '(:struct cg-rect) 'size) '(:struct cg-size) 'width) floatval)
-	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") cg-rect rect)))
-	  (break)
-	    (is (= floatval (cffi::foreign-slot-value (cffi::foreign-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'cg-rect 'size) 'cg-size 'width)))))))
+	  (setf (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)) floatval)
+	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") (:struct cg-rect) rect)))
+	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (cffi:convert-from-foreign (typed-objc-msg-send (value-with-rect "rectValue")) '(:struct cg-rect))))))))))
 
 (test typed-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"

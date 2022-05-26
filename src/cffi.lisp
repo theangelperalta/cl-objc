@@ -762,6 +762,10 @@ Class Methods: ~{~s ~}~%"
 	    (protocol-instance-methods protocol)
 	    (protocol-class-methods protocol))))
 
+(defmacro get-struct-from-objc-name (objc-name)
+  "Returns CFFI struct type for the given Objective-C struct name: e.g., NSPoint -> ns-point"
+  ``(:struct ,(objc-cffi::find-struct-lisp-name ,objc-name)))
+
 (defun get-ivar (obj ivar-name)
   "Returns the value of instance variable named IVAR-NAME of
 ObjectiveC object OBJ"
@@ -769,9 +773,9 @@ ObjectiveC object OBJ"
 		  (objc-object (obj-class obj))
 		  (objc-class obj)))
 	 (var (find ivar-name (append (class-ivars class) (class-ivars (second (super-classes class)))) :key #'ivar-name :test #'equal))
-	 (type (if (not (listp (car (ivar-type var))))
-		   (car (ivar-type var))
-		   :pointer))
+	 (type (if (listp (car (ivar-type var)))
+		   (get-struct-from-objc-name (second (car (ivar-type var))))
+		   (car (ivar-type var))))
 	 (ret (foreign-alloc :pointer :initial-element (foreign-alloc type))))
     (object-get-instance-variable obj ivar-name ret)
     (cond

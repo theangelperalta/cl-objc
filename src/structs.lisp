@@ -134,6 +134,10 @@ corresponding number of :int parameters"
 	"Get lisp struct name"
 	(intern (concatenate 'string "STRUCT-" (symbol-name lisp-name))))
 
+(defun get-make-struct-name (lisp-name)
+	"Get lisp struct name"
+	(intern (concatenate 'string "MAKE-" (symbol-name lisp-name)) :cl-objc))
+
 (defun get-cffi-type-name (lisp-name)
 	"Get CFFI type name need for pass-by-value for structs"
 	(intern (concatenate 'string "C-" (symbol-name lisp-name))))
@@ -199,7 +203,7 @@ corresponding number of :int parameters"
 
 (defun append-slot-name (lisp-name slot-name)
 	"Get CFFI type name need for pass-by-value for structs"
-	(intern (concatenate 'string (symbol-name lisp-name) (concatenate 'string "-" (symbol-name slot-name)))))
+	(intern (concatenate 'string (symbol-name (eval lisp-name)) (concatenate 'string "-" (symbol-name (eval slot-name)))) :cl-objc))
 
 
 (defun register-struct-name (objc-name lisp-name)
@@ -210,6 +214,9 @@ corresponding number of :int parameters"
 (defun find-struct-definition (lisp-name)
   (let ((objc-name (car (find lisp-name *registered-structs* :key #'cdr :test #'string-equal))))
     (find objc-name *objc-struct-db* :key #'second :test #'string-equal)))
+
+(defun find-struct-lisp-name (objc-name)
+  (cdr (find objc-name objc-cffi::*registered-structs* :key #'car :test #'string-equal)))
 
 (defun calculate-splayed-args (args)
   (loop 
@@ -338,13 +345,22 @@ the CL-OBjC package.
 	
 	 (export (cffi:foreign-slot-names ',lisp-name))))))
 
-(defun objc-struct-slot-value (ptr type slot-name)
+(defmacro objc-struct-slot-value (struct type slot-name)
   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."
-  (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) `(:struct ,type) slot-name))
+  (let ((access-fun-name (append-slot-name type slot-name)))
+   `(,access-fun-name ,struct)))
 
-(defun set-objc-struct-slot-value (ptr type slot-name newval)
-(format t "Type: ~A - newValue: ~A~%" type newval)
-  (setf (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) `(:struct ,type) slot-name) newval))
+
+;; (defun objc-struct-slot-value (struct type slot-name)
+;;   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."
+;;   (eval (construct-objc-struct-slot-value-accessor struct type slot-name)))
+
+;; (defun set-objc-struct-slot-value (ptr type slot-name newval)
+;;   (setf (cffi:foreign-slot-value ptr `(:struct ,type) slot-name) newval))
+
+(defmacro set-objc-struct-slot-value (struct type slot-name newval)
+  (let ((access-fun-name (append-slot-name type slot-name)))
+   `(setf (,access-fun-name ,struct) ,newval)))
   ;; (setf (cffi:foreign-slot-value (or (coerce ptr 'cffi:foreign-pointer) (cffi:foreign-alloc `(:struct ,type) :initial-contents ptr)) `(:struct ,type) slot-name) newval))
 ;;   (setf (cffi:foreign-slot-value  (cffi:foreign-alloc `(:struct ,type) :initial-element ptr) `(:struct ,type) slot-name) newval))
 

@@ -70,12 +70,9 @@ value usign NSNumber#intValue"
 a light struct as input parameter"
       (let ((intval (coerce (random (mod (get-universal-time) 1000)) 'integer)))
         (slet ((range ns-range))
-        (break)
 	       (setf (ns-range-location range) intval)
-	      (let ((value-with-range (invoke 'ns-value :value-with-range (cffi:convert-from-foreign range '(:struct ns-range)))))
-        ;; TODO - Remove cl-objc:: namespace and use objc-struct-slot-value instead of auto
-        ;; auto-generated accessor method
-		(is (= intval (cl-objc::ns-range-location (invoke value-with-range range-value))))))))
+	      (let ((value-with-range (invoke 'ns-value :value-with-range range)))
+		(is (= intval (ns-range-location (invoke value-with-range range-value))))))))
 
 ;; (test lisp-big-struct-returning-values 
 ;;   "Test with method returning big struct value. Test also passing a
