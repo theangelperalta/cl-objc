@@ -62,17 +62,17 @@ value usign NSNumber#intValue"
 	       (typed-objc-msg-send ((typed-objc-msg-send ((objc-get-class "NSNumber") "numberWithFloat:") :float num)
 				     "floatValue"))))))
 
-;; (test typed-light-struct-returning-values
-;; "Test with method returning light struct value. Test also passing
-;; a light struct as input parameter"
-;;       (let ((range (cffi:foreign-alloc 'ns-range)#+(or)(cl-objc::make-ns-range :location 100 :length 99))
-;; 	    (intval1 (random (mod (get-universal-time) 1000)))
-;; 	    (intval2 (random (mod (get-universal-time) 1000))))
-;; 	(setf (cffi:foreign-slot-value range 'ns-range 'location) intval1
-;; 	      (cffi:foreign-slot-value range 'ns-range 'length) intval2)
-;;         (let ((value-with-range (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRange:") (:struct ns-range) (cffi:convert-from-foreign range '(:struct ns-range)))))
-;; 	  (is (= intval1 (cl-objc::ns-range-location (typed-objc-msg-send (value-with-range "rangeValue")))))
-;;           (is (= intval2 (cl-objc::ns-range-length (typed-objc-msg-send (value-with-range "rangeValue"))))))))
+(test typed-light-struct-returning-values
+"Test with method returning light struct value. Test also passing
+a light struct as input parameter"
+      (let ((range (cffi:foreign-alloc 'ns-range)#+(or)(cl-objc::make-ns-range :location 100 :length 99))
+	    (intval1 (random (mod (get-universal-time) 1000)))
+	    (intval2 (random (mod (get-universal-time) 1000))))
+	(setf (cffi:foreign-slot-value range 'ns-range 'location) intval1
+	      (cffi:foreign-slot-value range 'ns-range 'length) intval2)
+        (let ((value-with-range (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRange:") (:struct ns-range) (cffi:convert-from-foreign range '(:struct ns-range)))))
+	  (is (= intval1 (cl-objc::ns-range-location (typed-objc-msg-send (value-with-range "rangeValue")))))
+          (is (= intval2 (cl-objc::ns-range-length (typed-objc-msg-send (value-with-range "rangeValue"))))))))
 
 ;; (test typed-big-struct-returning-values
 ;; "Test with method returning big struct value. Test also passing a
@@ -83,15 +83,15 @@ value usign NSNumber#intValue"
 ;; 	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") (:struct cg-rect) rect)))
 ;; 	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (cffi:convert-from-foreign (typed-objc-msg-send (value-with-rect "rectValue")) '(:struct cg-rect))))))))))
 (declaim (optimize (speed 0) (space 0) (debug 3)))
-;; (test typed-big-struct-returning-values 
-;; "Test with method returning big struct value. Test also passing a
-;; big struct as input parameter"
-;;       (cffi:with-foreign-object (rect 'cg-rect)
-;; 	(let ((floatval (coerce (random 4.0) 'double-float)))
-;; 	  (setf (cffi:foreign-slot-value (cffi::foreign-slot-value rect '(:struct cg-rect) 'size) '(:struct cg-size) 'width) floatval)
-;; 	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") cg-rect rect)))
-;; 	  (break)
-;; 	    (is (= floatval (cffi::foreign-slot-value (cffi::foreign-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'cg-rect 'size) 'cg-size 'width)))))))
+(test typed-big-struct-returning-values 
+"Test with method returning big struct value. Test also passing a
+big struct as input parameter"
+      (cffi:with-foreign-object (rect 'cg-rect)
+	(let ((floatval (coerce (random 4.0) 'double-float)))
+	  (setf (cffi:foreign-slot-value (cffi::foreign-slot-value rect '(:struct cg-rect) 'size) '(:struct cg-size) 'width) floatval)
+	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") cg-rect rect)))
+	  (break)
+	    (is (= floatval (cffi::foreign-slot-value (cffi::foreign-slot-value (typed-objc-msg-send (value-with-rect "rectValue")) 'cg-rect 'size) 'cg-size 'width)))))))
 
 (test typed-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
