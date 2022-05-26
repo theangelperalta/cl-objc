@@ -64,24 +64,28 @@ value usign NSNumber#intValue"
 	(is (= num
 	       (invoke (invoke 'ns-number :number-with-float num) float-value)))))
 
-;; (test lisp-light-struct-returning-values 
-;; "Test with method returning light struct value. Test also passing
-;; a light struct as input parameter"
-;;       (let ((intval (random (mod (get-universal-time) 1000))))
-;; 	(slet ((range struct-ns-range))
-;; 	      (setf (struct-ns-range-location range) intval)
-;; 	      (let ((value-with-range (invoke 'ns-value :value-with-range range)))
-;; 		(is (= intval (struct-ns-range-location (invoke value-with-range range-value))))))))
+(declaim (optimize (speed 0) (space 0) (debug 3)))
+(test lisp-light-struct-returning-values
+"Test with method returning light struct value. Test also passing
+a light struct as input parameter"
+      (let ((intval (coerce (random (mod (get-universal-time) 1000)) 'integer)))
+        (slet ((range ns-range))
+        (break)
+	       (setf (ns-range-location range) intval)
+	      (let ((value-with-range (invoke 'ns-value :value-with-range (cffi:convert-from-foreign range '(:struct ns-range)))))
+        ;; TODO - Remove cl-objc:: namespace and use objc-struct-slot-value instead of auto
+        ;; auto-generated accessor method
+		(is (= intval (cl-objc::ns-range-location (invoke value-with-range range-value))))))))
 
 ;; (test lisp-big-struct-returning-values 
 ;;   "Test with method returning big struct value. Test also passing a
 ;; big struct as input parameter"
-;;   (slet* ((rect struct-cg-rect)
-;; 	  (size struct-cg-size (struct-cg-rect-size rect)))
+;;   (slet* ((rect cg-rect)
+;; 	  (size cg-size (cg-rect-size rect)))
 ;;     (let ((floatval (random 4.0)))
-;;       (setf (struct-cg-size-width size) floatval)
+;;       (setf (cg-size-width size) floatval)
 ;;       (let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
-;; 	(is (= floatval (struct-cg-size-width (struct-cg-rect-size (invoke value-with-rect rect-value)))))))))
+;; 	(is (= floatval (cg-size-width (cg-rect-size (invoke value-with-rect rect-value)))))))))
 
 (test lisp-adding-instance-method-with-arg
   (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  
@@ -153,19 +157,19 @@ value usign NSNumber#intValue"
       (is (= (var4 x) 2.0)))))
 
 (define-objc-class ns-test-ivar-struct ns-object
-    ((point struct-cg-point)))
+    ((point cg-point)))
 
 ;; (test lisp-ivar-struct
 ;;   (let ((random-x (float (random 10.0)))
 ;; 	(random-y (float (random 10.0))))
 ;;     (objc-let ((obj 'ns-test-ivar-struct))
-;;       (slet ((p struct-cg-point))
-;; 	(setf (struct-cg-point-x p) random-x
-;; 	      (struct-cg-point-y p) random-y)
+;;       (slet ((p cg-point))
+;; 	(setf (cg-point-x p) random-x
+;; 	      (cg-point-y p) random-y)
 ;; 	(with-ivar-accessors ns-test-ivar-struct
 ;; 	  (setf (point obj) p)
-;; 	  (is (and (= (objc-struct-slot-value (point obj) 'struct-cg-point 'x) random-x)
-;; 		   (= (objc-struct-slot-value (point obj) 'struct-cg-point 'y) random-y))))))))
+;; 	  (is (and (= (objc-struct-slot-value (point obj) 'cg-point 'x) random-x)
+;; 		   (= (objc-struct-slot-value (point obj) 'cg-point 'y) random-y))))))))
 
 (define-objc-method magic-value (:return-type :int) ((self test-super-1))
   1)

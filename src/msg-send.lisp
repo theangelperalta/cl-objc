@@ -209,7 +209,6 @@ binded to SEL.
 			(objc-class (class-get-class-method ,gid ,gsel))
 			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
             (,gid (if *super-call*
-                      ;; FIXME: I don't believe slot access is possible anymore.
 		      (let ((,super (super-classes ,gid)))
 			(setf (slot-value (first ,super) 'class-ptr) ,gid
 			      ,super (slot-value (second (super-classes ,gid)) 'class-ptr))

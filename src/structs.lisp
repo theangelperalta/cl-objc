@@ -128,7 +128,7 @@ corresponding number of :int parameters"
       (t (error "Bad format name of ObjectiveC struct")))
 	  ;; first value replaces name in the name-and-option with "STRUCT-" appended to it
 	  ;; to allow pass-by-value for structs
-    (list (append (list lisp-struct-name) (cdr name-and-options)) objc-name lisp-name lisp-struct-name cffi-type-name)))
+    (list (append (list lisp-name) (cdr name-and-options)) objc-name lisp-name lisp-struct-name cffi-type-name)))
 
 (defun get-struct-name (lisp-name)
 	"Get lisp struct name"
@@ -147,7 +147,7 @@ corresponding number of :int parameters"
 		 ;; Create a mapping to cffi types to cl types
 		 (list (first slot) (convert-foreign-type (second slot))))
 		 ((and (listp slot) (symbolp (first slot)) (listp (second slot)))
-		 (list (first slot) (list (first (second slot)) (get-struct-name (cadr (second slot)))))))
+		 (list (first slot) (list (first (second slot)) (cadr (second slot))))))
 	 collect transformed-slot))
 
 (defun convert-foreign-type (type-keyword)
@@ -186,7 +186,7 @@ corresponding number of :int parameters"
 	(loop for slot in doc-and-slots
 	 when (not (stringp slot)) 
 	 collect (if (listp (cadr slot))
-	 `(,(car slot) (:struct ,(get-struct-name (cadadr slot))))
+	 `(,(car slot) (:struct ,(cadadr slot)))
 	  slot)))
 
 (defun parse-slots-for-translate-into-foreign-memory (lisp-name doc-and-slots)
@@ -194,7 +194,7 @@ corresponding number of :int parameters"
 	 when (not (stringp slot)) 
 	 collect (car slot)
 	 collect (if (listp (cadr slot))
-	 `(foreign-alloc '(:struct ,(get-struct-name (cadadr slot))) :initial-element (,(append-slot-name lisp-name (car slot)) value))
+	 `(foreign-alloc '(:struct ,(cadadr slot)) :initial-element (,(append-slot-name lisp-name (car slot)) value))
 	 `(,(append-slot-name lisp-name (car slot)) value))))
 
 (defun append-slot-name (lisp-name slot-name)
@@ -314,16 +314,16 @@ the CL-OBjC package.
 		   ((find ,gobjc-name *objc-struct-db* :test #'string-equal :key #'second) ,gobjc-name)
 		   ((find ,private-name *objc-struct-db* :test #'string-equal :key #'second) ,private-name)
 		   (t (error "There is no ObjC struct binded to ~a or ~a" ,gobjc-name ,private-name))))
-	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-struct-name))
-	 (export ',lisp-struct-name)
+	   (objc-cffi::register-struct-name ,gobjc-name ',lisp-name))
+	 (export ',lisp-name)
 	 (cffi:defcstruct ,name-and-options
-	   ,@(parse-slots-for-defcstruct doc-and-slots))
+	   ,@doc-and-slots)
 	 (export ',lisp-name)
      (defstruct ,lisp-name
 	 	,@(parse-struct-doc-and-slots doc-and-slots))
 	;; required for pass-by-value struct
 	(defmethod translate-from-foreign (ptr (type ,cffi-type-name))
-    (with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-struct-name))
+    (with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-name))
       (,(get-struct-make-name lisp-name) ,@(parse-structs-slots-for-translate doc-and-slots))))
 
     ;; FIXME: This may need to be implemented properly to optimize the calls to the generic functions
@@ -333,10 +333,10 @@ the CL-OBjC package.
 
     ;; TODO: Missing translate-into-foreign-memory
 	(defmethod translate-into-foreign-memory (value (type ,cffi-type-name) ptr)
-		(with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-struct-name))
+		(with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-name))
 		(setf ,@(parse-slots-for-translate-into-foreign-memory lisp-name doc-and-slots))))
 	
-	 (export (cffi:foreign-slot-names ',lisp-struct-name))))))
+	 (export (cffi:foreign-slot-names ',lisp-name))))))
 
 (defun objc-struct-slot-value (ptr type slot-name)
   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."

@@ -80,16 +80,17 @@
       (is (equal types (mapcar #'car (mapcar #'ivar-type vars))))
       (is (equal var-names (mapcar #'ivar-name vars))))))
 
+(declaim (optimize (speed 0) (space 0) (debug 3)))
 (test ivars-with-struct-value
   (let* ((random-x (coerce (random 10.0) 'double-float))
 	 (random-y (coerce (random 10.0) 'double-float))
 	 (class-name (temp-class-name))
-	 (ivar (make-ivar "struct" 'struct-cg-point))
+	 (ivar (make-ivar "struct" 'cg-point))
 	 (obj (untyped-objc-msg-send (add-objc-class class-name (objc-get-class "NSObject") (list ivar)) "alloc")))
-    (cffi:with-foreign-object (p '(:struct struct-cg-point))
-      (cffi:with-foreign-slots ((x y) p (:struct struct-cg-point))
+    (cffi:with-foreign-object (p '(:struct cg-point))
+      (cffi:with-foreign-slots ((x y) p (:struct cg-point))
 	(setf x random-x
 	      y random-y)
 	(set-ivar obj "struct" p)
-	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'struct-cg-point 'x) random-x))
-	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'struct-cg-point 'y) random-y))))))
+	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'cg-point 'x) random-x))
+	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'cg-point 'y) random-y))))))
