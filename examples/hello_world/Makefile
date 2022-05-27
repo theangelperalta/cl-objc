@@ -6,6 +6,11 @@ demo-app:
 	$(CL) --load ~/quicklisp/setup.lisp \
 		    --load save.lisp
 
+# demo-app: 
+# 	$(CL)  --dynamic-space-size 4096 --load ~/quicklisp/setup.lisp \
+# 		    --eval "(setf *break-on-signals* 'error)" \
+# 		    --load save.lisp	    
+
 demo-app.iconset: demo-app.svg
 	rm -rf demo-app.iconset
 	mkdir -p demo-app.iconset

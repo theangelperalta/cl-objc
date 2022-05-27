@@ -203,7 +203,7 @@ corresponding number of :int parameters"
 
 (defun append-slot-name (lisp-name slot-name)
 	"Get CFFI type name need for pass-by-value for structs"
-	(intern (concatenate 'string (symbol-name (eval lisp-name)) (concatenate 'string "-" (symbol-name (eval slot-name)))) :cl-objc))
+	(intern (concatenate 'string (symbol-name lisp-name) (concatenate 'string "-" (symbol-name slot-name))) :cl-objc))
 
 
 (defun register-struct-name (objc-name lisp-name)

@@ -126,8 +126,8 @@ to be on the main thread."
 	(:set-title (lisp-string-to-nsstring "Hello"))
 	(:set-target (invoke app delegate))
 	(:set-action (selector :say-hello))
-	;; (:set-sound beep))
-      )
+	(:set-sound beep))
+
 					; setting up bye button
       (invoke (invoke win content-view) :add-subview bye)
       (with-object bye
@@ -135,9 +135,8 @@ to be on the main thread."
 	(:set-action (selector :stop))
 	(:set-enabled 1)
 	(:set-title (lisp-string-to-nsstring "Goodbye!"))
-	;; (:set-sound adios))
-  )
-		  
+	(:set-sound adios))
+
       (invoke win display)
       (invoke win :make-key-and-order-front (cffi:null-pointer))
       (invoke app :set-activation-policy 0)
