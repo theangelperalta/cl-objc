@@ -91,6 +91,6 @@
       (cffi:with-foreign-slots ((x y) p (:struct cg-point))
 	(setf x random-x
 	      y random-y)
-	(set-ivar obj "struct" p)
-	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'cg-point 'x) random-x))
-	(is (= (objc-struct-slot-value (get-ivar obj "struct") 'cg-point 'y) random-y))))))
+	(set-ivar obj "struct" (cffi::convert-from-foreign p '(:struct cg-point)))
+	(is (= (objc-struct-slot-value (get-ivar obj "struct") cg-point x) random-x))
+	(is (= (objc-struct-slot-value (get-ivar obj "struct") cg-point y) random-y))))))

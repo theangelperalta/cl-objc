@@ -792,9 +792,9 @@ ObjectiveC object OBJ"
          (var (find ivar-name (append (class-ivars class) (class-ivars (second (super-classes class)))) :key #'ivar-name :test #'equal))
 	 (type (if (not (listp (car (ivar-type var))))
 		   (car (ivar-type var))
-		   :pointer))
-	 (value-ptr (if (eq (cffi::canonicalize-foreign-type type) :pointer) value (foreign-alloc type :initial-element value))))
-    (object-set-instance-variable obj ivar-name (convert-to-foreign value-ptr type))))
+		   (get-struct-from-objc-name (second (car (ivar-type var))))))
+	 (value-ptr (if (eq (cffi::canonicalize-foreign-type type) :pointer) (convert-to-foreign value type) (foreign-alloc type :initial-element value))))
+    (object-set-instance-variable obj ivar-name value-ptr)))
 
 ;;; Type Translators
 (defmethod translate-from-foreign (id (type objc-object-type))

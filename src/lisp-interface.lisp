@@ -165,7 +165,7 @@ e.g.
      (mapcar
       (lambda (slot-name)
 	`(,(intern (format nil "~a-~a" (car types) slot-name)) (ptr) 
-	   `(objc-struct-slot-value ,ptr ',(car ',types) ',',slot-name)))
+       `(objc-struct-slot-value ,ptr ,(car ',types) ,',slot-name)))
         (cffi:foreign-slot-names `(:struct ,(car `,types))))
      (slet-macrolet-forms (cdr types)))))
 

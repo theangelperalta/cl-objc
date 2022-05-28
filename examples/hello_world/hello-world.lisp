@@ -23,18 +23,25 @@
 (defun lisp-string-to-nsstring (string)
   (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
 
-(defun struct-make-cg-rect (x y w h)
-  (check-type x real)
-  (check-type y real)
-  (check-type w real)
-  (check-type h real)
-  (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x x :y y) :size (cl-objc::make-cg-size :width w :height h)))
-
 (defun make-rect (x y width height)
-  (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x (coerce x 'double-float) :y (coerce y 'double-float)) :size (cl-objc::make-cg-size :width (coerce width 'double-float) :height (coerce height 'double-float))))
+  (destructuring-bind (x y width height)
+      (mapcar (lambda (field) (coerce field 'double-float)) (list x y width height))
+    (slet* ((rect cg-rect)
+            (size cg-size (cg-rect-size rect))
+            (point cg-point (cg-rect-origin rect)))
+           (setf (cg-point-x point) x
+                 (cg-point-y point) y
+                 (cg-size-width size) width
+                 (cg-size-height size) height)
+           rect)))
 
 (defun make-point (x y)
-  (cl-objc::make-cg-point :x (coerce x 'double-float) :y (coerce y 'double-float)))
+  (destructuring-bind (x y)
+      (mapcar (lambda (field) (coerce field 'double-float)) (list x y))
+    (slet* ((point cg-point))
+           (setf (cg-point-x point) x
+                 (cg-point-y point) y)
+           point)))
 
 (defun load-nib (name app)
   ;; find and activate the nib

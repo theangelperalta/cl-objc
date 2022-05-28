@@ -74,15 +74,15 @@ a light struct as input parameter"
 	      (let ((value-with-range (invoke 'ns-value :value-with-range range)))
 		(is (= intval (ns-range-location (invoke value-with-range range-value))))))))
 
-;; (test lisp-big-struct-returning-values 
-;;   "Test with method returning big struct value. Test also passing a
-;; big struct as input parameter"
-;;   (slet* ((rect cg-rect)
-;; 	  (size cg-size (cg-rect-size rect)))
-;;     (let ((floatval (random 4.0)))
-;;       (setf (cg-size-width size) floatval)
-;;       (let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
-;; 	(is (= floatval (cg-size-width (cg-rect-size (invoke value-with-rect rect-value)))))))))
+(test lisp-big-struct-returning-values
+  "Test with method returning big struct value. Test also passing a
+big struct as input parameter"
+  (slet* ((rect cg-rect)
+	  (size cg-size (cg-rect-size rect)))
+    (let ((floatval (coerce (random 4.0) 'double-float)))
+      (setf (cg-size-width size) floatval)
+      (let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
+	(is (= floatval (cg-size-width (cg-rect-size (cffi:convert-from-foreign (invoke value-with-rect rect-value) '(:struct cg-rect))))))))))
 
 (test lisp-adding-instance-method-with-arg
   (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  
@@ -156,17 +156,17 @@ a light struct as input parameter"
 (define-objc-class ns-test-ivar-struct ns-object
     ((point cg-point)))
 
-;; (test lisp-ivar-struct
-;;   (let ((random-x (float (random 10.0)))
-;; 	(random-y (float (random 10.0))))
-;;     (objc-let ((obj 'ns-test-ivar-struct))
-;;       (slet ((p cg-point))
-;; 	(setf (cg-point-x p) random-x
-;; 	      (cg-point-y p) random-y)
-;; 	(with-ivar-accessors ns-test-ivar-struct
-;; 	  (setf (point obj) p)
-;; 	  (is (and (= (objc-struct-slot-value (point obj) 'cg-point 'x) random-x)
-;; 		   (= (objc-struct-slot-value (point obj) 'cg-point 'y) random-y))))))))
+(test lisp-ivar-struct
+  (let ((random-x (float (coerce (random 10.0) 'double-float)))
+	(random-y (float (coerce (random 10.0) 'double-float))))
+    (objc-let ((obj 'ns-test-ivar-struct))
+      (slet ((p cg-point))
+	(setf (cg-point-x p) random-x
+	      (cg-point-y p) random-y)
+	(with-ivar-accessors ns-test-ivar-struct
+	  (setf (point obj) p)
+	  (is (and (= (cg-point-x (point obj)) random-x)
+		   (= (cg-point-y (point obj)) random-y))))))))
 
 (define-objc-method magic-value (:return-type :int) ((self test-super-1))
   1)
@@ -174,6 +174,7 @@ a light struct as input parameter"
 (define-objc-method magic-value (:return-type :int) ((self test-derived-1))
   2)
 
+;; FIXME: Currently sending the message class instead of object during with-super call
 #+(or)(test call-to-super
   (objc-let ((obj 'test-derived-1))
     (is (= 2 (typed-objc-msg-send (obj "magicValue"))))
