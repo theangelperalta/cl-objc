@@ -91,11 +91,11 @@ big struct as input parameter"
 	(y (invoke 'ns-number :number-with-int 2)))
     (is (= (invoke x :lisp-add objc-id y) 3))))
 
-;; (test lisp-adding-instance-method 
-;;   (define-objc-method lisp-double (:return-type :int) ((self ns-number)) 
-;;     (* 2 (untyped-objc-msg-send self "intValue")))
-;;   (let ((x (invoke 'ns-number :number-with-int :int 1)))
-;;     (is (= (invoke x lisp-double) 2))))
+(test lisp-adding-instance-method
+  (define-objc-method lisp-double (:return-type :int) ((self ns-number))
+    (* 2 (untyped-objc-msg-send self "intValue")))
+  (let ((x (invoke 'ns-number :number-with-int :int 1)))
+    (is (= (invoke x lisp-double) 2))))
 
 (test lisp-adding-class-method
   (define-objc-method lisp-magic-number (:return-type :int :class-method t)
