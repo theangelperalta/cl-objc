@@ -28,13 +28,13 @@
   (class objc-class-pointer))
 
 (defcfun ("objc_msgSendSuper" objc-msg-send-super) :pointer
-  (id objc-id)
+  (id objc-super)
   (sel objc-sel)
   &rest)
 
 (defcfun ("objc_msgSendSuper_stret" objc-msg-send-super-stret) :pointer
   (stret :pointer)
-  (id objc-id)
+  (id objc-super)
   (sel objc-sel)
   &rest)
 
@@ -209,10 +209,10 @@ binded to SEL.
 			(objc-class (class-get-class-method ,gid ,gsel))
 			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
             (,gid (if *super-call*
-		      (let ((,super (super-classes ,gid)))
-			(setf (slot-value (first ,super) 'class-ptr) ,gid
-			      ,super (slot-value (second (super-classes ,gid)) 'class-ptr))
-			,super)
+                      (let ((,super (foreign-alloc 'objc-super)))
+                        (setf (foreign-slot-value ,super 'objc-super 'id) ,gid
+                              (foreign-slot-value ,super 'objc-super 'class) (second (super-classes ,gid)))
+                        ,super)
 		      ,gid)))
        (if ,gmethod
            (prog1

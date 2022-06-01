@@ -174,8 +174,7 @@ big struct as input parameter"
 (define-objc-method magic-value (:return-type :int) ((self test-derived-1))
   2)
 
-;; FIXME: Currently sending the message class instead of object during with-super call
-#+(or)(test call-to-super
+(test call-to-super
   (objc-let ((obj 'test-derived-1))
     (is (= 2 (typed-objc-msg-send (obj "magicValue"))))
     (is (= 2 (untyped-objc-msg-send obj "magicValue")))
