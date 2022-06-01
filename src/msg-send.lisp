@@ -28,13 +28,13 @@
   (class objc-class-pointer))
 
 (defcfun ("objc_msgSendSuper" objc-msg-send-super) :pointer
-  (id objc-super)
+  (id (:pointer (:struct objc-super)))
   (sel objc-sel)
   &rest)
 
 (defcfun ("objc_msgSendSuper_stret" objc-msg-send-super-stret) :pointer
   (stret :pointer)
-  (id objc-super)
+  (id (:pointer (:struct objc-super)))
   (sel objc-sel)
   &rest)
 
@@ -66,7 +66,7 @@
   (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
     (cffi::translate-objects gensyms 
 			     (append (list id sel) (odd-positioned-elements args))
-			     (append (list (if superp 'objc-super 'objc-id) 'objc-sel) (even-positioned-elements args))
+			     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
 			     return-type
 			     `,(append
 				     (list 'cffi:foreign-funcall)
@@ -86,7 +86,7 @@
   (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
     (cffi::translate-objects gensyms
 			     (append (list id sel) (odd-positioned-elements args))
-			     (append (list (if superp 'objc-super 'objc-id) 'objc-sel) (even-positioned-elements args))
+			     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
                  :pointer
 			     `,(append
 				     (list 'cffi:foreign-funcall)
@@ -209,9 +209,9 @@ binded to SEL.
 			(objc-class (class-get-class-method ,gid ,gsel))
 			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
             (,gid (if *super-call*
-                      (let ((,super (foreign-alloc 'objc-super)))
-                        (setf (foreign-slot-value ,super 'objc-super 'id) ,gid
-                              (foreign-slot-value ,super 'objc-super 'class) (second (super-classes ,gid)))
+                      (let ((,super (foreign-alloc '(:struct objc-super))))
+                        (setf (foreign-slot-value ,super '(:struct objc-super) 'id) ,gid
+                              (foreign-slot-value ,super '(:struct objc-super) 'class) (second (super-classes ,gid)))
                         ,super)
 		      ,gid)))
        (if ,gmethod
