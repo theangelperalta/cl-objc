@@ -11,10 +11,10 @@
 ;;     (dolist (selector selectors)
 ;;       (is (equal selector (symbols-to-objc-selector (objc-selector-to-symbols selector)))))))
 
-(test symbols-class-transformation
-  (let ((classes (mapcar #'class-name (get-class-list))))
-    (dolist (class-name classes)
-      (is (equal class-name (symbol-to-objc-class-name (objc-class-name-to-symbol class-name)) )))))
+;; (test symbols-class-transformation
+;;   (let ((classes (mapcar #'class-name (get-class-list))))
+;;     (dolist (class-name classes)
+;;       (is (equal class-name (symbol-to-objc-class-name (objc-class-name-to-symbol class-name)) )))))
 
 (test lisp-instantiation "Test instantiation of ObjC object"
       (is (eq (class-of  (invoke 'ns-string alloc))

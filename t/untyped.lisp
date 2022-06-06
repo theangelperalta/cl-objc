@@ -77,5 +77,5 @@ value usign NSNumber#intValue"
 (test untyped-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
   (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 3))
-    (untyped-objc-msg-send (create-new-string "foo") "getCharacters:" buffer)
+    (untyped-objc-msg-send (create-new-string "foo") "getCharacters:range:" buffer (make-range 0 3))
     (is (= (char-code #\f) (cffi:mem-aref buffer :unsigned-short 0)))))

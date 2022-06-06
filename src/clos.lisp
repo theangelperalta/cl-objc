@@ -229,7 +229,13 @@ bindings on OUTPUT-STREAM if provided."
   (dolist (objc-class (get-class-ordered-list))
     ;; Adding Classes
     (when (and (or (not for-framework)
-		   (string-equal for-framework (framework-class (class-name objc-class)))) 
+                   (string-equal for-framework (framework-class (class-name objc-class)))
+                   ;; FIXME: these class can't be found using [framework classNamed:] in Objective-C
+                   ;; should be inside Foundation.framework. But now it's hidden in the runtime for some
+                   ;; reason.
+                   (string-equal "Foundation" for-framework)
+                   #+(or)(string-equal "__NSCFNumber" (class-name objc-class))
+                   #+(or)(string-equal "NSObject" (class-name objc-class)))
 	   (or force
 	       (not (find-class (export-class-symbol objc-class) nil))))
       (add-clos-class objc-class output-stream))

@@ -648,14 +648,13 @@ of CLASS"
 
 (defun get-class-list ()
   "Returns the list of all the public ObjectiveC Class available"
-  (remove-if #'private-class-p
   (let ((class-count (objc-get-class-list (null-pointer) 0)))
     (with-foreign-object (class-ptrs 'objc-class-pointer class-count)
       (objc-get-class-list class-ptrs class-count)
       (loop for class-idx from 0 below class-count
          for class-ptr = (mem-aref class-ptrs 'objc-class-pointer class-idx)
          collect
-           class-ptr)))))
+           class-ptr))))
 
 (defun get-class-ordered-list ()
   "Returns the list of all the ObjectiveC Class available ordered

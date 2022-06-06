@@ -227,10 +227,10 @@ binded to SEL.
             ;; https://github.com/cffi/cffi/issues/290
 		    (if *super-call*
 			(objc-msg-send-super-stret (or ,stret
-						       (foreign-alloc (extract-struct-name ,greturn-type)))
+						       (foreign-alloc `(:struct ,(extract-struct-name ,greturn-type))))
 						   ,gid ,gsel ,@args-and-types)
 			(objc-msg-send-stret (or ,stret
-						 (foreign-alloc (extract-struct-name ,greturn-type)))
+						 (foreign-alloc `(:struct ,(extract-struct-name ,greturn-type))))
                                  ,gid ,gsel ,@args-and-types)))
 
 		   ;; small struct as return value passed by value
