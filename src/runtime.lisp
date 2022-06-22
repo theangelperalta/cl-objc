@@ -8,7 +8,7 @@
   (method_imp objc-method-pointer)
   (types :string))
 
-(defcfun ("class_replaceMethod" class-replace-method) :void 
+(defcfun ("class_replaceMethod" class-replace-method) :pointer
   (class objc-class-pointer)
   (name objc-sel)
   (method_imp objc-method-pointer)
@@ -21,15 +21,11 @@
            (types (foreign-string-alloc types))
            (class-type (if class-method (metaclass class) class)))
 	  (progn
-	  ;; Use replace instead of add
-        (handler-case
-            (unless (class-add-method class-type selector callback types)
-              (progn
-                (format t "Failed to add method: ~A to class: ~A. Attempting to replace method...~%" selector class)
-                (error "Failed to add method: ~A to class: ~A~%" selector class)))
-          (t (c)
-            (unless (class-replace-method class-type selector callback types))
-                (error "Failed to replace method: ~A to class: ~A~%" selector class)))
+        ;; class_replaceMethod - Can be used If the method identified by name does not yet exist,
+        ;; it is added as if class_addMethod were called. The type encoding specified by types is used as given.
+        ;; https://developer.apple.com/documentation/objectivec/1418677-class_replacemethod?language=objc
+        (unless (class-replace-method class-type selector callback types)
+            (error "Failed to add method: ~A to class: ~A~%" selector class))
 	    (class-get-instance-method (metaclass class) selector)))))
 
 (defun parse-argument-list (argument-list)
@@ -94,7 +90,7 @@ Return a new ObjectiveC Method object."
 	   (let ((,new-method
 		  (register-method ,class
 				   ,name
-				   (objc-types:encode-types (append (list ',return-type) ',(mapcar #'remove-typedef type-list)) t)
+				   (objc-types:encode-types (append (list ',return-type) ',type-list) t)
 				   (callback ,callback)
 				   ,class-method)))
 	     (when objc-clos:*automatic-clos-bindings-update*
