@@ -4,7 +4,7 @@ all: mkapp
 
 demo-app: 
 	$(CL) --load ~/quicklisp/setup.lisp \
-		    --eval '(pushnew (truename "~/Documents/dev/cl/cl-objc/") ql:*local-project-directories*)' \
+		    --eval '(pushnew (truename "~/Developer/cl/cl-objc/") ql:*local-project-directories*)' \
 		    --load save.lisp
 
 demo-app.iconset: demo-app.svg

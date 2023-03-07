@@ -54,25 +54,35 @@
    (timer ns-timer)
    (last-time ns-time-interval)))
 
-;; FIXME: (frame cg-rect) the struct is not being translated parsed properly
-(define-objc-method :init-with-frame () ((self circle-view) (frame cg-rect))
+(define-objc-method setup-view (:return-type :void) ((self circle-view))
+  (objc-let ((text-view 'ns-text-view :init-with-frame (make-rect 0 0 100 100) :text-container (with-ivar-accessors circle-view (text-container self))))
+            (format t "setup-view is called!~%")
+            (invoke text-view :set-string (make-nsstring "Here's to the crazy ones, the misfits, the rebels, the troublemakers, the round pegs in the square holes, the ones who see things differently."))
+            (invoke text-view :set-background-color (invoke 'ns-color white-color))
+    (invoke self :add-subview text-view)))
+
+;; FIXME: struct by value issue may be related to stuct type not being passed in the new way
+;; (:struct TYPE) vs. old blind passing
+(declaim (optimize (speed 0) (space 0) (debug 3)))
+(define-objc-method :init-with-frame () ((self circle-view) (frame (:struct cg-rect)))
   (with-super
-    (invoke self :init-with-frame frame))
+      (invoke self :init-with-frame frame))
   (with-ivar-accessors circle-view
-    (setf (objc-struct-slot-value (center self) cg-point x)
-	  (objc-struct-slot-value (objc-struct-slot-value frame cg-rect size) cg-size width)
-	  (objc-struct-slot-value (center self) 'cg-point 'y)
-	  (objc-struct-slot-value (objc-struct-slot-value frame cg-rect size) cg-size height)
-	  (radius self) 115.0
+    ;; Need to center view
+    (setf (radius self) 115.0
 	  (starting-angle self) (* 2 (atan 1))
-	  (angular-velocity self) (* 2 (atan 1))))
-  (objc-let ((text-storage 'ns-text-storage :init-with-string (make-nsstring "Here's to the crazy ones, the misfits, the rebels, the troublemakers, the round pegs in the square holes, the ones who see things differently.")))
-    (objc-letr ((layout-manager 'ns-layout-manager init)
-		(text-container 'ns-text-container init))
-      (invoke layout-manager :add-text-container text-container)
-      (invoke text-storage :add-layout-manager layout-manager)
-      (invoke layout-manager :set-uses-screen-fonts 0)
-      self)))
+          (angular-velocity self) (* 2 (atan 1))
+          (text-storage self) (invoke (invoke 'ns-text-storage alloc) :init-with-string (make-nsstring "Here's to the crazy ones, the misfits, the rebels, the troublemakers, the round pegs in the square holes, the ones who see things differently."))
+          (layout-manager self) (invoke (invoke 'ns-layout-manager alloc) init)
+          (text-container self) (invoke (invoke 'ns-text-container alloc) init))
+      (invoke (layout-manager self) :add-text-container (text-container self))
+      (invoke (text-storage self) :add-layout-manager (layout-manager self))
+    (invoke (layout-manager self) :set-uses-screen-fonts 0)
+    (invoke self setup-view)
+    self))
+
+(define-objc-method :test-frame (:return-type :void) ((self circle-view) (frame (:struct cg-rect)))
+  (format t "TEST - Rect: ~A~%" frame))
 
 ;; (define-objc-method dealloc (:return-type :void) ((self circle-view))
 ;;   (with-ivar-accessors circle-view
@@ -81,48 +91,52 @@
 ;;     (invoke (text-storage self) release)
 ;;     (with-super (invoke self dealloc))))
 
-;; (define-objc-method :draw-rect (:return-type :void) ((self circle-view) (rect ns-rect))
-;;   (declare (ignore rect))
-;;   (invoke (invoke 'ns-color white-color) set)
-;;   (with-ivar-accessors circle-view
-;;     (cl-objc::ns-rect-fill (invoke self bounds))
-;;     (slet* ((glyph-range ns-range (invoke (layout-manager self) :glyph-range-for-text-container (text-container self)))
-;; 	    (used-rect ns-rect (invoke (layout-manager self) :user-rect-for-text-container (text-container self)))
-;; 	    (size ns-size (ns-rect-size used-rect)))
-;;       (loop
-;; 	 for glyph-index = (ns-range-location glyph-range) then (incf glyph-index)
-;; 	 while (< glyph-index (max-range glyph-range))
-;; 	 for context = (invoke 'ns-graphics-context current-context)
-;; 	 for transform = (invoke 'ns-affine-transformation transform)
-;; 	 do
-;; 	   (slet* ((layout-location cg-point (invoke (layout-manager self) :location-for-glyph-at-index glyph-index))
-;; 		   (line-fragment-rect ns-rect (invoke (layout-manager self)
-;; 							:line-fragment-rect-for-glyph-at-index glyph-index
-;; 							:effective-range 0))
-;; 		   (view-location cg-point)
-;; 		   (origin cg-point (ns-rect-origin line-fragment-rect)))
-;; 	     (incf (cg-point-x layout-location) (cg-point-x origin))
-;; 	     (incf (cg-point-y layout-location) (cg-point-y origin))
-;; 	     (let* ((distance (+ (radius self)
-;; 				 (ns-size-height size)
-;; 				 (- (cg-point-y layout-location))))
-;; 		    (angle (+ (starting-angle self)
-;; 			      (/ (cg-point-x layout-location) distance))))
-;; 	       (setf (cg-point-x view-location) (+ (cg-point-x (center self))
-;; 						   (* distance (sin angle)))
-;; 		     (cg-point-y view-location) (+ (cg-point-y (center self))
-;; 						   (* distance (cos angle))))
-;; 	       (invoke transform :translate-x-by (cg-point-x view-location) :y-by (cg-point-y view-location))
-;; 	       (invoke transform :rotate-by-radians (- angle))
-;; 	       (invoke context save-graphics-state)
-;; 	       (invoke transform concat)
-;; 	       (invoke (layout-manager self)
-;; 		       :draw-glyphs-for-glyph-range (make-range glyph-index 1)
-;; 		       :at-point (make-point (- (cg-point-x layout-location)) (- (cg-point-y layout-location))))
-;; 	       (invoke context restore-graphics-state)))))))
+(declaim (optimize (speed 0) (space 0) (debug 3)))
+(define-objc-method :draw-rect (:return-type :void) ((self circle-view) (rect (:struct cg-rect)))
+  (declare (ignore rect))
+  (invoke (invoke 'ns-color white-color) set)
+  (with-ivar-accessors circle-view
+    (cl-objc::ns-rect-fill (invoke self bounds))
+    ;; Varadics msg_snd for with fsbv is not available on cffi
+    #+(or)
+    (slet* ((glyph-range ns-range (invoke (layout-manager self) :glyph-range-for-text-container (text-container self)))
+	    (used-rect cg-rect (invoke (layout-manager self) :used-rect-for-text-container (text-container self)))
+	    (size cg-size (cl-objc::cg-rect-size used-rect)))
+    #+(or)
+      (loop
+	 for glyph-index = (cl-objc::ns-range-location glyph-range) then (incf glyph-index)
+	 while (< glyph-index (max-range glyph-range))
+	 for context = (invoke 'ns-graphics-context current-context)
+	 for transform = (invoke 'ns-affine-transformation transform)
+	 do
+	   (slet* ((layout-location cg-point (invoke (layout-manager self) :location-for-glyph-at-index glyph-index))
+		   (line-fragment-rect ns-rect (invoke (layout-manager self)
+							:line-fragment-rect-for-glyph-at-index glyph-index
+							:effective-range 0))
+		   (view-location cg-point)
+		   (origin cg-point (cg-rect-origin line-fragment-rect)))
+	     (incf (cg-point-x layout-location) (cg-point-x origin))
+	     (incf (cg-point-y layout-location) (cg-point-y origin))
+	     (let* ((distance (+ (radius self)
+				 (ns-size-height size)
+				 (- (cg-point-y layout-location))))
+		    (angle (+ (starting-angle self)
+			      (/ (cg-point-x layout-location) distance))))
+	       (setf (cg-point-x view-location) (+ (cg-point-x (center self))
+						   (* distance (sin angle)))
+		     (cg-point-y view-location) (+ (cg-point-y (center self))
+						   (* distance (cos angle))))
+	       (invoke transform :translate-x-by (cg-point-x view-location) :y-by (cg-point-y view-location))
+	       (invoke transform :rotate-by-radians (- angle))
+	       (invoke context save-graphics-state)
+	       (invoke transform concat)
+	       (invoke (layout-manager self)
+		       :draw-glyphs-for-glyph-range (make-range glyph-index 1)
+		       :at-point (make-point (- (cg-point-x layout-location)) (- (cg-point-y layout-location))))
+	       (invoke context restore-graphics-state)))))))
 
-;; (define-objc-method is-opaque (:return-type :boolean) ((self circle-view))
-;;   t)
+(define-objc-method is-opaque (:return-type :boolean) ((self circle-view))
+  t)
 
 ;; (define-objc-method :mouse-down (:return-type :void) ((self circle-view) (event ns-event))
 ;;   (with-ivar-accessors circle-view
@@ -219,16 +233,16 @@
  (ccl:set-fpu-mode :overflow nil)
  (let ((app (invoke 'ns-application shared-application))
        (nsbundle (invoke 'ns-bundle main-bundle))
-       (circle-view-frame (make-rect 500 500 424 216))
+       (circle-view-frame (make-rect 0 0 424 216))
        (frame (make-rect 500 500 512 512)))
   ;; (load-nib "MainMenu" app)
   ;; (load-nib "MainMenu" app)
 
   ;; Start nsautorelease pool
    (invoke 'ns-autorelease-pool new)
-   (break)
    (objc-let* ((win 'ns-window)
-               (circle-view-instance 'circle-view :init-with-frame circle-view-frame))
+               (circle-view-instance 'circle-view :init-with-frame circle-view-frame)
+               (test-button 'ns-button :init-with-frame circle-view-frame))
 
   (with-object win
 	(:init-with-content-rect frame :style-mask 15 :backing 2 :defer 0)
@@ -237,7 +251,11 @@
 
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
 
+    (invoke circle-view-instance :set-background-color (invoke 'ns-color white-color))
     (invoke (invoke win content-view) :add-subview circle-view-instance)
+    (invoke circle-view-instance :test-frame circle-view-frame)
+    (invoke circle-view-instance setup-view)
+    (break)
 
   (invoke win display)
   (invoke win :make-key-and-order-front (cffi:null-pointer))

@@ -142,7 +142,7 @@ e.g.
 "
   (with-gensyms (greceiver greceiver-orig)
     (destructuring-bind (selector args types-and-args)
-	(parse-invoke-arguments selector-and-args)
+        (parse-invoke-arguments selector-and-args)
       `(let* ((,greceiver-orig ,receiver)
 	      (,greceiver (if (symbolp ,greceiver-orig) 
 			      (objc-get-class (symbol-to-objc-class-name ,greceiver-orig)) 
@@ -227,7 +227,8 @@ installs the new definition discarding the previous one.
 Return a new ObjectiveC Method object."
   (flet ((remove-symbol-with-name (symbol-name list)
 	   (remove symbol-name list :key (lambda (el) (symbol-name (car el))) :test #'string-equal))
-	 (replace-nsclass (arg-def) (if (and (listp arg-def) 
+	 (replace-nsclass (arg-def) (if (and (listp arg-def)
+	 				     (not (listp (second arg-def)))
 					     (not (eq objc-nil-class (objc-get-class (symbol-to-objc-class-name (second arg-def))))))
 					(list (first arg-def) 'objc-id)
 					arg-def)))
@@ -350,7 +351,7 @@ e.g.
      (prog1
 	 (progn
 	   ,@body)
-       ,@(mapcar (lambda (obj) `(invoke ,obj release)) (mapcar #'car bindings)))))
+       ,@(mapcar #'car bindings))))
 
 (defmacro objc-letr* (bindings &body body)
   `(objc-let* ,bindings

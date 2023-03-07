@@ -183,3 +183,5 @@ big struct as input parameter"
       (is (= 1 (typed-objc-msg-send (obj "magicValue"))))
       (is (= 1 (untyped-objc-msg-send obj "magicValue")))
       (is (= 1 (invoke obj magic-value))))))
+
+;; TODO: Add test to make sure struct arguements are passed

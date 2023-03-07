@@ -3,8 +3,8 @@ CL=sbcl
 all: unit-tests
 
 unit-tests:
-	$(CL) --dynamic-space-size 4096 --load ~/quicklisp/setup.lisp --non-interactive \
-		    --eval '(pushnew (truename "~/Documents/dev/cl/cl-objc/") ql:*local-project-directories*)' \
+	$(CL) --dynamic-space-size 8192 --load ~/quicklisp/setup.lisp --non-interactive \
+		    --eval '(pushnew (truename "~/Developer/cl/cl-objc/") ql:*local-project-directories*)' \
 		    --eval '(ql:quickload :cl-objc/test)' \
 		    --eval '(setf fiveam:*on-error* :debug fiveam:*on-failure* :debug)' \
 		    --eval '(setf *debugger-hook* \

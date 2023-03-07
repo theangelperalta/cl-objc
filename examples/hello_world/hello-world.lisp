@@ -87,13 +87,13 @@ to be on the main thread."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
   (let ((app (invoke 'ns-application shared-application))
-	(frame (make-rect 100 100 360 480))
+	(frame (make-rect 100 100 480 360))
 	;; (frame (objc-cffi::cg-make-rect 0.0d0 0.0d0 360.0d0 480.0d0))
 	;; (frame (make-rect 100.0d0 100.0d0 100.0d0 100.0d0))
 	;; (frame (invoke (invoke 'ns-screen main-screen) frame))
 	;; (nsbundle (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner cl-objc::*nsapp* ))
-	(button-rect (make-rect 10 10 80 80))
-	(bye-rect (make-rect 100 10 80 80)))
+	(button-rect (make-rect 10 10 40 40))
+	(bye-rect (make-rect 100 10 40 40)))
 	; Start nsautorelease pool
 	(invoke 'ns-autorelease-pool new)
     (objc-let* ((delegate 'app-delegate init)

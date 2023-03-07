@@ -47,7 +47,7 @@
   "TYPE is the lisp CFFI name. Returns an objc struct definition
 if TYPE names a struct, a primitive type if TYPE names a basic C
 typedef, else TYPE itself."
-  (let ((interned-type (intern (symbol-name type) "CL-OBJC")))
+  (let ((interned-type (if (not (listp type)) (intern (symbol-name type) "CL-OBJC") (second type))))
     (cond
       ((find-struct-definition interned-type))
       ((and (gethash interned-type cffi::*default-type-parsers*)

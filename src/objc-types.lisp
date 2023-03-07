@@ -142,7 +142,7 @@
 
 (defun encode-types (types &optional align)
   "Encode a type list to a method type signature"
-  (let* ((type-definition-types (mapcar #'(lambda (type) (if (not (listp type)) (objc-cffi::remove-typedef type) type)) types))
+  (let* ((type-definition-types (mapcar #'(lambda (type) (objc-cffi::remove-typedef type)) types))
          (encode-types (mapcar (lambda (type) (encode-type type align)) type-definition-types)))
   (if (not align)
       (format nil "~{~A~}" encode-types)

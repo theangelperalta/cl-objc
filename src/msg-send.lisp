@@ -81,13 +81,15 @@
 						   (cddr gensyms))
 					(list (cffi-foreign-type return-type)))
 			       ))))
-
+;; FIXME - Potentially need arguments expanded gensyms evaluated
+;; check big-struct calls to see if the gensyms are parsed away in the new libffi calls
+(declaim (optimize (speed 0) (space 0) (debug 3)))
 (defmacro %objc-msg-send-stret (return-type id sel args &optional superp)
   (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
-    (cffi::translate-objects gensyms
-			     (append (list id sel) (odd-positioned-elements args))
-			     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
-                 :pointer
+    ;; (cffi::translate-objects gensyms
+	;; 		     (append (list id sel) (odd-positioned-elements args))
+	;; 		     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
+    ;;              return-type
 			     `,(append
 				     (list 'cffi:foreign-funcall)
 			       (cond
@@ -98,8 +100,8 @@
 					(interpose (mapcar #'cffi-foreign-type
 							   (even-positioned-elements args))
 						   (cddr gensyms))
-					(list (cffi-foreign-type `(:struct ,return-type))))
-			       ))))
+					(list `(:struct ,return-type)))
+			       )))
 
 (defun cffi-foreign-type (type)
 "Necessary to check for foreign type or struct"
@@ -202,7 +204,7 @@ returned, otherwise a new struct will be allocated.
 If ID is an ObjectiveC class object it will call the class method
 binded to SEL.
 "
-  (with-gensyms (gsel gid gmethod greturn-type super)
+  (with-gensyms (gsel gid gmethod greturn-type gargs-and-types super)
     `(let* ((,gsel ,sel)
             (,gid ,id)
 	    (,gmethod (etypecase ,gid
@@ -225,20 +227,23 @@ binded to SEL.
             ;; this is currently throwing errors during macroexpansion
             ;; https://cffi.common-lisp.dev/manual/cffi-manual.html#defcfun
             ;; https://github.com/cffi/cffi/issues/290
+            ;; FIXME: This -stret shouldn't return a pointer value
+                (let ((rtn-struct (or ,stret
+                                     (foreign-alloc `(:struct ,(extract-struct-name ,greturn-type))))))
+                  (progn
 		    (if *super-call*
-			(objc-msg-send-super-stret (or ,stret
-						       (foreign-alloc `(:struct ,(extract-struct-name ,greturn-type))))
+
+			(objc-msg-send-super-stret rtn-struct
 						   ,gid ,gsel ,@args-and-types)
-			(objc-msg-send-stret (or ,stret
-						 (foreign-alloc `(:struct ,(extract-struct-name ,greturn-type))))
-                                 ,gid ,gsel ,@args-and-types)))
+			(objc-msg-send-stret rtn-struct ,gid ,gsel ,@args-and-types))
+            (convert-from-foreign rtn-struct `(:struct ,(extract-struct-name ,greturn-type))))))
 
 		   ;; small struct as return value passed by value
            ;; FIXME: This is currently generates a custom defcfun like for objc-msg with concrete struct return type
            ;; without, which cast would crash
 		   ((small-struct-type-p ,greturn-type)
-            (eval
-            `(%objc-msg-send-stret ,(extract-struct-name ,greturn-type) ,,gid ,,gsel ,,args-and-types ,,*super-call*)))
+            (cl-objc::objc-msg-send-ns-range ,gid ,gsel ,@args-and-types))
+            ;; (%objc-msg-send-stret ,(extract-struct-name greturn-type) ,gid ,gsel ,args-and-types ,*super-call*))
 
 		   ;; general case
 		   ((member ,greturn-type ',(allowed-simple-return-types))
@@ -270,6 +275,7 @@ binded to SEL.
   (setf *methods-cache* (make-hash-table)
 	*untyped-methods-cache* (make-hash-table)))
 
+(declaim (optimize (speed 0) (space 0) (debug 3)))
 (defun untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to SELECTOR to RECEIVER returning the
 value of the ObjectiveC call with ARGS.
@@ -277,7 +283,7 @@ value of the ObjectiveC call with ARGS.
 This method invokes typed-objc-msg-send calculating the types of
 ARGS at runtime.
 "
- (progn
+  (progn
   (let* ((method (etypecase receiver
 		   (objc-class (class-get-class-method receiver selector))
 		   (objc-object (class-get-instance-method (obj-class receiver) selector)))))
