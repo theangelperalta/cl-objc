@@ -14,3 +14,9 @@ with a call to a class method and one to an instance method"
   (funcall (intern "INT-VALUE" "OBJC") 
 	   (funcall (intern "NUMBER-WITH-INT?" "OBJC") 
 		    (meta (intern "NS-NUMBER" "OBJC")) num)))
+
+(defun make-range (location length)
+  (slet ((range ns-range))
+    (setf (ns-range-location range) location
+	  (ns-range-length range) length)
+    range))

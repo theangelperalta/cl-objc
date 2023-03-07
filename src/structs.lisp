@@ -26,20 +26,28 @@
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)
 
+(defun safeCADDR (signature)
+	(handler-case
+	(car (cdr (cdr signature)))
+	(t (c)
+		nil)))
+
 (defun update-cstruct-database (&key output-stream)
   (setf *objc-struct-db*
 	(remove-duplicates 
 	 (remove-if-not (lambda (type) 
 			  (and (struct-type-p type) 
 			       (not (string-equal (struct-objc-name type) "?")))) 
-			(mapcar #'caddr 
-				(mapcan #'objc-types:parse-objc-typestr 
+			(mapcar #'safeCADDR
+				(mapcan #'objc-types:parse-objc-typestr
 					(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
 	 :test #'string-equal
-	 :key #'second))    
+	 :key #'second))
+	    
   (when output-stream
     (let ((*package* (find-package "CL-OBJC")))
       (format output-stream ";;; BINDINGS FOR NON RUNTIME-INSPECTABLE OBJECT~%;;; THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC\")
+	  ~%~%(progn 
 ~%(dolist (struct-name (list ~{(quote ~s)~%~}))
 ~2t(pushnew struct-name ~s :test #'string-equal :key #'second))~%~%"
 	      *objc-struct-db*
@@ -65,11 +73,11 @@ CFFI, otherwise returns INPUT-TYPE unchanged"
 
 (defun big-struct-type-p (type)
   (and (struct-type-p type)
-       (> (objc-foreign-type-size type) 8)))
+       (> (objc-foreign-type-size type) 16)))
 
 (defun small-struct-type-p (type)
   (and (struct-type-p type)
-       (<= (objc-foreign-type-size type) 8)))
+       (<= (objc-foreign-type-size type) 16)))
 
 (defun pack-struct-arguments-type (arguments-type)
   "Given in input a list of types returns a new list of types
@@ -77,9 +85,7 @@ replacing in arguments-type the big struct types with the
 corresponding number of :int parameters"
   (mapcan (lambda (type) 
 	    (cond 
-	      ((big-struct-type-p type)
-	       (loop for i below (ceiling (objc-foreign-type-size type) (foreign-type-size :int)) collecting :int))
-	      ((small-struct-type-p type) (list (extract-struct-name type)))
+	      ((struct-type-p type) (list (append (list :struct) (list (extract-struct-name type)))))
 	      (t (list type))))
 	  arguments-type))
 
@@ -87,35 +93,118 @@ corresponding number of :int parameters"
   (loop
      for var in arguments
      for type in method-types
-     when (big-struct-type-p type) 
-     nconc (loop 
-	      for index below (ceiling (objc-foreign-type-size type) (foreign-type-size :int))
-	      collect `(mem-aref ,var :int ,index))
-     when (not (big-struct-type-p type) )
+;;      when (big-struct-type-p type) 
+    ;;  nconc (loop 
+	;;       for index below (ceiling (objc-foreign-type-size type) (foreign-type-size :int))
+	;;       collect `(mem-aref ,var :int ,index))
+    ;;  when (not (big-struct-type-p type) )
      nconc (list var)))
 
 (defun parse-objc-struct-name-options (name-and-objc-options)
   "See define-objc-struct"
-  (let (name-and-options objc-name lisp-name)
+  (let (name-and-options objc-name lisp-name lisp-struct-name cffi-type-name)
     (cond
       ((symbolp name-and-objc-options) 
        (setf name-and-options name-and-objc-options
 	     lisp-name name-and-objc-options
+	     lisp-struct-name (get-struct-name name-and-objc-options)
 	     objc-name (symbol-to-objc-class-name name-and-objc-options)))
       ((and (listp name-and-objc-options) (not (stringp (second name-and-objc-options))))
        (setf name-and-options name-and-objc-options
 	     lisp-name (first name-and-objc-options)
+	     lisp-struct-name (get-struct-name (first name-and-objc-options))
 	     objc-name (symbol-to-objc-class-name (car name-and-objc-options))))
       ((and (listp name-and-objc-options) (listp (first name-and-objc-options)) (stringp (second name-and-objc-options)))
        (setf name-and-options (first name-and-objc-options)
 	     lisp-name (caar name-and-objc-options)
-	     objc-name (symbol-to-objc-class-name (second name-and-objc-options))))
+	     lisp-struct-name (get-struct-name  (caar name-and-objc-options))
+		 cffi-type-name (car (last (car name-and-objc-options)))
+	     objc-name (second name-and-objc-options)))
       ((and (listp name-and-objc-options) (stringp (second name-and-objc-options)))
        (setf name-and-options (first name-and-objc-options)
 	     lisp-name (first name-and-objc-options)
+	     lisp-struct-name (get-struct-name (first name-and-objc-options))
 	     objc-name (second name-and-objc-options)))
       (t (error "Bad format name of ObjectiveC struct")))
-    (list name-and-options objc-name lisp-name)))
+	  ;; first value replaces name in the name-and-option with "STRUCT-" appended to it
+	  ;; to allow pass-by-value for structs
+    (list (append (list lisp-name) (cdr name-and-options)) objc-name lisp-name lisp-struct-name cffi-type-name)))
+
+(defun get-struct-name (lisp-name)
+	"Get lisp struct name"
+	(intern (concatenate 'string "STRUCT-" (symbol-name lisp-name))))
+
+(defun get-make-struct-name (lisp-name)
+	"Get lisp struct name"
+	(intern (concatenate 'string "MAKE-" (symbol-name lisp-name)) :cl-objc))
+
+(defun get-cffi-type-name (lisp-name)
+	"Get CFFI type name need for pass-by-value for structs"
+	(intern (concatenate 'string "C-" (symbol-name lisp-name))))
+
+(defun parse-struct-doc-and-slots (doc-and-slots)
+	(loop for slot in doc-and-slots
+	 for transformed-slot = (cond
+	 ((stringp slot)
+	 	slot)
+		 ((and (listp slot) (symbolp (first slot)) (keywordp (second slot)))
+		 ;; Create a mapping to cffi types to cl types
+		 (list (first slot) (convert-foreign-type (second slot))))
+		 ((and (listp slot) (symbolp (first slot)) (listp (second slot)))
+		 (list (first slot) (list (first (second slot)) (cadr (second slot))))))
+	 collect transformed-slot))
+
+(defun convert-foreign-type (type-keyword)
+  "Convert a CFFI type keyword to a ppc-ff-call type."
+  (ecase type-keyword
+    (:char                :signed-byte)
+    (:unsigned-char       :unsigned-byte)
+    (:short               :signed-short)
+    (:unsigned-short      :unsigned-short)
+    (:int                 :signed-fullword)
+    (:unsigned-int        :unsigned-fullword)
+    (:long                :signed-fullword)
+    (:unsigned-long       :unsigned-fullword)
+    (:long-long           :signed-doubleword)
+    (:unsigned-long-long  :unsigned-doubleword)
+    (:float               :single-float)
+    (:double              :double-float)
+    (:pointer             :address)
+    (:void                :void)))
+
+(defmacro parse-slots-for-translate (doc-and-slots)
+	`(loop for slot in ,doc-and-slots
+	 when (not (stringp slot)) 
+	 collect (car slot)))
+
+(defun parse-structs-slots-for-translate (doc-and-slots)
+	(loop for slot in (parse-slots-for-translate doc-and-slots)
+     collect (intern (symbol-name slot) :keyword)
+	 collect slot))
+
+(defun get-struct-make-name (lisp-name)
+	"Get CFFI type name need for pass-by-value for structs"
+	(intern (concatenate 'string "MAKE-" (symbol-name lisp-name))))
+
+(defun parse-slots-for-defcstruct (doc-and-slots)
+	(loop for slot in doc-and-slots
+	 when (not (stringp slot)) 
+	 collect (if (listp (cadr slot))
+	 `(,(car slot) (:struct ,(cadadr slot)))
+	  slot)))
+
+(defun parse-slots-for-translate-into-foreign-memory (lisp-name doc-and-slots)
+	(loop for slot in doc-and-slots
+	 when (not (stringp slot)) 
+	 collect (car slot)
+	 collect (if (listp (cadr slot))
+	 `(foreign-alloc '(:struct ,(cadadr slot)) :initial-element (,(append-slot-name lisp-name (car slot)) value))
+	 `(,(append-slot-name lisp-name (car slot)) value))))
+
+(defun append-slot-name (lisp-name slot-name)
+	"Get CFFI type name need for pass-by-value for structs"
+	(intern (concatenate 'string (symbol-name lisp-name) (concatenate 'string "-" (symbol-name slot-name))) :cl-objc))
+
 
 (defun register-struct-name (objc-name lisp-name)
   (if (assoc objc-name *registered-structs* :test #'equalp)
@@ -125,6 +214,9 @@ corresponding number of :int parameters"
 (defun find-struct-definition (lisp-name)
   (let ((objc-name (car (find lisp-name *registered-structs* :key #'cdr :test #'string-equal))))
     (find objc-name *objc-struct-db* :key #'second :test #'string-equal)))
+
+(defun find-struct-lisp-name (objc-name)
+  (cdr (find objc-name objc-cffi::*registered-structs* :key #'car :test #'string-equal)))
 
 (defun calculate-splayed-args (args)
   (loop 
@@ -218,8 +310,8 @@ error will be raised if the trial fails.
 The name of the struct and of the accessors will be exported in
 the CL-OBjC package.
 "
-  (with-gensyms (private-name gobjc-name)
-    (destructuring-bind (name-and-options objc-name lisp-name)
+  (with-gensyms (private-name gobjc-name glisp-name gdoc-and-slots)
+    (destructuring-bind (name-and-options objc-name lisp-name lisp-struct-name cffi-type-name)
 	(parse-objc-struct-name-options name-and-objc-options)
       `(progn
 	 (let* ((,gobjc-name ,objc-name)
@@ -233,14 +325,44 @@ the CL-OBjC package.
 	 (export ',lisp-name)
 	 (cffi:defcstruct ,name-and-options
 	   ,@doc-and-slots)
+	 (export ',lisp-name)
+     (defstruct ,lisp-name
+	 	,@(parse-struct-doc-and-slots doc-and-slots))
+	;; required for pass-by-value struct
+	(defmethod translate-from-foreign (ptr (type ,cffi-type-name))
+    (with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-name))
+      (,(get-struct-make-name lisp-name) ,@(parse-structs-slots-for-translate doc-and-slots))))
+
+    ;; FIXME: This may need to be implemented properly to optimize the calls to the generic functions
+	;; (defmethod expand-from-foreign (ptr (type ,cffi-type-name))
+  	;;   `(with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ,ptr (:struct ,lisp-name))
+  	;;     (,(get-struct-make-name lisp-name) ,@(parse-structs-slots-for-translate doc-and-slots))))
+
+    ;; TODO: Missing translate-into-foreign-memory
+	(defmethod translate-into-foreign-memory (value (type ,cffi-type-name) ptr)
+		(with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-name))
+		(setf ,@(parse-slots-for-translate-into-foreign-memory lisp-name doc-and-slots))))
+	
 	 (export (cffi:foreign-slot-names ',lisp-name))))))
 
-(defun objc-struct-slot-value (ptr type slot-name)
+(defmacro objc-struct-slot-value (struct type slot-name)
   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."
-  (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name))
+  (let ((access-fun-name (append-slot-name type slot-name)))
+   `(,access-fun-name ,struct)))
 
-(defun set-objc-struct-slot-value (ptr type slot-name newval)
-  (setf (cffi:foreign-slot-value (coerce ptr 'cffi:foreign-pointer) type slot-name) newval))
+
+;; (defun objc-struct-slot-value (struct type slot-name)
+;;   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."
+;;   (eval (construct-objc-struct-slot-value-accessor struct type slot-name)))
+
+;; (defun set-objc-struct-slot-value (ptr type slot-name newval)
+;;   (setf (cffi:foreign-slot-value ptr `(:struct ,type) slot-name) newval))
+
+(defmacro set-objc-struct-slot-value (struct type slot-name newval)
+  (let ((access-fun-name (append-slot-name type slot-name)))
+   `(setf (,access-fun-name ,struct) ,newval)))
+  ;; (setf (cffi:foreign-slot-value (or (coerce ptr 'cffi:foreign-pointer) (cffi:foreign-alloc `(:struct ,type) :initial-contents ptr)) `(:struct ,type) slot-name) newval))
+;;   (setf (cffi:foreign-slot-value  (cffi:foreign-alloc `(:struct ,type) :initial-element ptr) `(:struct ,type) slot-name) newval))
 
 (defsetf objc-struct-slot-value set-objc-struct-slot-value)
 

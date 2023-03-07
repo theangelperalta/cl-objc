@@ -64,18 +64,18 @@ value usign NSNumber#intValue"
       (let ((range (cffi:foreign-alloc 'ns-range))
 	    (intval (mod (random (get-universal-time)) 1000)))
 	(setf (cffi:foreign-slot-value range 'ns-range 'length) intval)
-	(let ((value-with-range (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRange:" range)))
-	  (is (= intval (cffi:foreign-slot-value (untyped-objc-msg-send value-with-range "rangeValue") 'ns-range 'length))))))
+	(let ((value-with-range (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRange:" (cffi:convert-from-foreign range '(:struct ns-range)))))
+	  (is (= intval (cl-objc::ns-range-length (untyped-objc-msg-send value-with-range "rangeValue")))))))
 
 (test untyped-big-struct-returning-values "Test with method returning and passing as input a big struct value"
-      (cffi:with-foreign-object (rect 'ns-rect)
-	(let ((floatval (random 4.0)))
-	  (setf (cffi:foreign-slot-value (cffi:foreign-slot-value rect 'ns-rect 'size) 'ns-size 'width) floatval)
+    (let ((rect (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x (coerce 0 'double-float) :y (coerce 0 'double-float)) :size (cl-objc::make-cg-size :width (coerce 0 'double-float) :height (coerce 0 'double-float)))))
+	(let ((floatval (coerce (random 4.0) 'double-float)))
+	  (setf (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)) floatval)
 	  (let ((value-with-rect (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRect:" rect)))
-	    (is (= floatval (cffi:foreign-slot-value (objc-struct-slot-value (untyped-objc-msg-send value-with-rect "rectValue") 'ns-rect 'size) 'ns-size 'width)))))))
+	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (cffi:convert-from-foreign (typed-objc-msg-send (value-with-rect "rectValue")) '(:struct cg-rect))))))))))
 
 (test untyped-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
   (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 3))
-    (untyped-objc-msg-send (create-new-string "foo") "getCharacters:" buffer)
+    (untyped-objc-msg-send (create-new-string "foo") "getCharacters:range:" buffer (make-range 0 3))
     (is (= (char-code #\f) (cffi:mem-aref buffer :unsigned-short 0)))))

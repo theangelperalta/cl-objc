@@ -44,7 +44,7 @@
 
 ;; What to do with the #\r type qualifier?
 (defun lex-typestr (typestr)
-  (declare (optimize (debug 3)))
+  ;; (declare (optimize (debug 3)))
   (with-input-from-string (s typestr)
     (loop for idx-char = (read-char s nil nil)
        while (not (null idx-char))
@@ -54,6 +54,8 @@
 	 (progn
 	     ; skip the const type qualifier
 	     (when (eql #\r idx-char) (setf idx-char (read-char s nil nil))) 
+       ; skip the _Atomic type specifier
+	     (when (eql #\A idx-char) (setf idx-char (read-char s nil nil)))
 	     (cond ((char-to-methodcode idx-char) (list 'methodcode (char-to-methodcode idx-char)))
 		   ((char-to-type idx-char) (list 'prim-type (char-to-type idx-char)))
 		   ((digit-char-p idx-char) (progn (unread-char idx-char s) (list 'alignment (read-num s))))
@@ -66,7 +68,7 @@
 		   ((eql #\) idx-char) (list 'end-union nil))
 		   ((eql #\} idx-char) (list 'end-struct nil))
 		   ((eql #\] idx-char) (list 'end-array nil))
-		   (t (error "Unknow code char ~c" idx-char)))))))
+		   (t (error "Unknown code char ~c" idx-char)))))))
 
 (defun typestr-lexer (typestr)
   (let ((tokens (lex-typestr typestr)))
@@ -78,7 +80,7 @@
                       (second v)))))))
 
 (defun read-num (stream)
-  (declare (optimize (debug 3)))
+  ;; (declare (optimize (debug 3)))
   (parse-integer
    (with-output-to-string (num)
      (loop for c = (read-char stream nil nil)
@@ -127,7 +129,10 @@
 
 (defun parse-objc-typestr (str)
   "Parse a method type signature"
-  (parse-with-lexer (typestr-lexer str) *objc-type-parser*))
+  (handler-case
+      (parse-with-lexer (typestr-lexer str) *objc-type-parser*)
+  (t (c)
+    (v:debug :objc-types "Failed to parse type string: |~a| : |~a|~%" str c))))
 
 (defun objc-foreign-type-size (type)
   (cond 
@@ -137,7 +142,20 @@
 
 (defun encode-types (types &optional align)
   "Encode a type list to a method type signature"
-  (format nil "~{~A~}" (mapcar (lambda (type) (encode-type type align)) types)))
+  (let* ((type-definition-types (mapcar #'(lambda (type) (objc-cffi::remove-typedef type)) types))
+         (encode-types (mapcar (lambda (type) (encode-type type align)) type-definition-types)))
+  (if (not align)
+      (format nil "~{~A~}" encode-types)
+      (let* ((return-type (first types))
+             (alignment 0)
+             (inputed-types (append (cdr types))))
+        (loop for type in types
+              for inputed-type in inputed-types
+              for remove-typedef-type in (cdr type-definition-types)
+              sum (if (equalp inputed-type :void) 0 (cffi:foreign-type-size inputed-type)) into stack-size
+              collect (encode-type remove-typedef-type alignment) into encoded-types
+              do (setf alignment (+ alignment (if (equalp inputed-type :void) 0 (cffi:foreign-type-size inputed-type))))
+              finally (return (format nil "~a~d~{~A~}" (encode-type return-type) stack-size encoded-types)))))))
 
 (defun lookup-type-char (type)
   (first (find type typemap :key #'second)))
@@ -150,12 +168,12 @@
 ObjectiveC runtime."
   (cond 
     ((and (listp type) (eq :align (car type))) (format nil "~a~d" (encode-type (third type)) (second type)))
-    ((lookup-type-char type) (if align (format nil "~a~d" (lookup-type-char type) 8) (lookup-type-char type)))
+    ((lookup-type-char type) (if align (format nil "~a~d" (lookup-type-char type) align) (lookup-type-char type)))
     ((listp type) 
      (cond 
        ((eq :bitfield (car type)) (format nil "b~d" (second type)))
        ((eq :union (car type)) (format nil "(~a=~{~a~})" (second type) (mapcar #'encode-type (caddr type))))
-       ((eq :struct (car type)) (format nil "{~a=~{~a~}}" (second type) (mapcar #'encode-type (caddr type))))
+       ((eq :struct (car type)) (if (not align) (format nil "{~a=~{~a~}}" (second type) (mapcar #'encode-type (caddr type))) (format nil "{~a=~{~a~}}~d" (second type) (mapcar #'encode-type (caddr type)) align)))
        ((eq :pointer (car type)) (format nil "^~a" (encode-type (cadr type))))
        ((eq :method (car type)) (format nil "~a~{~a~}" (lookup-method-char (second type)) (mapcar #'encode-type (cddr type))))
        ((eq :array (car type)) (format nil "[~d~a]" (second type) (encode-type (third type))))

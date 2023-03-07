@@ -4,18 +4,30 @@
 (in-package :cl-objc)
 
 (compile-framework ("Foundation")
-  (define-objc-struct (ns-range "_NSRange") (location :unsigned-int) (length :unsigned-int))
-  (define-objc-struct (ns-size "_NSSize") (width :float) (height :float))
-  (define-objc-struct (ns-point "_NSPoint") (x :float) (y :float))
-  (define-objc-struct (ns-rect "_NSRect") (origin ns-point) (size ns-size))
+  (define-objc-struct ((ns-range :class c-ns-range) "_NSRange") (location :unsigned-long-long) (length :unsigned-long-long))
+  ;; These "structs" are typealias for the CG structs
+  (define-objc-struct ((cg-size :class c-cg-size) "CGSize") (width :DOUBLE) (height :DOUBLE))
+  (define-objc-struct ((cg-point :class c-cg-point) "CGPoint") (x :DOUBLE) (y :DOUBLE))
+  (define-objc-struct ((cg-rect :class c-cg-rect) "CGRect") (origin (:struct cg-point)) (size (:struct cg-size)))
   (cffi:defctype ns-time-interval :double)
-  (cffi:defcvar ("NSForegroundColorAttributeName" *ns-foreground-color-attribute-name*) ns-rect)
+  (cffi:defcvar ("NSForegroundColorAttributeName" *ns-foreground-color-attribute-name*) (:struct cg-rect))
   (cffi:defcvar ("NSModalPanelRunLoopMode" *ns-modal-panel-run-loop-mode*) objc-id)
-  (cffi:defcvar ("NSEventTrackingRunLoopMode" *ns-event-tracking-run-loop-mode*) objc-id))
+  (cffi:defcvar ("NSEventTrackingRunLoopMode" *ns-event-tracking-run-loop-mode*) objc-id)
+  (cffi:defcfun ("objc_msgSend" objc-msg-send-ns-range) (:struct ns-range)
+    (id objc-id)
+    (sel objc-sel)
+    &rest)
+  (cffi:defcfun ("objc_msgSendSuper" objc-msg-send-super-ns-range) (:struct ns-range)
+    (id (:pointer (:struct objc-super)))
+    (sel objc-sel)
+    &rest))
 
-(compile-framework ("Appkit")
-  (define-objc-function ("NSRectFill" ns-rect-fill) :void
-    (rect ns-rect)) )
+(compile-framework ("AppKit")
+  (define-objc-struct ((cg-size :class c-cg-size) "CGSize") (width :DOUBLE) (height :DOUBLE))
+  (define-objc-struct ((cg-point :class c-cg-point) "CGPoint") (x :DOUBLE) (y :DOUBLE))
+                   (define-objc-struct ((cg-rect :class c-cg-rect) "CGRect") (origin (:struct cg-point)) (size (:struct cg-size)))
+  (cffi:defcfun ("NSRectFill" ns-rect-fill) :void
+    (rect (:struct cg-rect))))
 
 (compile-framework ("Cocoa")
   (cffi:defcfun "NSApplicationMain" :int

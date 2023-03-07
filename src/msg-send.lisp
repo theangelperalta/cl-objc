@@ -23,18 +23,18 @@
   (sel objc-sel)
   &rest)
 
-(defcstruct objc-super 
+(defcstruct objc-super
   (id objc-id)
   (class objc-class-pointer))
 
 (defcfun ("objc_msgSendSuper" objc-msg-send-super) :pointer
-  (id objc-super)
+  (id (:pointer (:struct objc-super)))
   (sel objc-sel)
   &rest)
 
 (defcfun ("objc_msgSendSuper_stret" objc-msg-send-super-stret) :pointer
   (stret :pointer)
-  (id objc-super)
+  (id (:pointer (:struct objc-super)))
   (sel objc-sel)
   &rest)
 
@@ -66,20 +66,49 @@
   (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
     (cffi::translate-objects gensyms 
 			     (append (list id sel) (odd-positioned-elements args))
-			     (append (list (if superp 'objc-super 'objc-id) 'objc-sel) (even-positioned-elements args))
+			     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
 			     return-type
-			     `(cffi-sys:%foreign-funcall 
-			       ,(cond
-				 ((member return-type '(:float :double)) "objc_msgSend_fpret")
-				 (superp "objc_msgSendSuper")
-				 (t "objc_msgSend")) 
-			       ,(append (list :pointer (first gensyms)
+			     `,(append
+				     (list 'cffi:foreign-funcall)
+			       (cond
+				 ((member return-type '(:float :double)) (list "objc_msgSend_fpret"))
+				 (superp (list "objc_msgSendSuper"))
+				 (t (list "objc_msgSend")))
+			       (append (list :pointer (first gensyms)
 					      :pointer (second gensyms))
-					(interpose (mapcar #'cffi::canonicalize-foreign-type 
+					(interpose (mapcar #'cffi-foreign-type 
 							   (even-positioned-elements args))
 						   (cddr gensyms))
-					(list (cffi::canonicalize-foreign-type return-type)))
-			       :library :default :calling-convention :cdecl))))
+					(list (cffi-foreign-type return-type)))
+			       ))))
+;; FIXME - Potentially need arguments expanded gensyms evaluated
+;; check big-struct calls to see if the gensyms are parsed away in the new libffi calls
+(declaim (optimize (speed 0) (space 0) (debug 3)))
+(defmacro %objc-msg-send-stret (return-type id sel args &optional superp)
+  (let ((gensyms (gensym-list (+ 2 (/ (length args) 2)))))
+    ;; (cffi::translate-objects gensyms
+	;; 		     (append (list id sel) (odd-positioned-elements args))
+	;; 		     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
+    ;;              return-type
+			     `,(append
+				     (list 'cffi:foreign-funcall)
+			       (cond
+				 (superp (list "objc_msgSendSuper"))
+				 (t (list "objc_msgSend")))
+			       (append (list :pointer (first gensyms)
+					      :pointer (second gensyms))
+					(interpose (mapcar #'cffi-foreign-type
+							   (even-positioned-elements args))
+						   (cddr gensyms))
+					(list `(:struct ,return-type)))
+			       )))
+
+(defun cffi-foreign-type (type)
+"Necessary to check for foreign type or struct"
+	(cond 
+	((and (listp type) 
+       (eq (car type) :struct)) type)
+	(t (cffi::canonicalize-foreign-type type))))
 
 (defmacro build-objc-msg-send ()
   `(progn
@@ -96,7 +125,7 @@
 
 (defmethod translate-from-foreign (protocol-ptr (type objc-protocol-type))
   (unless (null-pointer-p protocol-ptr)
-    (let* ((name (%objc-msg-send :string protocol-ptr "name" nil))
+    (let* ((name (objc-get-protocol-name protocol-ptr)#+(or) (%objc-msg-send :string protocol-ptr "name" nil))
 	   (new-protocol
 	    (make-instance 'objc-protocol
 			   :id protocol-ptr
@@ -175,52 +204,56 @@ returned, otherwise a new struct will be allocated.
 If ID is an ObjectiveC class object it will call the class method
 binded to SEL.
 "
-  (with-gensyms (gsel gid gmethod greturn-type super)
+  (with-gensyms (gsel gid gmethod greturn-type gargs-and-types super)
     `(let* ((,gsel ,sel)
-	    (,gid ,id)
+            (,gid ,id)
 	    (,gmethod (etypecase ,gid
 			(objc-class (class-get-class-method ,gid ,gsel))
 			(objc-object (class-get-instance-method (obj-class ,gid) ,gsel))))
-	    (,gid (if *super-call*
-		      (let ((,super (foreign-alloc 'objc-super)))
-			(setf (foreign-slot-value ,super 'objc-super 'id) ,gid
-			      (foreign-slot-value ,super 'objc-super 'class) (second (super-classes ,gid)))
-			,super)
+            (,gid (if *super-call*
+                      (let ((,super (foreign-alloc '(:struct objc-super))))
+                        (setf (foreign-slot-value ,super '(:struct objc-super) 'id) ,gid
+                              (foreign-slot-value ,super '(:struct objc-super) 'class) (second (super-classes ,gid)))
+                        ,super)
 		      ,gid)))
        (if ,gmethod
-	   (prog1
-	       (let ((,greturn-type (method-return-type ,gmethod)))
+           (prog1
+               (let ((,greturn-type (method-return-type ,gmethod)))
 		 (cond
-		   ;; big struct passed by value as argument
-		   ((and (some #'big-struct-type-p (method-argument-types ,gmethod)) 
-			 (equal (mapcar #'extract-struct-name (method-argument-types ,gmethod))
-				',(even-positioned-elements args-and-types)))
-		    (untyped-objc-msg-send ,gid ,gsel ,@(odd-positioned-elements args-and-types)))
+           ;; big struct as return value passed by value
+           ((big-struct-type-p ,greturn-type)
+            ;; FIXME: Currently CFFI variadic functions cannot at present accept or return structures by value.
+            ;; Need to implement macro that builds defcfun macro for the specified function
+            ;; this is currently throwing errors during macroexpansion
+            ;; https://cffi.common-lisp.dev/manual/cffi-manual.html#defcfun
+            ;; https://github.com/cffi/cffi/issues/290
+            ;; FIXME: This -stret shouldn't return a pointer value
+                (let ((rtn-struct (or ,stret
+                                     (foreign-alloc `(:struct ,(extract-struct-name ,greturn-type))))))
+                  (progn
+		    (if *super-call*
 
-		   ;; big struct as return value passed by value
-		   ((big-struct-type-p ,greturn-type) 
-		    (if *super-call*
-			(objc-msg-send-super-stret (or ,stret 
-						       (foreign-alloc (extract-struct-name ,greturn-type))) 
+			(objc-msg-send-super-stret rtn-struct
 						   ,gid ,gsel ,@args-and-types)
-			(objc-msg-send-stret (or ,stret 
-						 (foreign-alloc (extract-struct-name ,greturn-type))) 
-					     ,gid ,gsel ,@args-and-types)))
+			(objc-msg-send-stret rtn-struct ,gid ,gsel ,@args-and-types))
+            (convert-from-foreign rtn-struct `(:struct ,(extract-struct-name ,greturn-type))))))
+
 		   ;; small struct as return value passed by value
+           ;; FIXME: This is currently generates a custom defcfun like for objc-msg with concrete struct return type
+           ;; without, which cast would crash
 		   ((small-struct-type-p ,greturn-type)
-		    (if *super-call*
-			(objc-msg-send-super ,gid ,gsel ,@args-and-types)
-			(objc-msg-send ,gid ,gsel ,@args-and-types))) 
+            (cl-objc::objc-msg-send-ns-range ,gid ,gsel ,@args-and-types))
+            ;; (%objc-msg-send-stret ,(extract-struct-name greturn-type) ,gid ,gsel ,args-and-types ,*super-call*))
 
 		   ;; general case
-		   ((member ,greturn-type ',(allowed-simple-return-types)) 
-		    (funcall 
+		   ((member ,greturn-type ',(allowed-simple-return-types))
+		    (funcall
 		     (cache-compile ,gsel ,greturn-type *super-call* ',(even-positioned-elements args-and-types))
 		     ,gid ,@(odd-positioned-elements args-and-types)))
 		   (t (error "Unknown return type ~s" ,greturn-type))))
 	     (when *super-call*
 	       (foreign-free ,gid)))
-	   (error "ObjC method ~a not found" ,gsel)))))
+	   (error "ObjC method ~a not found on class ~a" ,gsel ,gid)))))
 
 (defparameter *untyped-methods-cache* (make-hash-table :test #'equal))
 
@@ -242,6 +275,7 @@ binded to SEL.
   (setf *methods-cache* (make-hash-table)
 	*untyped-methods-cache* (make-hash-table)))
 
+(declaim (optimize (speed 0) (space 0) (debug 3)))
 (defun untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to SELECTOR to RECEIVER returning the
 value of the ObjectiveC call with ARGS.
@@ -249,6 +283,7 @@ value of the ObjectiveC call with ARGS.
 This method invokes typed-objc-msg-send calculating the types of
 ARGS at runtime.
 "
+  (progn
   (let* ((method (etypecase receiver
 		   (objc-class (class-get-class-method receiver selector))
 		   (objc-object (class-get-instance-method (obj-class receiver) selector)))))
@@ -256,7 +291,7 @@ ARGS at runtime.
 	(apply (cache-compile-for-untyped selector method)	receiver args)
 	(error "ObjC method ~a not found for class ~a" selector (class-name (etypecase receiver
 									      (objc-class receiver)
-									      (objc-object (obj-class receiver))))))))
+									      (objc-object (obj-class receiver)))))))))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 
