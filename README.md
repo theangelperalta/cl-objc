@@ -10,6 +10,6 @@ CL-OBJC is a portable common-lisp/objective-c bridge written using CFFI. The aim
 I have one of the three original examples up running. A simple window with buttons that bind to CL methods. The entire application is written in Objective-C no InterfaceBuilder used.
 
 ### Converter
-![example_screenshot](/doc/screenshots/converter.png)
+![example_screenshot](/doc/screenshots/converter.jpg)
 
 One of the orignal macOS app tutorials convert to CL again completely built in Objective-C, no interface builder!
