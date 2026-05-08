@@ -80,6 +80,7 @@ Examples must be started from a Swank server running on the main thread. See eac
 | `(objc-let* ((var class init-msg)) body)` | Alloc/init an ObjC object |
 | `(with-ivar-accessors class body)` | Bind ivar getters/setters in scope |
 | `(with-super (invoke self ...) body)` | Route message to superclass |
+| `(with-objc-exception-handling body)` | Catch ObjC exceptions; signals `objc-exception` instead of crashing |
 
 A reader macro provides Smalltalk-style bracket syntax: `[receiver message: arg]`. Activate it with `(objc-reader:activate-objc-reader-macro)`.
 
@@ -90,7 +91,6 @@ A reader macro provides Smalltalk-style bracket syntax: `[receiver message: arg]
 - Struct field access inside `define-objc-method` bodies must use standalone helper `defun`s (e.g. `rect-size`, `point-x`) rather than `slet*` macrolet accessors, because `defcallback` evaluates its body in a null lexical environment.
 - Struct dispatch uses dynamically compiled `foreign-funcall` wrappers with concrete struct types to bypass CFFI's variadic function limitation ([cffi#290](https://github.com/cffi/cffi/issues/290)). arm64 only.
 - Uses several unexported CFFI internals (`cffi::translate-objects`, `cffi::canonicalize-foreign-type`, etc.) for type introspection and argument marshaling.
-- Exception handling is not implemented (no portable way to catch `SIGTRAP`).
 
 ---
 
