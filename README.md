@@ -65,6 +65,26 @@ Place this repo under your Quicklisp local projects directory (e.g. `~/quicklisp
 
 Examples must be started from a Swank server running on the main thread. See each example's source file for details.
 
+### CLOS bindings
+
+By default, `import-framework` loads only the STATIC bindings (struct layouts, C functions). CLOS classes and generic functions are generated **lazily on demand**:
+
+- `(invoke ...)` works immediately with no CLOS setup — it dispatches directly through the ObjC runtime.
+- `convert-result-from-objc` automatically creates CLOS wrappers for returned objects as they are encountered.
+- To explicitly prepare bindings for a class and all its methods (e.g. for tab-completion):
+
+```lisp
+(ensure-clos-bindings 'ns-string)    ; by Lisp symbol
+(ensure-clos-bindings "NSString")    ; by ObjC class name
+```
+
+- To eagerly generate all CLOS bindings for a framework upfront (old behaviour):
+
+```lisp
+(import-framework "Foundation" t)
+;; or: (setf objc-clos:*automatic-clos-bindings-update* t) before import-framework
+```
+
 ---
 
 ## Key API
@@ -81,6 +101,7 @@ Examples must be started from a Swank server running on the main thread. See eac
 | `(with-ivar-accessors class body)` | Bind ivar getters/setters in scope |
 | `(with-super (invoke self ...) body)` | Route message to superclass |
 | `(with-objc-exception-handling body)` | Catch ObjC exceptions; signals `objc-exception` instead of crashing |
+| `(ensure-clos-bindings 'ns-string)` | Lazily create CLOS class + method GFs for one ObjC class |
 
 A reader macro provides Smalltalk-style bracket syntax: `[receiver message: arg]`. Activate it with `(objc-reader:activate-objc-reader-macro)`.
 

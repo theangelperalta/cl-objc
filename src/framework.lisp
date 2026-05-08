@@ -34,9 +34,14 @@ framework and cons is wheter or not its clos binding are been
 loaded.")
 
 (defmacro import-framework (framework-name &optional clos)
-  "Import the ObjC framework FRAMEWORK-NAME. If CLOS or
-OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true then load also
-the CLOS bindings."
+  "Import the ObjC framework FRAMEWORK-NAME, loading its STATIC bindings
+(struct layouts, C functions, type definitions).
+
+CLOS bindings are now generated lazily on demand via ENSURE-CLOS-BINDINGS
+and ENSURE-CLOS-CLASS rather than loaded from a pre-generated file.
+
+If CLOS or OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true, all CLOS
+bindings for the framework are created eagerly in memory (no file I/O)."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal))
 	    (clos-loaded (cdr framework-loaded-p)))
@@ -52,17 +57,12 @@ the CLOS bindings."
 	 (push (cons ,framework-name nil) *frameworks*))
        (when (and (not clos-loaded)
 		  (or ,clos objc-clos:*automatic-clos-bindings-update*))
-	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'clos))))
-	   (unless (probe-file compiled-file)
-	     (compile-file (framework-bindings-pathname ,framework-name 'clos) :verbose nil :print nil)
-	     (format *trace-output* "~%Compiling CLOS bindings for ~a framework in ~a~%"
-		     ,framework-name
-		     compiled-file))
-	   (load compiled-file))
+	 (format *trace-output* "~%Generating CLOS bindings for ~a framework...~%" ,framework-name)
+	 (objc-clos:update-clos-bindings :for-framework ,framework-name)
 	 (rplacd (assoc ,framework-name *frameworks* :test #'string-equal) t)))
      *frameworks*))
 
-(defmacro compile-framework ((framework-name &key force (clos-bindings t)) &body other-bindings)
+(defmacro compile-framework ((framework-name &key force (clos-bindings nil)) &body other-bindings)
   "Create bindings for FRAMEWORK-NAME. Frameworks will be
 searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*. The bindings
 will not be loaded."

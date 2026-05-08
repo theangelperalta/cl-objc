@@ -75,15 +75,53 @@ setX:Y: becomes set-x?y?"
 	     when (keywordp arg-name) collect (intern (format nil "ARG-~a-~d" (symbol-name arg-name) i)
 						       "OBJC"))))
 
+(defun ensure-clos-class (objc-class)
+  "Lazily ensure a CLOS class exists for OBJC-CLASS, creating its entire
+superclass chain first if needed. Returns the CLOS class symbol."
+  (let ((sym (export-class-symbol objc-class)))
+    (unless (find-class sym nil)
+      (let ((parent (second (super-classes objc-class))))
+        (when parent (ensure-clos-class parent)))
+      (add-clos-class objc-class))
+    sym))
+
+(defun ensure-clos-selector (sel-name)
+  "Lazily ensure a CLOS generic function exists for the ObjC selector
+named SEL-NAME (a string). Returns the generic function symbol."
+  (let* ((selector (sel-get-uid sel-name))
+         (sym (intern (string-upcase (objc-selector-to-clos-symbol selector)) "OBJC")))
+    (unless (fboundp sym)
+      (export sym "OBJC")
+      (closer-mop:ensure-generic-function-using-class
+       nil sym
+       :generic-function-class 'objc-generic-function
+       :lambda-list (compute-lambda-list selector)))
+    sym))
+
+(defun ensure-clos-bindings (class-designator)
+  "Lazily ensure CLOS class and method bindings exist for CLASS-DESIGNATOR.
+CLASS-DESIGNATOR may be an ObjC class name string, a Lisp symbol
+(e.g. 'ns-string), or an objc-class object. Creates the class, its full
+superclass chain, and a generic function for every non-private method."
+  (let ((objc-class
+          (etypecase class-designator
+            (string (objc-get-class class-designator))
+            (symbol (objc-get-class (symbol-to-objc-class-name class-designator)))
+            (t class-designator))))
+    (ensure-clos-class objc-class)
+    (dolist (method (append (get-instance-methods objc-class)
+                             (get-class-methods objc-class)))
+      (unless (private-method-p method)
+        (ensure-clos-selector (sel-name (method-selector method)))))))
+
 (defun convert-result-from-objc (ret)
   "Convert the returned value of an Objc Method to a lisp
 value (CLOS instance or primitive type)"
   (typecase ret
-    (objc-object 
+    (objc-object
      (if (objc-nil-object-p ret)
 	 ret
-	 (let ((new-ret 
-		(make-instance (export-class-symbol (obj-class ret)))))
+	 (let ((new-ret (make-instance (ensure-clos-class (obj-class ret)))))
 	   (setf (objc:objc-id new-ret) ret)
 	   new-ret)))
     (fixnum ret)
