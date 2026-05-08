@@ -32,7 +32,7 @@
   (* currency rate))
 
 (define-objc-class converter-controller ns-window
-  ((converter ns-text-field)
+  ((converter converter)
    (first-currency-field ns-text-field)
    (other-currency-field ns-text-field)
    (rate-field ns-text-field)))
@@ -46,10 +46,6 @@
 	   (amount (invoke (converter self) :convert-currency currency :at-rate rate)))
       (invoke (other-currency-field self) :set-float-value amount)
       (invoke (rate-field self) :select-text self))))
-
-(define-objc-method :view-did-load (:return-type :float)
-    ((self converter-controller) (currency :float) (rate :float))
-  (* currency rate))
 
 (define-objc-method :set-converter (:return-type :void) ((self converter-controller) (converter-obj converter))
   (with-ivar-accessors converter-controller
@@ -108,6 +104,7 @@ to be on the main thread."
     (:set-title (lisp-string-to-nsstring "Convert"))
     ;; NSBezelStyleRounded - 1
     (:set-action (selector :convert))
+    (:set-target win)
     (:set-bezel-style 1)
     )
 

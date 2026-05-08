@@ -71,21 +71,16 @@ CFFI, otherwise returns INPUT-TYPE unchanged"
   (and (listp type) 
        (eq (car type) :struct)))
 
-(defun big-struct-type-p (type)
-  (and (struct-type-p type)
-       (> (objc-foreign-type-size type) 16)))
 
-(defun small-struct-type-p (type)
-  (and (struct-type-p type)
-       (<= (objc-foreign-type-size type) 16)))
 
 (defun pack-struct-arguments-type (arguments-type)
   "Given in input a list of types returns a new list of types
 replacing in arguments-type the big struct types with the
 corresponding number of :int parameters"
-  (mapcan (lambda (type) 
-	    (cond 
+  (mapcan (lambda (type)
+	    (cond
 	      ((struct-type-p type) (list (append (list :struct) (list (extract-struct-name type)))))
+	      ((and (listp type) (eq (car type) :pointer)) (list :pointer))
 	      (t (list type))))
 	  arguments-type))
 
@@ -93,11 +88,6 @@ corresponding number of :int parameters"
   (loop
      for var in arguments
      for type in method-types
-;;      when (big-struct-type-p type) 
-    ;;  nconc (loop 
-	;;       for index below (ceiling (objc-foreign-type-size type) (foreign-type-size :int))
-	;;       collect `(mem-aref ,var :int ,index))
-    ;;  when (not (big-struct-type-p type) )
      nconc (list var)))
 
 (defun parse-objc-struct-name-options (name-and-objc-options)
@@ -218,78 +208,21 @@ corresponding number of :int parameters"
 (defun find-struct-lisp-name (objc-name)
   (cdr (find objc-name objc-cffi::*registered-structs* :key #'car :test #'string-equal)))
 
-(defun calculate-splayed-args (args)
-  (loop 
-     for arg-def in args
-     for name = (symbol-name (first arg-def))
-     for type = (second arg-def)
-     for struct-def = (find-struct-definition type)
-     when (not struct-def) nconc (list arg-def)
-     when  struct-def nconc (loop 
-			       for i below (ceiling (objc-foreign-type-size type) 
-						    (foreign-type-size :int))
-			       for arg = (intern (format nil "~a-~d" name i))
-			       collecting (list arg :int))))
-
 (defmacro define-objc-function (name-and-options return-type &rest doc-and-args)
   "Define an ObjC function. Use it instead of common CFFI:DEFCFUN
 when you have to handle structs by value passing and returning.
 Arguments NAME-AND-OPTIONS RETURN-TYPE and DOC-AND-ARGS are
 passed to CFFI:DEFCFUN. The name of the function will be exported
-in the current package"
-  (let* ((doc-string)
-	 (args (if (stringp (car doc-and-args)) 
-		   (progn
-		     (setf doc-string (car doc-and-args))
-		     (cdr doc-and-args))
-		   doc-and-args))
-	 (has-struct-arg (member-if #'find-struct-definition args :key #'second))
-	 (has-struct-return (find-struct-definition return-type))
-	 (splayed-args (calculate-splayed-args args))
-	 (dereferenced-args (loop 
-			       for arg-def in args
-			       for name = (car arg-def)
-			       for type = (cadr arg-def)
-			       for struct-def = (find-struct-definition type)
-			       when struct-def nconc (loop
-							for i below (ceiling (objc-foreign-type-size type) 
-									 (foreign-type-size :int))
-							collect `(mem-aref ,name :int ,i))
-			       when (not struct-def) nconc (list name)))
-	 (lisp-args (mapcar #'car args)))
-    (multiple-value-bind (lisp-name foreign-name) 
-	(cffi::parse-name-and-options name-and-options)
-      (if has-struct-arg
-	  (let* ((new-name (intern (format nil "SPLAYED-~a" lisp-name)))
-		 (stret (gensym "STRET-"))
-		 (stret-val (gensym))
-		 (new-name-and-options (list foreign-name new-name)))
-	    `(progn
-	       ,(cond
-		 ((not has-struct-return)
-		  `(cffi:defcfun ,new-name-and-options ,return-type ,@splayed-args))
-		 ((small-struct-type-p has-struct-return) 
-		  `(cffi:defcfun ,new-name-and-options :int ,@splayed-args))
-		 ((big-struct-type-p has-struct-return)
-		  `(cffi:defcfun ,new-name-and-options :void (,stret :pointer) ,@splayed-args))
-		 (t (error "Struct nor small neither big?That shouldn't happen")))
-	       (defun ,lisp-name ,lisp-args
-		 ,doc-string
-		 ,(cond
-		   ((not has-struct-return)
-		    `(,new-name ,@dereferenced-args))
-		   ((small-struct-type-p has-struct-return) 
-		    `(let ((,stret-val (cffi:foreign-alloc ,return-type))) 
-		       (setf (mem-ref ,stret-val :int) (,new-name ,@dereferenced-args))
-		       ,stret-val))
-		   ((big-struct-type-p has-struct-return)
-		    `(let ((,stret-val (cffi:foreign-alloc ,return-type)))
-		       (,new-name ,stret-val ,@dereferenced-args)))
-		   (t (error "Struct nor small neither big?That shouldn't happen"))))
-	       (export ',lisp-name)))
-	  `(progn 
-	     (cffi:defcfun ,name-and-options ,return-type ,@doc-and-args)
-	     (export ',lisp-name))))))
+in the current package.
+
+On arm64, CFFI handles struct arguments and return types directly
+via (:struct ...) types in non-variadic defcfun declarations."
+  (multiple-value-bind (lisp-name foreign-name)
+      (cffi::parse-name-and-options name-and-options)
+    (declare (ignore foreign-name))
+    `(progn
+       (cffi:defcfun ,name-and-options ,return-type ,@doc-and-args)
+       (export ',lisp-name))))
 
 (defmacro define-objc-struct (name-and-objc-options &body doc-and-slots)
   "Wrapper for CFFI:DEFCSTRUCT allowing struct to be used as

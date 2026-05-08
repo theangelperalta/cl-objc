@@ -81,6 +81,15 @@
 (defmethod translate-to-foreign (sel (type objc-selector-type))
   sel)
 
+(defmethod translate-into-foreign-memory ((sel objc-selector) (type objc-selector-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value sel 'uid)))
+
+(defmethod translate-into-foreign-memory ((name string) (type objc-selector-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value (sel-register-name name) 'uid)))
+
+(defmethod translate-into-foreign-memory (sel (type objc-selector-type) pointer)
+  (setf (mem-ref pointer :pointer) sel))
+
 ;;; Methods
 
 (defcfun ("sel_isMapped" sel-is-mapped) :boolean
@@ -810,6 +819,14 @@ ObjectiveC object OBJ"
   "Translation of a class object into an objc-object for message
 calling"
   (slot-value class 'class-ptr))
+
+;; translate-into-foreign-memory is needed when cffi-libffi prepares
+;; arguments for foreign-funcall with struct return types.
+(defmethod translate-into-foreign-memory ((obj objc-object) (type objc-object-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value obj 'id)))
+
+(defmethod translate-into-foreign-memory ((class objc-class) (type objc-object-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value class 'class-ptr)))
 
 ;;; Utilities
 (defmethod super-classes ((obj objc-object))

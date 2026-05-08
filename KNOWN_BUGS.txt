@@ -1,14 +1,21 @@
-* Passing structs by value is supported with an ugly hack to overcome
-  the actual limits of CFFI. We splay args in integer values, so it is
-  platform-dependent (only for x86 ABI)
+* Passing structs by value uses dynamically compiled foreign-funcall
+  wrappers with concrete struct types to bypass CFFI's variadic
+  function limitation (cffi#290). Targets arm64 only — x86-64
+  support has been removed.
 
-* Use of not exported symbols of CFFI. As ObjC use a different
-  convention to push arguments for variadic functions (it doesn't do
-  argument promotion), we can't use normal defcfun but we are using
-  internal methods of CFFI. We use not exported symbols also to get
-  info about foreign types.
+* Use of unexported CFFI symbols for type introspection and
+  marshaling (e.g. cffi::*default-type-parsers*, cffi::translate-objects,
+  cffi::canonicalize-foreign-type, cffi::parse-name-and-options,
+  cffi::foreign-typedef, cffi::type-keyword, cffi::actual-type).
+  These are used to resolve typedefs, look up type definitions, and
+  marshal arguments — not for the original variadic workaround,
+  which has been replaced by dynamically compiled foreign-funcall
+  wrappers on arm64.
 
 * Exception management is missing because we don't know how to catch
   SIGTRAP signals in a portable way
 
-* Circle View example doesn't work
+* Struct field access inside define-objc-method must go through
+  helper defuns (e.g. rect-size, point-x) rather than slet*
+  macrolet accessors, because defcallback evaluates its body in a
+  null lexical environment.
