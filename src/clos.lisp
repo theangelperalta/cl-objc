@@ -124,9 +124,12 @@ value (CLOS instance or primitive type)"
     (objc-object
      (if (objc-nil-object-p ret)
 	 ret
-	 (let ((new-ret (make-instance (ensure-clos-class (obj-class ret)))))
-	   (setf (objc:objc-id new-ret) ret)
-	   new-ret)))
+	 ;; Wrap the existing id directly via the :objc-id initarg. Calling
+	 ;; plain make-instance would fire the slot's initform and try to
+	 ;; alloc a fresh ObjC instance, which traps for toll-free-bridged
+	 ;; private classes like __NSCFNumber whose +allocWithZone: is not
+	 ;; implemented.
+	 (make-instance (ensure-clos-class (obj-class ret)) :objc-id ret)))
     (fixnum ret)
     (string ret)
     (otherwise (error "Not yet supported ~s" (class-name (class-of ret))))))
@@ -189,6 +192,7 @@ value (CLOS instance or primitive type)"
 	 (slots (list (list :name 'objc:objc-id
 			    :initform `(invoke ',class-symbol-name alloc)
 			    :initfunction (lambda () (invoke class-symbol-name alloc))
+			    :initargs '(:objc-id)
 			    :readers '(objc:objc-id)
 			    :writers '((setf objc:objc-id)))))
 	 (metaclass-slots (list (list :name 'objc:objc-id
