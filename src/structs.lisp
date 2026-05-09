@@ -26,12 +26,6 @@
 (defvar *objc-struct-db* nil)
 (defvar *registered-structs* nil)
 
-(defun safeCADDR (signature)
-	(handler-case
-	(car (cdr (cdr signature)))
-	(t (c)
-		nil)))
-
 (defun update-cstruct-database (&key output-stream)
   (when output-stream
     (format output-stream ";;; BINDINGS FOR NON RUNTIME-INSPECTABLE OBJECT~%;;; THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC\")~%~%"))
@@ -42,7 +36,10 @@
       (format *trace-output* "~&[update-cstruct-database] scanning ~a classes...~%" (length classes))
       (force-output *trace-output*))
     (dolist (objc-class classes)
-      (dolist (type (mapcar #'safeCADDR
+      ;; The flattened parse-objc-typestr stream interleaves :method
+      ;; keywords and stack-size integers with the type-spec lists, so
+      ;; guard with consp before reaching for the third element.
+      (dolist (type (mapcar (lambda (form) (when (consp form) (third form)))
                             (mapcan #'objc-types:parse-objc-typestr
                                     (mapcar #'method-type-signature
                                             (get-instance-methods objc-class)))))
