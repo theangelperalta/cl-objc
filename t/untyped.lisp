@@ -79,3 +79,42 @@ who should gets the result"
   (cffi:with-foreign-pointer (buffer (* (cffi:foreign-type-size :unsigned-short) 3))
     (untyped-objc-msg-send (create-new-string "foo") "getCharacters:range:" buffer (make-range 0 3))
     (is (= (char-code #\f) (cffi:mem-aref buffer :unsigned-short 0)))))
+
+;; Regression for *untyped-methods-cache* being keyed only on the selector
+;; name. Two classes responding to the same selector with different argument
+;; signatures must each get their own compiled wrapper; otherwise the first
+;; class to be called wins the cache and subsequent calls on the other class
+;; get marshalled through the wrong foreign types.
+(define-objc-class untyped-collide-double ns-object ())
+(define-objc-class untyped-collide-int    ns-object ())
+
+(define-objc-method (:collide)
+    (:return-type :int)
+    ((self untyped-collide-double) (x :double))
+  (declare (ignore self))
+  (round (* x 100)))
+
+(define-objc-method (:collide)
+    (:return-type :int)
+    ((self untyped-collide-int) (x :int))
+  (declare (ignore self))
+  (* x 7))
+
+(test untyped-cache-distinguishes-by-signature
+  "Same selector name, different arg signatures, must not collide in
+*untyped-methods-cache*. Without the (sel-name . type-signature) key, the
+second class's call would reuse the first's wrapper and marshal an integer
+as a double (or vice versa)."
+  (let ((d (invoke (invoke 'untyped-collide-double alloc) init))
+        (i (invoke (invoke 'untyped-collide-int alloc) init)))
+    ;; Prime the cache from each class — order shouldn't matter, but try
+    ;; double-first because that's the case that errored before the fix.
+    (is (= 150 (untyped-objc-msg-send d "collide:" 1.5d0)))
+    (is (=  63 (untyped-objc-msg-send i "collide:" 9)))
+    ;; And then re-call the first to make sure its wrapper still works.
+    (is (= 250 (untyped-objc-msg-send d "collide:" 2.5d0)))
+    ;; Both signatures should now be present as distinct cache entries.
+    (let ((keys (loop for k being the hash-keys of objc-cffi::*untyped-methods-cache*
+                      when (and (consp k) (string= (car k) "collide:"))
+                      collect (cdr k))))
+      (is (= 2 (length (remove-duplicates keys :test #'string=)))))))

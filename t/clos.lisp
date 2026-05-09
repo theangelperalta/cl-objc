@@ -2,6 +2,24 @@
 
 (in-suite :objc-clos)
 
+(test framework-class-lookup
+  "framework-class resolves an ObjC class name to the framework that
+defines it. Foundation classes return \"Foundation\"; runtime-created
+classes (which have no .framework image) return NIL."
+  (is (string-equal "Foundation" (objc-clos::framework-class "NSString")))
+  (is (null (objc-clos::framework-class "NoSuchClassXyz")))
+  (let ((tmp (symbol-name (gensym "TestFw"))))
+    (objc-cffi:add-objc-class tmp (objc-cffi:objc-get-class "NSObject"))
+    (is (null (objc-clos::framework-class tmp)))))
+
+(test framework-class-cache-invalidation
+  "clear-framework-class-cache forces the next lookup to rebuild from
+class_getImageName; results must remain consistent across rebuilds."
+  (objc-clos:clear-framework-class-cache)
+  (is (null objc-clos::*class-framework-cache*))
+  (is (string-equal "Foundation" (objc-clos::framework-class "NSString")))
+  (is (not (null objc-clos::*class-framework-cache*))))
+
 (test class-creation
   (update-clos-bindings)
   (dolist (class-symbol (mapcar #'objc-clos::export-class-symbol (get-class-list)))
