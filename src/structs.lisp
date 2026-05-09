@@ -33,25 +33,32 @@
 		nil)))
 
 (defun update-cstruct-database (&key output-stream)
-  (setf *objc-struct-db*
-	(remove-duplicates 
-	 (remove-if-not (lambda (type) 
-			  (and (struct-type-p type) 
-			       (not (string-equal (struct-objc-name type) "?")))) 
-			(mapcar #'safeCADDR
-				(mapcan #'objc-types:parse-objc-typestr
-					(mapcar #'method-type-signature (mapcan #'get-instance-methods (get-class-list))))))
-	 :test #'string-equal
-	 :key #'second))
-	    
   (when output-stream
-    (let ((*package* (find-package "CL-OBJC")))
-      (format output-stream ";;; BINDINGS FOR NON RUNTIME-INSPECTABLE OBJECT~%;;; THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC\")
-	  ~%~%(progn 
-~%(dolist (struct-name (list ~{(quote ~s)~%~}))
-~2t(pushnew struct-name ~s :test #'string-equal :key #'second))~%~%"
-	      *objc-struct-db*
-	      '*objc-struct-db*))))
+    (format output-stream ";;; BINDINGS FOR NON RUNTIME-INSPECTABLE OBJECT~%;;; THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC\")~%~%"))
+  (let ((seen (make-hash-table :test #'equal))
+        (classes (get-class-list))
+        (struct-count 0))
+    (when objc-clos:*cl-objc-verbose*
+      (format *trace-output* "~&[update-cstruct-database] scanning ~a classes...~%" (length classes))
+      (force-output *trace-output*))
+    (dolist (objc-class classes)
+      (dolist (type (mapcar #'safeCADDR
+                            (mapcan #'objc-types:parse-objc-typestr
+                                    (mapcar #'method-type-signature
+                                            (get-instance-methods objc-class)))))
+        (when (and (struct-type-p type)
+                   (not (string-equal (struct-objc-name type) "?"))
+                   (not (gethash (struct-objc-name type) seen)))
+          (setf (gethash (struct-objc-name type) seen) t)
+          (pushnew type *objc-struct-db* :test #'string-equal :key #'second)
+          (incf struct-count)
+          (when output-stream
+            (let ((*package* (find-package "CL-OBJC")))
+              (format output-stream "(pushnew '~s objc-cffi::*objc-struct-db* :test #'string-equal :key #'second)~%"
+                      type))))))
+    (when objc-clos:*cl-objc-verbose*
+      (format *trace-output* "~&[update-cstruct-database] done — ~a structs~%" struct-count)
+      (force-output *trace-output*))))
 
 (defun canonicalize-objc-struct-name (name)
   (or (cdr (assoc name *registered-structs* :test #'equal)) 

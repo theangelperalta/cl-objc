@@ -11,6 +11,9 @@
   "Set this to t if you want that clos bindings will be updated
   every time you add classes, method or load libraries.")
 
+(defparameter *cl-objc-verbose* nil 
+  "Set to t to enable progress logging for update-clos-bindings and compile-framework.")
+
 (defclass objc-clos-class (standard-class)
   ())
 
@@ -239,22 +242,28 @@ value (CLOS instance or primitive type)"
     (when (fboundp symbol) (fmakunbound symbol))
     (unintern symbol "OBJC")))
 
-(defun framework-class (class-name)
-  "Find the framework short name handling CLASS-NAME"
+(org.tfeb.hax.memoize:def-memoized-function framework-class (class-name)
+  "Find the framework short name for CLASS-NAME via NSBundle lookup. Memoized
+because it is called for every class in the runtime during update-clos-bindings."
   (objc-cffi::load-framework "Foundation")
   (let ((all-frameworks (invoke 'ns-bundle all-frameworks))
 	(class-name-string (invoke (invoke 'ns-string alloc) :init-with-utf8-string class-name)))
-    (loop 
-       for i below (invoke all-frameworks count)
-       for framework = (invoke all-frameworks :object-at-index i)
-       when (and 
-	     (not (objc-nil-object-p framework))
-	     (not (eq objc-nil-class (invoke framework :class-named class-name-string))))
-       do 
-	 (let ((bundle-id (invoke framework bundle-identifier)))
-	   (unless (objc-nil-object-p bundle-id)
-	       (let ((full-name (invoke bundle-id utf8-string)))
-		 (return (car (last (split-string full-name #\.))))))))))
+    (let ((result
+           (loop
+              for i below (invoke all-frameworks count)
+              for framework = (invoke all-frameworks :object-at-index i)
+              when (and
+                    (not (objc-nil-object-p framework))
+                    (not (eq objc-nil-class (invoke framework :class-named class-name-string))))
+              do
+                (let ((bundle-id (invoke framework bundle-identifier)))
+                  (unless (objc-nil-object-p bundle-id)
+                    (let ((full-name (invoke bundle-id utf8-string)))
+                      (return (car (last (split-string full-name #\.)))))))))
+           )
+      (when *cl-objc-verbose*
+        (format *trace-output* "~&  [framework-class] ~a => ~a~%" class-name (or result "nil")))
+      result)))
 
 (defun update-clos-bindings (&key output-stream force for-framework)
   "Generate CLOS classes/generic function for each ObjC
@@ -264,24 +273,44 @@ defined, except if FORCE is set. UPDATE-CLOS-BINDINGS writes the
 bindings on OUTPUT-STREAM if provided."
   (when output-stream
     (format output-stream ";;; CLOS BINDINGS FILE~%;;;THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC-USER\")~%~%"))
-  (dolist (objc-class (get-class-ordered-list))
-    ;; Adding Classes
-    (when (and (or (not for-framework)
-                   (string-equal for-framework (framework-class (class-name objc-class)))
-                   ;; FIXME: these class can't be found using [framework classNamed:] in Objective-C
-                   ;; should be inside Foundation.framework. But now it's hidden in the runtime for some
-                   ;; reason.
-                   (string-equal "Foundation" for-framework)
-                   #+(or)(string-equal "__NSCFNumber" (class-name objc-class))
-                   #+(or)(string-equal "NSObject" (class-name objc-class)))
-	   (or force
-	       (not (find-class (export-class-symbol objc-class) nil))))
-      (add-clos-class objc-class output-stream))
-    ;; Adding Generic Functions for ObjC methods
-    (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
-      (when(and (not (private-method-p method)) 
-		(not (fboundp (export-method-symbol method))))
-       (add-clos-method method objc-class :output-stream output-stream)))))
+  (let* ((all-classes (get-class-ordered-list))
+         (total (length all-classes))
+         (classes-added 0)
+         (methods-added 0)
+         (i 0))
+    (when *cl-objc-verbose*
+      (format *trace-output* "~&[update-clos-bindings] start: ~a classes, for-framework=~a, output-stream=~a~%"
+              total for-framework (if output-stream "yes" "no")))
+    (dolist (objc-class all-classes)
+      (incf i)
+      (when (and *cl-objc-verbose* (zerop (mod i 100)))
+        (format *trace-output* "~&[update-clos-bindings] ~a/~a (~a) classes-added=~a methods-added=~a~%"
+                i total (class-name objc-class) classes-added methods-added)
+        (force-output *trace-output*))
+      ;; Adding Classes
+      (when (and (or (not for-framework)
+                     (string-equal for-framework (framework-class (class-name objc-class)))
+                     ;; FIXME: these class can't be found using [framework classNamed:] in Objective-C
+                     ;; should be inside Foundation.framework. But now it's hidden in the runtime for some
+                     ;; reason.
+                     (string-equal "Foundation" for-framework)
+                     #+(or)(string-equal "__NSCFNumber" (class-name objc-class))
+                     #+(or)(string-equal "NSObject" (class-name objc-class)))
+                 (or force
+                     (not (find-class (export-class-symbol objc-class) nil))))
+        (when *cl-objc-verbose*
+          (format *trace-output* "~&[update-clos-bindings]   adding class ~a~%" (class-name objc-class)))
+        (incf classes-added)
+        (add-clos-class objc-class output-stream))
+      ;; Adding Generic Functions for ObjC methods
+      (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
+        (when (and (not (private-method-p method))
+                   (not (fboundp (export-method-symbol method))))
+          (incf methods-added)
+          (add-clos-method method objc-class :output-stream output-stream))))
+    (when *cl-objc-verbose*
+      (format *trace-output* "~&[update-clos-bindings] done: ~a/~a classes processed, ~a classes added, ~a methods added~%"
+              i total classes-added methods-added))))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 
