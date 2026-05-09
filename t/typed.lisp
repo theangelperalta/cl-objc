@@ -81,7 +81,7 @@ big struct as input parameter"
 	(let ((floatval (coerce (random 4.0) 'double-float)))
 	  (setf (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)) floatval)
 	  (let ((value-with-rect (typed-objc-msg-send ((objc-get-class "NSValue") "valueWithRect:") (:struct cg-rect) rect)))
-	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (cffi:convert-from-foreign (typed-objc-msg-send (value-with-rect "rectValue")) '(:struct cg-rect))))))))))
+	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (typed-objc-msg-send (value-with-rect "rectValue"))))))))))
 
 (test typed-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"

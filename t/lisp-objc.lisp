@@ -82,7 +82,7 @@ big struct as input parameter"
     (let ((floatval (coerce (random 4.0) 'double-float)))
       (setf (cg-size-width size) floatval)
       (let ((value-with-rect (invoke 'ns-value :value-with-rect rect)))
-	(is (= floatval (cg-size-width (cg-rect-size (cffi:convert-from-foreign (invoke value-with-rect rect-value) '(:struct cg-rect))))))))))
+	(is (= floatval (cg-size-width (cg-rect-size (invoke value-with-rect rect-value)))))))))
 
 (test lisp-adding-instance-method-with-arg
   (define-objc-method :lisp-add (:return-type :int) ((self ns-number) (y))  

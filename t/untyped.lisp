@@ -72,7 +72,7 @@ value usign NSNumber#intValue"
 	(let ((floatval (coerce (random 4.0) 'double-float)))
 	  (setf (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)) floatval)
 	  (let ((value-with-rect (untyped-objc-msg-send (objc-get-class "NSValue") "valueWithRect:" rect)))
-	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (cffi:convert-from-foreign (typed-objc-msg-send (value-with-rect "rectValue")) '(:struct cg-rect))))))))))
+	    (is (= floatval (cl-objc::cg-size-width (cl-objc::cg-rect-size (untyped-objc-msg-send value-with-rect "rectValue")))))))))
 
 (test untyped-passing-buffers-to-write "Test passing a buffer as argument
 who should gets the result"
