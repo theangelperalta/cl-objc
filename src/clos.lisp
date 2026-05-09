@@ -242,28 +242,52 @@ value (CLOS instance or primitive type)"
     (when (fboundp symbol) (fmakunbound symbol))
     (unintern symbol "OBJC")))
 
-(org.tfeb.hax.memoize:def-memoized-function framework-class (class-name)
-  "Find the framework short name for CLASS-NAME via NSBundle lookup. Memoized
-because it is called for every class in the runtime during update-clos-bindings."
-  (objc-cffi::load-framework "Foundation")
-  (let ((all-frameworks (invoke 'ns-bundle all-frameworks))
-	(class-name-string (invoke (invoke 'ns-string alloc) :init-with-utf8-string class-name)))
-    (let ((result
-           (loop
-              for i below (invoke all-frameworks count)
-              for framework = (invoke all-frameworks :object-at-index i)
-              when (and
-                    (not (objc-nil-object-p framework))
-                    (not (eq objc-nil-class (invoke framework :class-named class-name-string))))
-              do
-                (let ((bundle-id (invoke framework bundle-identifier)))
-                  (unless (objc-nil-object-p bundle-id)
-                    (let ((full-name (invoke bundle-id utf8-string)))
-                      (return (car (last (split-string full-name #\.)))))))))
-           )
-      (when *cl-objc-verbose*
-        (format *trace-output* "~&  [framework-class] ~a => ~a~%" class-name (or result "nil")))
-      result)))
+(defun extract-framework-name-from-path (path)
+  "Given a dylib path like
+'/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit',
+return 'AppKit'. NIL if PATH is NIL or has no .framework segment
+(e.g. '/usr/lib/libobjc.A.dylib')."
+  (when path
+    (let ((seg (search ".framework/" path)))
+      (when seg
+        (let* ((before (subseq path 0 seg))
+               (slash (position #\/ before :from-end t)))
+          (if slash
+              (subseq before (1+ slash))
+              before))))))
+
+(defvar *class-framework-cache* nil
+  "Hash table mapping ObjC class name (string) to framework short name
+(string). Built lazily on first access by walking class_getImageName once
+for every loaded class, so framework-class is O(1) afterwards. Invalidate
+with clear-framework-class-cache when new classes/frameworks are loaded.")
+
+(defun build-class-framework-cache ()
+  (let* ((classes (get-class-list))
+         (h (make-hash-table :test #'equal)))
+    (when *cl-objc-verbose*
+      (format *trace-output* "~&[framework-class] building cache for ~a classes~%"
+              (length classes))
+      (force-output *trace-output*))
+    (dolist (objc-class classes)
+      (let ((fw (extract-framework-name-from-path
+                 (class-get-image-name objc-class))))
+        (when fw
+          (setf (gethash (class-name objc-class) h) fw))))
+    (setf *class-framework-cache* h)))
+
+(defun clear-framework-class-cache ()
+  "Drop the class→framework cache so the next framework-class call rebuilds
+it. Call after loading a new framework or registering a new class."
+  (setf *class-framework-cache* nil))
+
+(defun framework-class (class-name)
+  "Return the framework short name (e.g. \"AppKit\") that defines the ObjC
+class named CLASS-NAME, or NIL if it isn't part of a framework. Served from
+*class-framework-cache*."
+  (unless *class-framework-cache*
+    (build-class-framework-cache))
+  (gethash class-name *class-framework-cache*))
 
 (defun update-clos-bindings (&key output-stream force for-framework)
   "Generate CLOS classes/generic function for each ObjC

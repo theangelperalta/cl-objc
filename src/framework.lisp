@@ -59,6 +59,7 @@ bindings for the framework are created eagerly in memory (no file I/O)."
 	    (clos-loaded (cdr framework-loaded-p)))
        (unless framework-loaded-p
 	 (load-framework ,framework-name)
+	 (objc-clos:clear-framework-class-cache)
 	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'static))))
 	   (unless (probe-file compiled-file)
 	     (compile-file (framework-bindings-pathname ,framework-name 'static) :verbose nil :print nil)

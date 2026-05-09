@@ -202,6 +202,7 @@ error of type OBJC-CLASS-ALREADY-EXISTS."
 	;;     cache (null-pointer)
 	;;     protocols (null-pointer)))
     (objc-register-class new-class)
+    (objc-clos:clear-framework-class-cache)
     (when objc-clos:*automatic-clos-bindings-update*
       (objc-clos:add-clos-class new-class))
     (objc-get-class class-name)))

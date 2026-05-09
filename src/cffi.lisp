@@ -510,6 +510,12 @@
   "Returns the size of instances of a class."
   (class objc-class-pointer))
 
+(defcfun ("class_getImageName" class-get-image-name) :string
+  "Returns the path of the dylib that defines CLASS (e.g.
+'/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit'),
+or NIL for classes with no image (created dynamically at runtime)."
+  (class objc-class-pointer))
+
 (defcfun ("class_copyMethodList" objc-get-class-method-list) :pointer
   "Describes the instance methods implemented by a class."
   (class objc-class-pointer)
