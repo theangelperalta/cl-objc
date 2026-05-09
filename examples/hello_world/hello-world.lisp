@@ -86,6 +86,7 @@ to be on the main thread."
   (fresh-line))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
+  (with-autorelease-pool ()
   (let ((app (invoke 'ns-application shared-application))
 	(frame (make-rect 100 100 480 360))
 	;; (frame (objc-cffi::cg-make-rect 0.0d0 0.0d0 360.0d0 480.0d0))
@@ -94,8 +95,6 @@ to be on the main thread."
 	;; (nsbundle (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner cl-objc::*nsapp* ))
 	(button-rect (make-rect 10 10 100 40))
 	(bye-rect (make-rect 120 10 100 40)))
-	; Start nsautorelease pool
-	(invoke 'ns-autorelease-pool new)
     (objc-let* ((delegate 'app-delegate init)
 	       (win 'ns-window)
 	       (hel 'ns-button :init-with-frame button-rect)
@@ -148,5 +147,5 @@ to be on the main thread."
       (invoke win :make-key-and-order-front (cffi:null-pointer))
       (invoke app :set-activation-policy 0)
       (invoke app :activate-ignoring-other-apps 1)
-      (invoke app run))))
+      (invoke app run)))))
 	  )

@@ -77,7 +77,8 @@ to be on the main thread."
  #+ccl
  (ccl:set-fpu-mode :overflow nil)
 
-  (let ((app (invoke 'ns-application shared-application)) 
+  (with-autorelease-pool ()
+  (let ((app (invoke 'ns-application shared-application))
   (nsbundle (invoke 'ns-bundle main-bundle))
   (frame (make-rect 500 500 424 216))
   (convertBtnRect (make-rect 293 37 84 32))
@@ -86,9 +87,6 @@ to be on the main thread."
   (resultRect (make-rect 273 113 125 22)))
   ;; (load-nib "MainMenu" app)
   ;; (load-nib "MainMenu" app)
-  
-  ;; Start nsautorelease pool
-	(invoke 'ns-autorelease-pool new)
     (objc-let* ((win 'converter-controller)
               (converter-obj 'converter init)
               (convert-btn 'ns-button :init-with-frame convertBtnRect)
@@ -164,4 +162,4 @@ to be on the main thread."
   (invoke win :make-key-and-order-front (cffi:null-pointer))
   (invoke app :set-activation-policy 0)
   (invoke app :activate-ignoring-other-apps 1)
-  (invoke app run)))))
+  (invoke app run))))))

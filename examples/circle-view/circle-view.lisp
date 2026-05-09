@@ -254,12 +254,10 @@
   (sb-int:set-floating-point-modes :traps nil)
   #+ccl
   (ccl:set-fpu-mode :overflow nil)
+  (with-autorelease-pool ()
   (let ((app (invoke 'ns-application shared-application))
         (circle-view-frame (make-rect 0 0 512 512))
         (frame (make-rect 500 500 512 512)))
-
-    ;; Start nsautorelease pool
-    (invoke 'ns-autorelease-pool new)
     (objc-let* ((win 'ns-window)
                 (circle-view-instance 'circle-view :init-with-frame circle-view-frame))
 
@@ -275,4 +273,4 @@
         (invoke win :make-key-and-order-front (cffi:null-pointer))
         (invoke app :set-activation-policy 0)
         (invoke app :activate-ignoring-other-apps 1)
-        (invoke app run)))))
+        (invoke app run))))))

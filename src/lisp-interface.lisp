@@ -363,10 +363,21 @@ e.g.
 (defmacro with-object (obj &body actions)
   "Calls messages with OBJ as receveir. ACTIONS is a list of
 selector and arguments passed to invoke."
-  `(progn 
+  `(progn
      ,@(mapcar (lambda (action)
 		 `(invoke ,obj ,@action))
 	       actions)))
+
+(defmacro with-autorelease-pool (() &body body)
+  "Allocate an NSAutoreleasePool around BODY and drain it on exit.
+Equivalent to Objective-C's @autoreleasepool { ... } block — any objects
+inside BODY that are autoreleased (directly via -autorelease, or implicitly
+via convenience constructors that return autoreleased instances) get
+released when the form unwinds, including via non-local transfer."
+  (let ((pool (gensym "POOL-")))
+    `(let ((,pool (invoke (invoke 'ns-autorelease-pool alloc) init)))
+       (unwind-protect (progn ,@body)
+         (invoke ,pool drain)))))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 
