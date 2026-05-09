@@ -226,11 +226,17 @@ binded to SEL.
 (defparameter *untyped-methods-cache* (make-hash-table :test #'equal))
 
 (defun cache-compile-for-untyped (sel method)
-  (let ((sel-name (etypecase sel
-		    (objc-selector (sel-name sel))
-		    (string sel))))
-    (or (gethash sel-name *untyped-methods-cache*)
-	(setf (gethash sel-name *untyped-methods-cache*)
+  ;; Key on (sel-name . type-signature) so two classes that share a selector
+  ;; name but have different argument signatures don't collide. Keying on
+  ;; sel-name alone returned a wrapper compiled with the *first* class's
+  ;; argument types, which then marshalled subsequent calls on classes with
+  ;; differently-sized arguments through the wrong foreign types.
+  (let* ((sel-name (etypecase sel
+		     (objc-selector (sel-name sel))
+		     (string sel)))
+         (cache-key (cons sel-name (method-type-signature method))))
+    (or (gethash cache-key *untyped-methods-cache*)
+	(setf (gethash cache-key *untyped-methods-cache*)
 	      (compile nil
 		       (let ((varargs (gensym-list (- (method-get-number-of-arguments method) 2))))
 			 `(lambda ,varargs
