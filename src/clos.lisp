@@ -345,27 +345,32 @@ bindings on OUTPUT-STREAM if provided."
         (format *trace-output* "~&[update-clos-bindings] ~a/~a (~a) classes-added=~a methods-added=~a~%"
                 i total (class-name objc-class) classes-added methods-added)
         (force-output *trace-output*))
-      ;; Adding Classes
-      (when (and (or (not for-framework)
-                     (string-equal for-framework (framework-class (class-name objc-class)))
-                     ;; FIXME: these class can't be found using [framework classNamed:] in Objective-C
-                     ;; should be inside Foundation.framework. But now it's hidden in the runtime for some
-                     ;; reason.
-                     (string-equal "Foundation" for-framework)
-                     #+(or)(string-equal "__NSCFNumber" (class-name objc-class))
-                     #+(or)(string-equal "NSObject" (class-name objc-class)))
-                 (or force
-                     (not (find-class (export-class-symbol objc-class) nil))))
-        (when *cl-objc-verbose*
-          (format *trace-output* "~&[update-clos-bindings]   adding class ~a~%" (class-name objc-class)))
-        (incf classes-added)
-        (add-clos-class objc-class output-stream))
-      ;; Adding Generic Functions for ObjC methods
-      (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
-        (when (and (not (private-method-p method))
-                   (not (fboundp (export-method-symbol method))))
-          (incf methods-added)
-          (add-clos-method method objc-class :output-stream output-stream))))
+      (when (or (not for-framework)
+                (string-equal for-framework (framework-class (class-name objc-class)))
+                ;; Some classes that should belong to Foundation have no
+                ;; .framework image (hidden in the runtime, not findable
+                ;; via [framework classNamed:]). Pull them in too — but
+                ;; only when caller asked for Foundation, not for every
+                ;; class on the system.
+                (and (string-equal "Foundation" for-framework)
+                     (null (framework-class (class-name objc-class)))))
+        ;; Adding Classes
+        (when (or force
+                  (not (find-class (export-class-symbol objc-class) nil)))
+          (when *cl-objc-verbose*
+            (format *trace-output* "~&[update-clos-bindings]   adding class ~a~%" (class-name objc-class)))
+          (incf classes-added)
+          (add-clos-class objc-class output-stream))
+        ;; Adding Generic Functions for ObjC methods. Selectors unique to
+        ;; classes outside FOR-FRAMEWORK are left for lazy creation via
+        ;; OBJC-CLOS::ENSURE-CLOS-SELECTOR — otherwise iterating every class
+        ;; on the system (~26k on macOS) dominates load time even when the
+        ;; class filter has narrowed what we actually want.
+        (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
+          (when (and (not (private-method-p method))
+                     (not (fboundp (export-method-symbol method))))
+            (incf methods-added)
+            (add-clos-method method objc-class :output-stream output-stream)))))
     (when *cl-objc-verbose*
       (format *trace-output* "~&[update-clos-bindings] done: ~a/~a classes processed, ~a classes added, ~a methods added~%"
               i total classes-added methods-added))))

@@ -1,12 +1,12 @@
 (in-package "CL-OBJC-TEST")
 
 (defvar *foundation-clos-loaded-p* nil
-  "Set to T after update-clos-bindings has been run once for Foundation
-in this image. Lets the suite avoid re-traversing the class list per test.")
+  "Set to T after Foundation CLOS bindings have been ensured once in this
+image. Lets the suite avoid re-traversing the class list per test.")
 
 (defun load-foundation-clos-bindings-once ()
   (unless *foundation-clos-loaded-p*
-    (update-clos-bindings :for-framework "Foundation")
+    (objc-cffi:ensure-framework-clos-bindings "Foundation")
     (setf *foundation-clos-loaded-p* t)))
 
 (defun foundation-class-list ()

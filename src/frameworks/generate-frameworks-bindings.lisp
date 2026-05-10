@@ -3,7 +3,7 @@
 
 (in-package :cl-objc)
 
-(compile-framework ("Foundation")
+(compile-framework ("Foundation" :clos-bindings t)
   (define-objc-struct ((ns-range :class c-ns-range) "_NSRange") (location :unsigned-long-long) (length :unsigned-long-long))
   ;; These "structs" are typealias for the CG structs
   (define-objc-struct ((cg-size :class c-cg-size) "CGSize") (width :DOUBLE) (height :DOUBLE))

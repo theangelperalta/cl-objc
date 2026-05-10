@@ -13,4 +13,7 @@
 
 (in-package "CL-OBJC-TEST")
 
-(objc-cffi:import-framework "Foundation" t)
+;; Load Foundation lazily — CLOS bindings for tests that need them are
+;; built on first use via load-foundation-clos-bindings-once in t/clos.lisp.
+;; Tests that go through invoke / typed-objc-msg-send don't need CLOS at all.
+(objc-cffi:import-framework "Foundation")

@@ -45,18 +45,46 @@ Each element is a cons with car eq to the short name of the
 framework and cons is wheter or not its clos binding are been
 loaded.")
 
+(defun ensure-framework-clos-bindings (framework-name)
+  "Make sure CLOS bindings (classes + generic functions) are present in
+the image for FRAMEWORK-NAME. If a precompiled CLOS fasl exists under
+*FRAMEWORK-DIRECTORY*, load it as a fast path; then run
+UPDATE-CLOS-BINDINGS to cover any classes the runtime has added since
+the cache was generated. Idempotent across calls within an image."
+  (let ((entry (assoc framework-name *frameworks* :test #'string-equal)))
+    (when (and entry (cdr entry))
+      (return-from ensure-framework-clos-bindings)))
+  (let* ((clos-source (framework-bindings-pathname framework-name 'clos))
+         (clos-fasl (compile-file-pathname clos-source)))
+    (when (probe-file clos-fasl)
+      (format *trace-output* "~&Loading cached CLOS bindings for ~a from ~a~%"
+              framework-name clos-fasl)
+      (force-output *trace-output*)
+      (handler-case (load clos-fasl)
+        (error (c)
+          (format *trace-output*
+                  "~&Failed to load cached CLOS bindings (~a); falling back to in-memory generation~%"
+                  c)
+          (force-output *trace-output*)))))
+  (format *trace-output* "~&Updating CLOS bindings for ~a framework...~%" framework-name)
+  (force-output *trace-output*)
+  (objc-clos:update-clos-bindings :for-framework framework-name)
+  (let ((entry (assoc framework-name *frameworks* :test #'string-equal)))
+    (if entry
+        (rplacd entry t)
+        (push (cons framework-name t) *frameworks*))))
+
 (defmacro import-framework (framework-name &optional clos)
   "Import the ObjC framework FRAMEWORK-NAME, loading its STATIC bindings
 (struct layouts, C functions, type definitions).
 
-CLOS bindings are now generated lazily on demand via ENSURE-CLOS-BINDINGS
-and ENSURE-CLOS-CLASS rather than loaded from a pre-generated file.
-
-If CLOS or OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true, all CLOS
-bindings for the framework are created eagerly in memory (no file I/O)."
+If CLOS or OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true, CLOS
+bindings are made available via ENSURE-FRAMEWORK-CLOS-BINDINGS, which
+prefers a precompiled CLOS fasl when one is present and otherwise
+generates them in memory. Otherwise CLOS bindings are produced lazily on
+demand via OBJC-CLOS:ENSURE-CLOS-BINDINGS / ENSURE-CLOS-CLASS."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal))
-	    (clos-loaded (cdr framework-loaded-p)))
+     (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal)))
        (unless framework-loaded-p
 	 (load-framework ,framework-name)
 	 (objc-clos:clear-framework-class-cache)
@@ -68,11 +96,8 @@ bindings for the framework are created eagerly in memory (no file I/O)."
 		     compiled-file))
 	   (load compiled-file))
 	 (push (cons ,framework-name nil) *frameworks*))
-       (when (and (not clos-loaded)
-		  (or ,clos objc-clos:*automatic-clos-bindings-update*))
-	 (format *trace-output* "~%Generating CLOS bindings for ~a framework...~%" ,framework-name)
-	 (objc-clos:update-clos-bindings :for-framework ,framework-name)
-	 (rplacd (assoc ,framework-name *frameworks* :test #'string-equal) t)))
+       (when (or ,clos objc-clos:*automatic-clos-bindings-update*)
+	 (ensure-framework-clos-bindings ,framework-name)))
      *frameworks*))
 
 (defmacro compile-framework ((framework-name &key force (clos-bindings nil)) &body other-bindings)
