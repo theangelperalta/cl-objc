@@ -336,15 +336,15 @@
       nil))
 
 (defmethod translate-to-foreign ((var-list list) (type objc-ivar-list-type))
-  (let ((ret (foreign-alloc 'objc-ivar-list-cstruct))
+  (let ((ret (foreign-alloc '(:struct objc-ivar-list-cstruct)))
 	(length (length var-list)))
-    (setf (foreign-slot-value ret 'objc-ivar-list-cstruct 'ivar_count) length
-	  (foreign-slot-value ret 'objc-ivar-list-cstruct 'ivar_list) (foreign-alloc 'objc-ivar-cstruct :count length))
-    (loop 
+    (setf (foreign-slot-value ret '(:struct objc-ivar-list-cstruct) 'ivar_count) length
+	  (foreign-slot-value ret '(:struct objc-ivar-list-cstruct) 'ivar_list) (foreign-alloc '(:struct objc-ivar-cstruct) :count length))
+    (loop
        for ivar-idx below length
-       for ivar-ptr = (foreign-slot-pointer ret 'objc-ivar-list-cstruct 'ivar_list) then (inc-pointer ivar-ptr (foreign-type-size 'objc-ivar-cstruct))
+       for ivar-ptr = (foreign-slot-pointer ret '(:struct objc-ivar-list-cstruct) 'ivar_list) then (inc-pointer ivar-ptr (foreign-type-size '(:struct objc-ivar-cstruct)))
        for var in var-list
-       do (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar-cstruct)
+       do (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr (:struct objc-ivar-cstruct))
 	    (setf ivar_name (ivar-name var)
 		  ivar_type (objc-types:encode-types (ivar-type var))
 		  ivar_offset (ivar-offset var))))
@@ -352,7 +352,7 @@
 
 (defmethod free-translated-object (method-list-ptr (type objc-ivar-list-type) param)
   (declare (ignore param))
-  (foreign-free (foreign-slot-value method-list-ptr 'objc-ivar-list-cstruct 'ivar_list))
+  (foreign-free (foreign-slot-value method-list-ptr '(:struct objc-ivar-list-cstruct) 'ivar_list))
   (foreign-free method-list-ptr))
 
 ;;; utilities
@@ -580,7 +580,7 @@ of CLASS"
       (handler-case
           (or (gethash (objc-get-class-name class-ptr) *objc-classes*)
               (with-foreign-slots ((isa)
-				 class-ptr objc-class-cstruct)
+				 class-ptr (:struct objc-class-cstruct))
 	    (let* ((super_class (objc-get-class-superclass class-ptr))
                 (name (objc-get-class-name class-ptr))
                 (new-isa (objc-get-meta-class-ptr name))
@@ -625,12 +625,12 @@ of CLASS"
   (slot-value (objc-get-class class-name) 'class-ptr))
 
 (defmethod translate-from-foreign (protocol-list-ptr (type objc-protocol-list-type))
-  (loop 
-     for ptr = protocol-list-ptr then (foreign-slot-value ptr 'objc-protocol-list-cstruct 'next)
+  (loop
+     for ptr = protocol-list-ptr then (foreign-slot-value ptr '(:struct objc-protocol-list-cstruct) 'next)
      until (null-pointer-p ptr)
-     nconc (loop 
-	      for idx below (foreign-slot-value ptr 'objc-protocol-list-cstruct 'count) 
-	      for protocol-ptr = (foreign-slot-pointer ptr 'objc-protocol-list-cstruct 'protocols) then (inc-pointer protocol-ptr (foreign-type-size 'objc-object-cstruct))
+     nconc (loop
+	      for idx below (foreign-slot-value ptr '(:struct objc-protocol-list-cstruct) 'count)
+	      for protocol-ptr = (foreign-slot-pointer ptr '(:struct objc-protocol-list-cstruct) 'protocols) then (inc-pointer protocol-ptr (foreign-type-size '(:struct objc-object-cstruct)))
 	      for protocol = (mem-ref protocol-ptr 'objc-protocol-pointer)
 	      collecting protocol)))
 

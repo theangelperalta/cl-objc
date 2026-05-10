@@ -93,16 +93,16 @@
 	    (slot-value new-protocol 'instance-methods)
 	    (unless (null-pointer-p instance-methods)
 	      (loop
-		 for idx below (foreign-slot-value instance-methods 'objc-method-description-list 'count)
-		 for method-desc-ptr = (foreign-slot-pointer instance-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
-		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name)))
+		 for idx below (foreign-slot-value instance-methods '(:struct objc-method-description-list) 'count)
+		 for method-desc-ptr = (foreign-slot-pointer instance-methods '(:struct objc-method-description-list) 'list) then (inc-pointer method-desc-ptr (foreign-type-size '(:struct objc-method-description)))
+		 collecting (foreign-slot-value method-desc-ptr '(:struct objc-method-description) 'name)))
 
 	    (slot-value new-protocol 'class-methods)
 	    (unless (null-pointer-p class-methods)
 	      (loop
-		 for idx below (foreign-slot-value class-methods 'objc-method-description-list 'count)
-		 for method-desc-ptr = (foreign-slot-pointer class-methods 'objc-method-description-list 'list) then (inc-pointer method-desc-ptr (foreign-type-size 'objc-method-description))
-		 collecting (foreign-slot-value method-desc-ptr 'objc-method-description 'name))))
+		 for idx below (foreign-slot-value class-methods '(:struct objc-method-description-list) 'count)
+		 for method-desc-ptr = (foreign-slot-pointer class-methods '(:struct objc-method-description-list) 'list) then (inc-pointer method-desc-ptr (foreign-type-size '(:struct objc-method-description)))
+		 collecting (foreign-slot-value method-desc-ptr '(:struct objc-method-description) 'name))))
       new-protocol)))
 
 (defun method-return-type (method)

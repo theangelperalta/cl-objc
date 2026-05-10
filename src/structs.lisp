@@ -280,7 +280,7 @@ the CL-OBjC package.
 		(with-foreign-slots (,(parse-slots-for-translate doc-and-slots) ptr (:struct ,lisp-name))
 		(setf ,@(parse-slots-for-translate-into-foreign-memory lisp-name doc-and-slots))))
 	
-	 (export (cffi:foreign-slot-names ',lisp-name))))))
+	 (export (cffi:foreign-slot-names '(:struct ,lisp-name)))))))
 
 (defmacro objc-struct-slot-value (struct type slot-name)
   "Return the value of SLOT-NAME in the ObjC Structure TYPE at PTR."

@@ -222,7 +222,7 @@ exists it just returns without adding the new class definition"
 
 (defun make-ivar (name type)
   "Returns a new instance variable object named NAME of TYPE"
-  (let ((ret (foreign-alloc 'objc-ivar-cstruct))
+  (let ((ret (foreign-alloc '(:struct objc-ivar-cstruct)))
 	(type (remove-typedef type)))
 	;; TODO: Create objc-ivar-struct with size and no ptr
 	(make-instance 'objc-ivar
