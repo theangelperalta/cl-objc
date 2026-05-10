@@ -18,7 +18,15 @@
   ())
 
 (defclass objc-generic-function (standard-generic-function)
-  ((df :accessor df :initform nil))
+  ((df :accessor df :initform nil)
+   (class-cache :accessor class-cache
+                :initform (make-hash-table :test #'eq)
+                :documentation "Per-receiver-class hash of fully-typed
+objc_msgSend wrappers. On the first dispatch of this GF for a given
+receiver class, the method is looked up once and cache-compile produces
+a wrapper with both argument and return types baked in; subsequent
+dispatches just hash-lookup by class and apply, with no further CFFI
+method lookup or type-signature walk."))
   (:metaclass closer-mop:funcallable-standard-class))
 
 (defmethod closer-mop:validate-superclass
@@ -134,26 +142,48 @@ value (CLOS instance or primitive type)"
     (string ret)
     (otherwise (error "Not yet supported ~s" (class-name (class-of ret))))))
 
+(defun compile-msg-send-wrapper-for-method (sel-name method)
+  "Build a fully-typed objc_msgSend wrapper for METHOD: cache-compile
+chooses between the simple-return and struct-return paths and bakes
+both the argument types and the return type into a foreign-funcall, so
+the resulting function does no further CFFI method lookups when called."
+  (let* ((return-type (objc-cffi::method-return-type method))
+         (arg-types (objc-cffi::pack-struct-arguments-type
+                     (objc-cffi::method-argument-types method))))
+    (cond
+      ((objc-cffi::struct-type-p return-type)
+       (objc-cffi::cache-compile-struct-msg-send sel-name return-type nil arg-types))
+      (t
+       (objc-cffi::cache-compile sel-name return-type nil arg-types)))))
+
 (defmethod closer-mop:compute-discriminating-function ((gf objc-generic-function))
-  (let* ((gf-name (closer-mop:generic-function-name gf))
-	 (sel-name (clos-symbol-to-objc-selector gf-name))
-	 (selector (sel-get-uid sel-name))
-	 (lambda-list (compute-lambda-list selector)))
-    (or (df gf)
-	(lambda (&rest args)
-	  (flet ((dfun (&rest args) 
-		   (apply 
-		    (eval `(lambda ,lambda-list
-			     (let ((id (objc:objc-id objc:receiver)))
-			       (convert-result-from-objc 
-				(untyped-objc-msg-send id 
-						       ,sel-name 
-						       ,@(remove '&optional 
-								 (cdr lambda-list)))))))
-		    args)))
-	    (closer-mop:set-funcallable-instance-function gf #'dfun)
-	    (setf (df gf) #'dfun)
-	    (apply #'dfun args))))))
+  (or (df gf)
+      (let* ((gf-name (closer-mop:generic-function-name gf))
+             (sel-name (clos-symbol-to-objc-selector gf-name))
+             (selector (sel-get-uid sel-name))
+             (cache (class-cache gf)))
+        (labels ((dispatch (receiver &rest args)
+                   (let* ((id (objc:objc-id receiver))
+                          (class-key (etypecase id
+                                       (objc-cffi::objc-class id)
+                                       (objc-cffi:objc-object (objc-cffi:obj-class id))))
+                          (wrapper (gethash class-key cache)))
+                     (unless wrapper
+                       (let ((method (etypecase id
+                                       (objc-cffi::objc-class
+                                        (objc-cffi:class-get-class-method id selector))
+                                       (objc-cffi:objc-object
+                                        (objc-cffi:class-get-instance-method
+                                         (objc-cffi:obj-class id) selector)))))
+                         (unless method
+                           (error "ObjC method ~a not found on class ~a"
+                                  sel-name (objc-cffi:class-name class-key)))
+                         (setf wrapper (compile-msg-send-wrapper-for-method sel-name method)
+                               (gethash class-key cache) wrapper)))
+                     (convert-result-from-objc (apply wrapper id args)))))
+          (setf (df gf) #'dispatch)
+          (closer-mop:set-funcallable-instance-function gf #'dispatch)
+          #'dispatch))))
 
 
 (defun add-clos-method (objc-method objc-class &key output-stream class-method)
