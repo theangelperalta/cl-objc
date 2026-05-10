@@ -87,9 +87,8 @@
 				     (:file "runtime" :depends-on ("suite"))
 				     (:file "lisp-objc" :depends-on ("suite" "utils"))
                          (:file "clos" :depends-on ("suite")))))
-  :depends-on (:cl-objc :fiveam))
+  :depends-on (:cl-objc :rove))
 
 ;;; some extension in order to do (asdf:oos 'asdf:test-op 'cl-objc)
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system 'cl-objc))))
-  (funcall (intern (string :run!) (string :it.bese.FiveAM))
-           :cl-objc))
+  (uiop:symbol-call :rove :run :cl-objc/test))
