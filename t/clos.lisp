@@ -2,6 +2,21 @@
 
 (in-suite :objc-clos)
 
+(defvar *foundation-clos-loaded-p* nil
+  "Set to T after update-clos-bindings has been run once for Foundation
+in this image. Lets the suite avoid re-traversing the class list per test.")
+
+(defun load-foundation-clos-bindings-once ()
+  (unless *foundation-clos-loaded-p*
+    (update-clos-bindings :for-framework "Foundation")
+    (setf *foundation-clos-loaded-p* t)))
+
+(defun foundation-class-list ()
+  (remove-if-not (lambda (c)
+                   (string-equal "Foundation"
+                                 (objc-clos::framework-class (class-name c))))
+                 (get-class-list)))
+
 (test framework-class-lookup
   "framework-class resolves an ObjC class name to the framework that
 defines it. Foundation classes return \"Foundation\"; runtime-created
@@ -21,19 +36,20 @@ class_getImageName; results must remain consistent across rebuilds."
   (is (not (null objc-clos::*class-framework-cache*))))
 
 (test class-creation
-  (update-clos-bindings)
-  (dolist (class-symbol (mapcar #'objc-clos::export-class-symbol (get-class-list)))
-    (is (find-class class-symbol t)))
+  (load-foundation-clos-bindings-once)
+  (let ((classes (foundation-class-list)))
+    (dolist (class-symbol (mapcar #'objc-clos::export-class-symbol classes))
+      (is (find-class class-symbol t)))
 
-  (dolist (class-symbol
-	    (composite-mapcar (get-class-list) 
-			      #'class-name 
-			      #'objc-class-name-to-symbol 
-			      #'objc-clos::metaclass-name))
-    (is (find-class class-symbol t))))
+    (dolist (class-symbol
+              (composite-mapcar classes
+                                #'class-name
+                                #'objc-class-name-to-symbol
+                                #'objc-clos::metaclass-name))
+      (is (find-class class-symbol t)))))
 
 (test instance-creation
-  (update-clos-bindings)
+  (load-foundation-clos-bindings-once)
   (let* ((n (make-instance (intern "NS-NUMBER" "OBJC")))
 	 (id (objc:objc-id n)))
     (is (string-equal
@@ -41,12 +57,12 @@ class_getImageName; results must remain consistent across rebuilds."
 	 (class-name (objc-cffi:obj-class id))))))
 
 (test simple-method-invocation
-  (update-clos-bindings)
+  (load-foundation-clos-bindings-once)
   (let ((n (make-instance (intern "NS-NUMBER" "OBJC")))
 	(num 10))
     (is (= (funcall (intern "INT-VALUE" "OBJC") (funcall (intern "INIT-WITH-INT?" "OBJC") n num))))))
 
 (test simple-class-method-invocation
-  (update-clos-bindings)
+  (load-foundation-clos-bindings-once)
   (let* ((num 10))
     (is (= (create-ns-number num) num))))
