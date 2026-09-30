@@ -6,9 +6,6 @@
 
 (import-framework "Cocoa")
 
-(defun lisp-string-to-nsstring (string)
-  (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
-
 (defun make-rect (x y width height)
   (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x (coerce x 'double-float) :y (coerce y 'double-float)) :size (cl-objc::make-cg-size :width (coerce width 'double-float) :height (coerce height 'double-float))))
 
