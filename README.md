@@ -158,4 +158,5 @@ Or from the REPL:
 ## License
 
 BSD 3-Clause. See [COPYRIGHT](COPYRIGHT).  
-Original authors: Geoff Cant, Luigi Panzeri.
+Original authors: Geoff Cant, Luigi Panzeri.  
+Maintained since 2021 by Angel Peralta.

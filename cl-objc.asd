@@ -8,6 +8,7 @@
 (defsystem cl-objc
     :name "CL-OBJC"
     :author "Geoff Cant, Luigi Panzeri"
+    :maintainer "Angel Peralta <acort3255@gmail.com>"
     :version "0.5"
   :description "Common Lisp / ObjectiveC Interface"
   :depends-on (#:cffi #:cffi-libffi #:yacc #:closer-mop #:org.tfeb.hax #:trivial-main-thread #:verbose)
