@@ -69,3 +69,4 @@ venv
 
 class_introspection
 .qlot/
+!doc/screenshots/*.png

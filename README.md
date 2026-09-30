@@ -22,15 +22,24 @@ All three original examples are working on Apple Silicon (arm64). The bridge sup
 ## Examples
 
 ### Hello World
+<img src="doc/screenshots/hello-world.png" alt="Hello World window with Hello and Goodbye buttons" width="480">
+
 A native `NSWindow` with two buttons wired to Lisp callbacks. The entire UI is built programmatically — no nib files required.
 
 ### Converter
-![converter screenshot](/doc/screenshots/converter.jpg)
+<img src="doc/screenshots/converter.png" alt="Converter window with currency, exchange rate and result fields" width="424">
 
 The classic Cocoa unit-converter tutorial, ported entirely to Common Lisp.
 
 ### Circle View
+<img src="doc/screenshots/circle-view.png" alt="Circle View window with text laid out along a circle" width="512">
+
 A custom `NSView` subclass that renders text curved along a circle, with mouse interaction and animation — translated from an original Apple Xcode SDK sample.
+
+### Video Player
+<img src="doc/screenshots/video-player.png" alt="Video Player window playing Apple's HLS test stream with a status overlay" width="800">
+
+An `AVPlayerView` streaming an HLS URL, with a key-value-observing `PlayerObserver` class defined in Lisp that shows player status in an overlay. Builds a standalone executable with `make`.
 
 ---
 
