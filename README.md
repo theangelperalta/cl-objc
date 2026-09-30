@@ -39,20 +39,45 @@ A custom `NSView` subclass that renders text curved along a circle, with mouse i
 - **macOS** on Apple Silicon (arm64)
 - **SBCL** or **CCL**
 - **Quicklisp** with the following libraries available:
-  - `cffi`, `cffi-libffi`, `cffi-grovel`
+  - `cffi`, `cffi-libffi`, `cffi-grovel` — from the
+    [`feature/fsbv-defcallback`](https://github.com/theangelperalta/cffi/tree/feature/fsbv-defcallback)
+    fork (see below)
   - `yacc`
   - `closer-mop`
   - `org.tfeb.hax`
   - `trivial-main-thread`
   - `verbose`
   - `swank` (for running examples from the REPL)
-  - `fiveam` (for tests)
+  - `rove` (for tests)
+
+### CFFI fork
+
+`define-objc-method` methods that take a struct by value (for example
+`drawRect:` with a `cg-rect`) need CFFI callbacks with struct-by-value
+arguments. Released CFFI does not support these yet; the fork adds them and
+is pending upstream review in [cffi#351](https://github.com/cffi/cffi/pull/351).
+With released CFFI, such methods fail to compile with
+``(:STRUCT CG-RECT) fell through ECASE expression``.
+
+The `qlfile` pins the fork. With [qlot](https://github.com/fukamachi/qlot):
+
+```sh
+qlot install
+sbcl --dynamic-space-size 4096 --load .qlot/setup.lisp
+```
+
+Without qlot, clone the fork's `feature/fsbv-defcallback` branch into your
+Quicklisp local projects directory so it takes precedence over the Quicklisp
+release.
+
+The test suite needs more than SBCL's default 1 GB heap, hence
+`--dynamic-space-size 4096`.
 
 ---
 
 ## Getting Started
 
-Place this repo under your Quicklisp local projects directory (e.g. `~/quicklisp/local-projects/cl-objc/`), then from a REPL:
+Place this repo under your Quicklisp local projects directory (e.g. `~/quicklisp/local-projects/cl-objc/`), or use the qlot setup above, then from a REPL:
 
 ```lisp
 ;; Load the library
