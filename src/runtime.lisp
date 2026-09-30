@@ -84,9 +84,14 @@ Return a new ObjectiveC Method object."
 		    (first body))
 	     ,(intern "SELF")		; to avoid warning
 	     ,(intern "SEL")		; to avoid warning
-	     ,(if has-declare
-		  `(progn ,@(cdr body))
-		  `(progn ,@body)))
+	     ;; ObjC can call back into Lisp from inside a WITH-SUPER
+	     ;; call, e.g. a table view asking its data source for cell
+	     ;; values during [super keyDown:]. Those messages go to their
+	     ;; receiver as usual, not to its superclass.
+	     (let ((*super-call* nil))
+	       ,(if has-declare
+		    `(progn ,@(cdr body))
+		    `(progn ,@body))))
 	   (let ((,new-method
 		  (register-method ,class
 				   ,name

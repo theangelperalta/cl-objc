@@ -184,4 +184,21 @@ big struct as input parameter"
       (ok (= 1 (untyped-objc-msg-send obj "magicValue")))
       (ok (= 1 (invoke obj magic-value))))))
 
+;; Defined only on the subclass, so a message that wrongly goes to the
+;; superclass raises "unrecognized selector".
+(define-objc-method reentry-marker () ((self test-derived-1))
+  (invoke 'ns-number :number-with-int 42))
+
+(define-objc-method reentry-inner () ((self test-derived-1))
+  (invoke self reentry-marker))
+
+(deftest call-to-super-reentry
+  (testing "A Lisp method that ObjC calls from inside WITH-SUPER sends its
+own messages normally, not to the superclass."
+    (objc-let ((obj 'test-derived-1))
+      ;; NSObject's performSelector: calls back into reentryInner.
+      (let ((result (with-super
+                      (invoke obj :perform-selector (selector 'reentry-inner)))))
+        (ok (= 42 (invoke result int-value)))))))
+
 ;; TODO: Add test to make sure struct arguements are passed
