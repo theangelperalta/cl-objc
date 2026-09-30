@@ -40,9 +40,9 @@ A custom `NSView` subclass that renders text curved along a circle, with mouse i
 An `AVPlayerView` streaming an HLS URL, with a key-value-observing `PlayerObserver` class defined in Lisp that shows player status in an overlay. Builds a standalone executable with `make`.
 
 ### Todo
-<img src="doc/screenshots/todo.png" alt="Todo window with a list of items, some checked off, and All, Active and Done filters" width="480">
+<img src="doc/screenshots/todo.png" alt="Todo window with a list of items under floating Liquid Glass controls: a new-item field and Add button at the top, and filters, Remove and Clear Done at the bottom" width="480">
 
-A todo list in an `NSTableView` whose data source and delegate are a Lisp class. Add items from the text field, check them off, double-click to rename, filter by All, Active or Done, and press Delete to remove the selected item. The list is saved to `~/Library/Application Support/cl-objc/todos.lisp`. Run it with `(ql:quickload :cl-objc/examples/todo)` and `(cl-objc-examples:todo-app)`, or build a standalone executable with `make`.
+A todo list in an `NSTableView` whose data source and delegate are a Lisp class. Add items from the text field, check them off, double-click to rename, filter by All, Active or Done, and press Delete to remove the selected item. The list scrolls under floating Liquid Glass controls (`NSGlassEffectView` and glass buttons) on macOS 26 and later, and under a translucent material elsewhere. The list is saved to `~/Library/Application Support/cl-objc/todos.lisp`. Run it with `(ql:quickload :cl-objc/examples/todo)` and `(cl-objc-examples:todo-app)`, or build a standalone executable with `make`.
 
 ---
 

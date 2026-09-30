@@ -68,10 +68,10 @@ app runs so a saved executable uses its user's home directory.")
   (getf *todo-views* role))
 
 (defun update-todo-controls ()
-  "Update the count label and the buttons that depend on the model or
-the table selection."
+  "Update the remaining count in the window subtitle and the buttons
+that depend on the model or the table selection."
   (let ((remaining (count-if-not #'todo-item-done *todo-items*)))
-    (invoke (todo-view :count-label) :set-string-value
+    (invoke (todo-view :window) :set-subtitle
             (format nil "~d of ~d remaining" remaining (length *todo-items*)))
     (invoke (todo-view :clear-button) :set-enabled
             (< remaining (length *todo-items*)))
@@ -216,23 +216,65 @@ keep classes registered with the ObjC runtime."
    :origin (cl-objc::make-cg-point :x (float x 1d0) :y (float y 1d0))
    :size (cl-objc::make-cg-size :width (float width 1d0) :height (float height 1d0))))
 
+;; cl-objc doesn't define NSEdgeInsets, which the scroll view's content
+;; insets use. The struct machinery expects its names in CL-OBJC.
+(in-package :cl-objc)
+
+(define-objc-struct ((ns-edge-insets :class c-ns-edge-insets) "NSEdgeInsets")
+  (top :double) (left :double) (bottom :double) (right :double))
+
+(in-package "CL-OBJC-EXAMPLES")
+
 ;; NSAutoresizingMaskOptions
 (defconstant +min-x-margin+ 1)
 (defconstant +width-sizable+ 2)
 (defconstant +min-y-margin+ 8)
 (defconstant +height-sizable+ 16)
 
+(defvar *todo-glass* t
+  "Use Liquid Glass when this macOS has it (macOS 26 and later). With
+NIL, or on older systems, the floating controls use a translucent
+material and standard buttons instead.")
+
+(defun todo-glass-p ()
+  (and *todo-glass*
+       (not (eq objc-nil-class (objc-get-class "NSGlassEffectView")))))
+
+(defun make-todo-capsule (frame content)
+  "Return a capsule with CONTENT inside, floating over the list: an
+NSGlassEffectView, or an NSVisualEffectView without Liquid Glass."
+  (let ((radius (/ (cl-objc::cg-size-height (cl-objc::cg-rect-size frame)) 2)))
+    (invoke content :set-autoresizing-mask (logior +width-sizable+ +height-sizable+))
+    (if (todo-glass-p)
+        (let ((glass (invoke (invoke 'ns-glass-effect-view alloc) :init-with-frame frame)))
+          (with-object glass
+            (:set-corner-radius radius)
+            (:set-content-view content))
+          glass)
+        (let ((effect (invoke (invoke 'ns-visual-effect-view alloc) :init-with-frame frame)))
+          (with-object effect
+            (:set-material 5)           ; NSVisualEffectMaterialMenu
+            (:set-wants-layer t)
+            (:add-subview content))
+          (with-object (invoke effect layer)
+            (:set-corner-radius radius)
+            (:set-masks-to-bounds t))
+          (invoke content :set-frame (invoke effect bounds))
+          effect))))
+
 (defun make-todo-button (title frame action target)
   (let ((button (invoke (invoke 'ns-button alloc) :init-with-frame frame)))
     (with-object button
       (:set-title title)
-      (:set-bezel-style 1)              ; NSBezelStyleRounded
+      ;; NSBezelStyleGlass or NSBezelStyleRounded
+      (:set-bezel-style (if (todo-glass-p) 16 1))
+      (:set-control-size 3)             ; NSControlSizeLarge
       (:set-target target)
       (:set-action (selector action)))
     button))
 
 (defun make-todo-table (controller)
-  (let ((table (invoke (invoke 'todo-table-view alloc) :init-with-frame (todo-rect 0 0 440 366)))
+  (let ((table (invoke (invoke 'todo-table-view alloc) :init-with-frame (todo-rect 0 0 480 560)))
         (done-column (invoke (invoke 'ns-table-column alloc) :init-with-identifier "done"))
         (title-column (invoke (invoke 'ns-table-column alloc) :init-with-identifier "title"))
         (checkbox (invoke (invoke 'ns-button-cell alloc) init)))
@@ -257,22 +299,36 @@ keep classes registered with the ObjC runtime."
     table))
 
 (defun make-todo-window (controller)
-  (let* ((win (invoke (invoke 'ns-window alloc)
-                      :init-with-content-rect (todo-rect 300 300 480 520)
+  "The list fills the window and scrolls under two rows of floating
+controls: the new-item field and Add at the top, the filter and the
+Remove and Clear Done buttons at the bottom. The segmented control
+draws its own capsule, so only the field gets a glass one."
+  (let* ((width 480)
+         (height 560)
+         (win (invoke (invoke 'ns-window alloc)
+                      :init-with-content-rect (todo-rect 300 300 width height)
                       :style-mask 15 :backing 2 :defer nil))
-         (field (invoke (invoke 'ns-text-field alloc) :init-with-frame (todo-rect 20 476 364 24)))
-         (add-button (make-todo-button "Add" (todo-rect 388 472 72 32) :add-todo controller))
-         (filter (invoke (invoke 'ns-segmented-control alloc) :init-with-frame (todo-rect 20 438 240 24)))
-         (scroll (invoke (invoke 'ns-scroll-view alloc) :init-with-frame (todo-rect 20 60 440 366)))
+         (scroll (invoke (invoke 'ns-scroll-view alloc) :init-with-frame (todo-rect 0 0 width height)))
          (table (make-todo-table controller))
-         (count-label (invoke (invoke 'ns-text-field alloc) :init-with-frame (todo-rect 20 26 200 18)))
-         (remove-button (make-todo-button "Remove" (todo-rect 240 18 100 32) :remove-todo controller))
-         (clear-button (make-todo-button "Clear Done" (todo-rect 344 18 116 32) :clear-completed controller)))
+         (field (invoke (invoke 'ns-text-field alloc) :init-with-frame (todo-rect 16 8 312 20)))
+         (field-row (invoke (invoke 'ns-view alloc) :init-with-frame (todo-rect 0 0 344 36)))
+         (field-capsule (make-todo-capsule (todo-rect 16 (- height 52) 344 36) field-row))
+         (add-button (make-todo-button "Add" (todo-rect 368 (- height 52) 96 36) :add-todo controller))
+         (filter (invoke (invoke 'ns-segmented-control alloc) :init-with-frame (todo-rect 16 20 216 28)))
+         (remove-button (make-todo-button "Remove" (todo-rect 240 16 100 36) :remove-todo controller))
+         (clear-button (make-todo-button "Clear Done" (todo-rect 348 16 116 36) :clear-completed controller)))
     (with-object field
+      (:set-bezeled nil)
+      (:set-bordered nil)
+      (:set-draws-background nil)
+      (:set-focus-ring-type 1)          ; NSFocusRingTypeNone
+      (:set-font (invoke 'ns-font :system-font-of-size 14d0))
       (:set-placeholder-string "What needs to be done?")
       (:set-target controller)
       (:set-action (selector :add-todo))
-      (:set-autoresizing-mask (logior +width-sizable+ +min-y-margin+)))
+      (:set-autoresizing-mask +width-sizable+))
+    (invoke field-row :add-subview field)
+    (invoke field-capsule :set-autoresizing-mask (logior +width-sizable+ +min-y-margin+))
     (invoke add-button :set-autoresizing-mask (logior +min-x-margin+ +min-y-margin+))
     (with-object filter
       (:set-segment-count 3)
@@ -280,32 +336,30 @@ keep classes registered with the ObjC runtime."
       (:set-label "Active" :for-segment 1)
       (:set-label "Done" :for-segment 2)
       (:set-segment-distribution 2)     ; NSSegmentDistributionFillEqually
+      (:set-control-size 3)             ; NSControlSizeLarge
       (:set-selected-segment 0)
       (:set-target controller)
-      (:set-action (selector :filter-changed))
-      (:set-autoresizing-mask +min-y-margin+))
+      (:set-action (selector :filter-changed)))
     (with-object scroll
       (:set-document-view table)
       (:set-has-vertical-scroller t)
       (:set-autohides-scrollers t)
-      (:set-autoresizing-mask (logior +width-sizable+ +height-sizable+)))
-    (with-object count-label
-      (:set-bezeled nil)
       (:set-draws-background nil)
-      (:set-editable nil)
-      (:set-selectable nil)
-      (:set-text-color (invoke 'ns-color secondary-label-color)))
+      ;; Keep rows clear of the floating controls while letting them
+      ;; scroll underneath.
+      (:set-automatically-adjusts-content-insets nil)
+      (:set-content-insets (cl-objc::make-ns-edge-insets :top 60d0 :left 0d0 :bottom 64d0 :right 0d0))
+      (:set-autoresizing-mask (logior +width-sizable+ +height-sizable+)))
     (invoke remove-button :set-autoresizing-mask +min-x-margin+)
     (invoke clear-button :set-autoresizing-mask +min-x-margin+)
     (let ((content (invoke win content-view)))
-      (dolist (view (list field add-button filter scroll count-label remove-button clear-button))
+      (dolist (view (list scroll field-capsule add-button filter remove-button clear-button))
         (invoke content :add-subview view)))
     (with-object win
       (:set-title "Todo")
-      (:set-content-min-size (cl-objc::make-cg-size :width 380d0 :height 300d0)))
+      (:set-content-min-size (cl-objc::make-cg-size :width 480d0 :height 300d0)))
     (setf *todo-views* (list :window win :field field :filter filter :table table
-                             :count-label count-label :remove-button remove-button
-                             :clear-button clear-button))
+                             :remove-button remove-button :clear-button clear-button))
     (refresh-todo-ui)
     win))
 
