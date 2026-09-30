@@ -95,8 +95,12 @@ classes registered with the ObjC runtime."
 
 (defun make-debug-overlay (parent-frame)
   "Create a semi-transparent debug overlay label positioned at the top of the view."
-  (let* ((label (invoke (invoke 'ns-text-field alloc)
-                        :init-with-frame (make-rect 10 10 780 24))))
+  (let* ((size (slet* ((r cg-rect parent-frame)
+                       (s cg-size (cg-rect-size r)))
+                 (list (cg-size-width s) (cg-size-height s))))
+         (label (invoke (invoke 'ns-text-field alloc)
+                        :init-with-frame (make-rect 10 (- (second size) 34)
+                                                    (- (first size) 20) 24))))
     ;; Style the label
     (invoke label :set-editable 0)
     (invoke label :set-selectable 0)
