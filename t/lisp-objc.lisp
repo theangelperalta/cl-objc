@@ -14,6 +14,19 @@
 ;;     (dolist (class-name classes)
 ;;       (ok (equal class-name (symbol-to-objc-class-name (objc-class-name-to-symbol class-name)) )))))
 
+(deftest selector-acronyms
+  (testing "Acronyms stay upper case in selectors and round-trip back to
+the same Lisp names."
+    (dolist (case '(("eventWithCGEvent:" :event-with-cg-event)
+                    ("CGColor" cg-color)
+                    ("initWithURL:" :init-with-url)
+                    ("initWithUTF8String:" :init-with-utf8-string)
+                    ("isAvailable" is-available)))
+      (destructuring-bind (selector symbol) case
+        (ok (equal selector (cl-objc::symbols-to-objc-selector (list symbol))))
+        (ok (equal (symbol-name symbol)
+                   (symbol-name (first (cl-objc::objc-selector-to-symbols selector)))))))))
+
 (deftest lisp-instantiation
   (testing "Test instantiation of ObjC object"
     (ok (eq (class-of  (invoke 'ns-string alloc))

@@ -4,6 +4,7 @@
 (defparameter *acronyms* '("UTF"
 			   "URL"
 			   "AV"
+			   "CG"
 			   "FTP"
 			   "HTTP")
   "Acronyms used in name translators")
