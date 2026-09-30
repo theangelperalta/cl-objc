@@ -9,9 +9,6 @@
 (import-framework "AVFoundation")
 (import-framework "AVKit")
 
-(defun lisp-string-to-nsstring (string)
-  (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
-
 (defun make-rect (x y width height)
   (destructuring-bind (x y width height)
       (mapcar (lambda (field) (coerce field 'double-float)) (list x y width height))

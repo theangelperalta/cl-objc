@@ -36,18 +36,23 @@
 						:depends-on ("framework"))))))
 
 (defsystem cl-objc/examples/hello-world
-  :components ((:module :examples
-			:components ((:file "hello-world"))))
+  :pathname "examples/hello_world/"
+  :components ((:file "hello-world"))
   :depends-on (:cl-objc :swank))
 
 (defsystem cl-objc/examples/converter
-  :components ((:module :examples
-			:components ((:file "converter"))))
+  :pathname "examples/converter/"
+  :components ((:file "converter"))
   :depends-on (:cl-objc :swank))
 
 (defsystem cl-objc/examples/circle-view
-  :components ((:module :examples
-			:components ((:file "circle-view"))))
+  :pathname "examples/circle-view/"
+  :components ((:file "circle-view"))
+  :depends-on (:cl-objc :swank))
+
+(defsystem cl-objc/examples/video-player
+  :pathname "examples/video-player/"
+  :components ((:file "video-player"))
   :depends-on (:cl-objc :swank))
 
 (defsystem cl-objc.doc

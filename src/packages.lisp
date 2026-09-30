@@ -164,7 +164,8 @@
   (:export "LISP-HELLO-WORLD"
 	   "CONVERTER"
 	   "APP-DELEGATE"
-	   "CIRCLE-VIEW"))
+	   "CIRCLE-VIEW"
+	   "VIDEO-PLAYER"))
 
 (defpackage "CL-OBJC-USER"
   (:use "COMMON-LISP" "CL-OBJC" "OBJC-CFFI" "OBJC-READER" "OBJC-CLOS"))
