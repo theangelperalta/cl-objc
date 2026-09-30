@@ -578,7 +578,12 @@ of CLASS"
 (defmethod translate-from-foreign (class-ptr (type objc-class-type))
   (if (not (null-pointer-p class-ptr))
       (handler-case
-          (or (gethash (objc-get-class-name class-ptr) *objc-classes*)
+          ;; Only trust a cached entry whose pointer still matches: classes
+          ;; created at runtime get a new address in each process, so an
+          ;; entry saved in a Lisp image can point at freed memory.
+          (or (let ((cached (gethash (objc-get-class-name class-ptr) *objc-classes*)))
+                (when (and cached (pointer-eq (slot-value cached 'class-ptr) class-ptr))
+                  cached))
               (with-foreign-slots ((isa)
 				 class-ptr (:struct objc-class-cstruct))
 	    (let* ((super_class (objc-get-class-superclass class-ptr))
