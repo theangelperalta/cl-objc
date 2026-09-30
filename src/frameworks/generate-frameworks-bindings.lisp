@@ -26,3 +26,7 @@
     (argc :int)
     (argv :pointer))
   (cffi:defcvar ("NSApp" *nsapp*) objc-id))
+
+(compile-framework ("AVFoundation"))
+
+(compile-framework ("AVKit"))

@@ -250,22 +250,63 @@ binded to SEL.
 	*untyped-methods-cache* (make-hash-table :test #'equal)
 	*struct-msg-send-cache* (make-hash-table :test #'equal)))
 
+(defun lisp-string-to-nsstring (string)
+  "Convert a Lisp string to an NSString object. The caller owns the
+returned object (it comes from alloc/init) and must release it.
+
+The conversion always sends plain messages, even inside WITH-SUPER,
+so NSString itself receives alloc and initWithUTF8String:."
+  (let ((*super-call* nil))
+    (typed-objc-msg-send
+     ((typed-objc-msg-send ((objc-get-class "NSString") "alloc"))
+      "initWithUTF8String:")
+     :string string)))
+
+(defun release-objc-objects (objects)
+  ;; objc_release directly: -release is typed oneway void, which
+  ;; TYPED-OBJC-MSG-SEND can't dispatch on.
+  (dolist (object objects)
+    (foreign-funcall "objc_release" objc-id object :void)))
+
+(defun coerce-objc-args (args method)
+  "Coerce Lisp strings to NSString objects for arguments where the
+ObjC method expects an object (objc-id) type.
+
+Returns the coerced argument list and, as a second value, the list of
+NSStrings created, which the caller must release after the call."
+  (let ((arg-types (method-argument-types method))
+	(created '()))
+    (values (mapcar (lambda (arg type)
+		      (if (and (stringp arg) (eq type 'objc-id))
+			  (let ((nsstring (lisp-string-to-nsstring arg)))
+			    (push nsstring created)
+			    nsstring)
+			  arg))
+		    args arg-types)
+	    created)))
+
 (defun untyped-objc-msg-send (receiver selector &rest args)
   "Send the message binded to SELECTOR to RECEIVER returning the
 value of the ObjectiveC call with ARGS.
 
 This method invokes typed-objc-msg-send calculating the types of
 ARGS at runtime.
+
+Lisp strings passed where an ObjC object (objc-id) is expected
+are automatically converted to NSString objects.
 "
-  (progn
   (let* ((method (etypecase receiver
 		   (objc-class (class-get-class-method receiver selector))
 		   (objc-object (class-get-instance-method (obj-class receiver) selector)))))
     (if method
-	(apply (cache-compile-for-untyped selector method)	receiver args)
+	(multiple-value-bind (coerced-args created) (coerce-objc-args args method)
+	  (unwind-protect
+	       (apply (cache-compile-for-untyped selector method)
+		      receiver coerced-args)
+	    (release-objc-objects created)))
 	(error "ObjC method ~a not found for class ~a" selector (class-name (etypecase receiver
 									      (objc-class receiver)
-									      (objc-object (obj-class receiver)))))))))
+									      (objc-object (obj-class receiver))))))))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved.
