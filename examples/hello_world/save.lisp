@@ -5,7 +5,10 @@
 #+sbcl
 ;; FIXME: Properly handle the verbose thread causing
 ;; saving issues.
-(bt:destroy-thread (first (bt:all-threads)))
+(dolist (thread (bt:all-threads))
+  (unless (eq thread (bt:current-thread))
+    (bt:destroy-thread thread)
+    (sb-thread:join-thread thread :default nil)))
 (sb-ext:save-lisp-and-die "demo-app" :toplevel 'cl-objc-examples::lisp-hello-world :executable t)
 #+ccl
 (ccl:save-application "demo-app" :toplevel-function 'cl-objc-examples::lisp-hello-world :prepend-kernel t)
