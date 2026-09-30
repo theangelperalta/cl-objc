@@ -284,7 +284,7 @@ NSStrings created, which the caller must release after the call."
 			       nsstring))
 			    ;; CFFI's :boolean treats any non-NIL value,
 			    ;; including 0, as true.
-			    ((and (integerp arg) (eq type :boolean))
+			    ((and (integerp arg) (member type '(objc-bool :boolean)))
 			     (/= arg 0))
 			    (t arg)))
 		    args arg-types)

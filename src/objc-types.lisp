@@ -13,6 +13,8 @@
     (#\Q :unsigned-long-long)
     (#\f :float)
     (#\d :double)
+    (#\B objc-cffi:objc-bool)
+    ;; So methods declared with CFFI's :boolean still encode as BOOL.
     (#\B :boolean)
     (#\v :void)
     (#\* :string)

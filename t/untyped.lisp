@@ -133,3 +133,17 @@ NO. CFFI's :boolean alone would turn 0 into YES."
       (ok (bool-round-trip 1))
       (ok (null (bool-round-trip nil)))
       (ok (bool-round-trip t)))))
+
+(deftest untyped-bool-arguments-on-the-stack
+  (testing "A BOOL passed on the stack takes one byte, so the arguments
+after it arrive intact. keyEventWithType:... passes isARepeat and keyCode
+on the stack on arm64."
+    (cffi:load-foreign-library "/System/Library/Frameworks/AppKit.framework/AppKit")
+    (untyped-objc-msg-send (objc-get-class "NSApplication") "sharedApplication")
+    (let ((event (untyped-objc-msg-send
+                  (objc-get-class "NSEvent")
+                  "keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:"
+                  10 (cl-objc::make-cg-point :x 0d0 :y 0d0) 0 0d0 0 objc-nil-object
+                  "a" "a" nil 51)))
+      (ok (= 51 (untyped-objc-msg-send event "keyCode")))
+      (ok (null (untyped-objc-msg-send event "isARepeat"))))))

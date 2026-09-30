@@ -46,6 +46,11 @@
             uid)))
 
 ;;; CFFI definitions
+(defctype objc-bool (:boolean :unsigned-char)
+  "Objective C BOOL: a one-byte C bool on arm64. CFFI's plain :boolean
+is an int, which puts BOOL arguments passed on the stack at the wrong
+size and shifts the arguments after them.")
+
 (define-foreign-type objc-selector-type ()
   ()
   (:actual-type :pointer)
