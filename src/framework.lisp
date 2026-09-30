@@ -15,17 +15,47 @@ TYPE exists."
   (ensure-directories-exist *framework-directory*)
   (probe-file (framework-bindings-pathname framework-name type)))
 
-(defmacro with-framework-file (framework-name type force &body body)
+(defparameter *framework-bindings-format* 1
+  "Version of the generated bindings files. Bump it when the code that
+writes them changes, so cached files are regenerated.")
+
+(defun framework-bindings-stamp (inputs)
+  "Return the first line of a generated bindings file. It fingerprints
+what the file was generated from: INPUTS (the extra binding forms),
+the OS version, since struct and class data come from the running
+ObjC runtime, the Lisp version, since the file is compiled, and
+*FRAMEWORK-BINDINGS-FORMAT*."
+  (format nil ";;; cl-objc bindings v~a, ~a ~a, ~a ~a, inputs ~x"
+          *framework-bindings-format*
+          (software-type) (software-version)
+          (lisp-implementation-type) (lisp-implementation-version)
+          (sxhash (with-standard-io-syntax
+                    (let ((*print-pretty* nil))
+                      (prin1-to-string inputs))))))
+
+(defun framework-bindings-current-p (pathname stamp)
+  "Return true if the bindings file at PATHNAME exists and was generated
+with STAMP."
+  (with-open-file (in pathname :if-does-not-exist nil)
+    (and in (equal (read-line in nil) stamp))))
+
+(defmacro with-framework-file ((framework-name type &key force inputs) &body body)
+  "Write the TYPE bindings file for FRAMEWORK-NAME with BODY, which
+writes to the stream OUT, and compile it. Skip both if the file is
+already current for INPUTS; see FRAMEWORK-BINDINGS-STAMP."
   (let ((pathname (gensym))
+        (stamp (gensym "STAMP-"))
         (t0 (gensym "T0-")))
-    `(let ((,pathname (framework-bindings-pathname ,framework-name ',type)))
-       (when (or ,force (not (probe-file ,pathname)))
+    `(let ((,pathname (framework-bindings-pathname ,framework-name ',type))
+           (,stamp (framework-bindings-stamp ,inputs)))
+       (when (or ,force (not (framework-bindings-current-p ,pathname ,stamp)))
          (let ((,t0 (get-internal-real-time)))
            (with-open-file (out ,pathname
                                 :direction :output :if-exists :supersede :if-does-not-exist :create)
              (format *trace-output* "~%Writing ~a bindings for ~a to ~a~%"
                      (symbol-name ',type) ,framework-name ,pathname)
              (force-output *trace-output*)
+             (write-line ,stamp out)
              ,@body)
            (when objc-clos:*cl-objc-verbose*
              (format *trace-output* "~&[with-framework-file] write done in ~,1fs~%"
@@ -107,12 +137,13 @@ will not be loaded."
   `(progn 
      (load-framework ,framework-name)
      (when (or ,clos-bindings objc-clos:*automatic-clos-bindings-update*)
-       (with-framework-file ,framework-name clos ,force
-	 (objc-clos:update-clos-bindings :output-stream out 
-					 :force t 
+       (with-framework-file (,framework-name clos :force ,force)
+	 (objc-clos:update-clos-bindings :output-stream out
+					 :force t
 					 :for-framework ,framework-name)))
 
-     (with-framework-file ,framework-name static ,force
+     (with-framework-file (,framework-name static :force ,force
+                                           :inputs (quote ,other-bindings))
        (update-cstruct-database :output-stream out)
        (format out "~{~s~%~}" (quote ,other-bindings)))
      t))

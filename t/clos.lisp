@@ -33,6 +33,26 @@ class_getImageName; results must remain consistent across rebuilds."
     (ok (string-equal "Foundation" (objc-clos::framework-class "NSString")))
     (ok (not (null objc-clos::*class-framework-cache*)))))
 
+(deftest framework-bindings-stamp
+  (testing "A cached bindings file is current only if its first line is the
+stamp for the same inputs, so changing the binding forms regenerates it."
+    (let ((stamp (objc-cffi::framework-bindings-stamp '((define-foo 1)))))
+      (ok (equal stamp (objc-cffi::framework-bindings-stamp '((define-foo 1)))))
+      (ok (not (equal stamp (objc-cffi::framework-bindings-stamp '((define-foo 2))))))
+      (uiop:with-temporary-file (:pathname file)
+        (with-open-file (out file :direction :output :if-exists :supersede)
+          (write-line stamp out)
+          (write-line "(bindings)" out))
+        (ok (objc-cffi::framework-bindings-current-p file stamp))
+        (ok (not (objc-cffi::framework-bindings-current-p
+                  file (objc-cffi::framework-bindings-stamp '((define-foo 2))))))
+        ;; Files written before stamps existed start with a binding form.
+        (with-open-file (out file :direction :output :if-exists :supersede)
+          (write-line "(pushnew '(:struct \"CGRect\") db)" out))
+        (ok (not (objc-cffi::framework-bindings-current-p file stamp))))
+      (ok (not (objc-cffi::framework-bindings-current-p
+                #p"/nonexistent/Foundation-STATIC.lisp" stamp))))))
+
 (deftest class-creation
   (load-foundation-clos-bindings-once)
   (let ((classes (foundation-class-list)))
