@@ -1,7 +1,7 @@
 (in-package :cl-user)
 
 (defpackage "CL-OBJC-TEST"
-  (:use 
+  (:use
    :common-lisp
    :objc-cffi
    :objc-types
@@ -9,14 +9,11 @@
    :cl-objc
    :objc-clos
    :cl-objc-utils
-   :fiveam))
+   :rove))
 
-(objc-cffi:import-framework "Foundation" t)
+(in-package "CL-OBJC-TEST")
 
-(5am:def-suite :cl-objc)
-(5am:def-suite :typed-objc-msg-send :in :cl-objc)
-(5am:def-suite :untyped-objc-msg-send :in :cl-objc)
-(5am:def-suite :objc-reader :in :cl-objc)
-(5am:def-suite :runtime :in :cl-objc)
-(5am:def-suite :lisp-objc :in :cl-objc)
-(5am:def-suite :objc-clos :in :cl-objc)
+;; Load Foundation lazily — CLOS bindings for tests that need them are
+;; built on first use via load-foundation-clos-bindings-once in t/clos.lisp.
+;; Tests that go through invoke / typed-objc-msg-send don't need CLOS at all.
+(objc-cffi:import-framework "Foundation")

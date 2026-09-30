@@ -11,11 +11,22 @@
   "Set this to t if you want that clos bindings will be updated
   every time you add classes, method or load libraries.")
 
+(defparameter *cl-objc-verbose* nil 
+  "Set to t to enable progress logging for update-clos-bindings and compile-framework.")
+
 (defclass objc-clos-class (standard-class)
   ())
 
 (defclass objc-generic-function (standard-generic-function)
-  ((df :accessor df :initform nil))
+  ((df :accessor df :initform nil)
+   (class-cache :accessor class-cache
+                :initform (make-hash-table :test #'eq)
+                :documentation "Per-receiver-class hash of fully-typed
+objc_msgSend wrappers. On the first dispatch of this GF for a given
+receiver class, the method is looked up once and cache-compile produces
+a wrapper with both argument and return types baked in; subsequent
+dispatches just hash-lookup by class and apply, with no further CFFI
+method lookup or type-signature walk."))
   (:metaclass closer-mop:funcallable-standard-class))
 
 (defmethod closer-mop:validate-superclass
@@ -75,41 +86,104 @@ setX:Y: becomes set-x?y?"
 	     when (keywordp arg-name) collect (intern (format nil "ARG-~a-~d" (symbol-name arg-name) i)
 						       "OBJC"))))
 
+(defun ensure-clos-class (objc-class)
+  "Lazily ensure a CLOS class exists for OBJC-CLASS, creating its entire
+superclass chain first if needed. Returns the CLOS class symbol."
+  (let ((sym (export-class-symbol objc-class)))
+    (unless (find-class sym nil)
+      (let ((parent (second (super-classes objc-class))))
+        (when parent (ensure-clos-class parent)))
+      (add-clos-class objc-class))
+    sym))
+
+(defun ensure-clos-selector (sel-name)
+  "Lazily ensure a CLOS generic function exists for the ObjC selector
+named SEL-NAME (a string). Returns the generic function symbol."
+  (let* ((selector (sel-get-uid sel-name))
+         (sym (intern (string-upcase (objc-selector-to-clos-symbol selector)) "OBJC")))
+    (unless (fboundp sym)
+      (export sym "OBJC")
+      (closer-mop:ensure-generic-function-using-class
+       nil sym
+       :generic-function-class 'objc-generic-function
+       :lambda-list (compute-lambda-list selector)))
+    sym))
+
+(defun ensure-clos-bindings (class-designator)
+  "Lazily ensure CLOS class and method bindings exist for CLASS-DESIGNATOR.
+CLASS-DESIGNATOR may be an ObjC class name string, a Lisp symbol
+(e.g. 'ns-string), or an objc-class object. Creates the class, its full
+superclass chain, and a generic function for every non-private method."
+  (let ((objc-class
+          (etypecase class-designator
+            (string (objc-get-class class-designator))
+            (symbol (objc-get-class (symbol-to-objc-class-name class-designator)))
+            (t class-designator))))
+    (ensure-clos-class objc-class)
+    (dolist (method (append (get-instance-methods objc-class)
+                             (get-class-methods objc-class)))
+      (unless (private-method-p method)
+        (ensure-clos-selector (sel-name (method-selector method)))))))
+
 (defun convert-result-from-objc (ret)
   "Convert the returned value of an Objc Method to a lisp
 value (CLOS instance or primitive type)"
   (typecase ret
-    (objc-object 
+    (objc-object
      (if (objc-nil-object-p ret)
 	 ret
-	 (let ((new-ret 
-		(make-instance (export-class-symbol (obj-class ret)))))
-	   (setf (objc:objc-id new-ret) ret)
-	   new-ret)))
+	 ;; Wrap the existing id directly via the :objc-id initarg. Calling
+	 ;; plain make-instance would fire the slot's initform and try to
+	 ;; alloc a fresh ObjC instance, which traps for toll-free-bridged
+	 ;; private classes like __NSCFNumber whose +allocWithZone: is not
+	 ;; implemented.
+	 (make-instance (ensure-clos-class (obj-class ret)) :objc-id ret)))
     (fixnum ret)
     (string ret)
     (otherwise (error "Not yet supported ~s" (class-name (class-of ret))))))
 
+(defun compile-msg-send-wrapper-for-method (sel-name method)
+  "Build a fully-typed objc_msgSend wrapper for METHOD: cache-compile
+chooses between the simple-return and struct-return paths and bakes
+both the argument types and the return type into a foreign-funcall, so
+the resulting function does no further CFFI method lookups when called."
+  (let* ((return-type (objc-cffi::method-return-type method))
+         (arg-types (objc-cffi::pack-struct-arguments-type
+                     (objc-cffi::method-argument-types method))))
+    (cond
+      ((objc-cffi::struct-type-p return-type)
+       (objc-cffi::cache-compile-struct-msg-send sel-name return-type nil arg-types))
+      (t
+       (objc-cffi::cache-compile sel-name return-type nil arg-types)))))
+
 (defmethod closer-mop:compute-discriminating-function ((gf objc-generic-function))
-  (let* ((gf-name (closer-mop:generic-function-name gf))
-	 (sel-name (clos-symbol-to-objc-selector gf-name))
-	 (selector (sel-get-uid sel-name))
-	 (lambda-list (compute-lambda-list selector)))
-    (or (df gf)
-	(lambda (&rest args)
-	  (flet ((dfun (&rest args) 
-		   (apply 
-		    (eval `(lambda ,lambda-list
-			     (let ((id (objc:objc-id objc:receiver)))
-			       (convert-result-from-objc 
-				(untyped-objc-msg-send id 
-						       ,sel-name 
-						       ,@(remove '&optional 
-								 (cdr lambda-list)))))))
-		    args)))
-	    (closer-mop:set-funcallable-instance-function gf #'dfun)
-	    (setf (df gf) #'dfun)
-	    (apply #'dfun args))))))
+  (or (df gf)
+      (let* ((gf-name (closer-mop:generic-function-name gf))
+             (sel-name (clos-symbol-to-objc-selector gf-name))
+             (selector (sel-get-uid sel-name))
+             (cache (class-cache gf)))
+        (labels ((dispatch (receiver &rest args)
+                   (let* ((id (objc:objc-id receiver))
+                          (class-key (etypecase id
+                                       (objc-cffi::objc-class id)
+                                       (objc-cffi:objc-object (objc-cffi:obj-class id))))
+                          (wrapper (gethash class-key cache)))
+                     (unless wrapper
+                       (let ((method (etypecase id
+                                       (objc-cffi::objc-class
+                                        (objc-cffi:class-get-class-method id selector))
+                                       (objc-cffi:objc-object
+                                        (objc-cffi:class-get-instance-method
+                                         (objc-cffi:obj-class id) selector)))))
+                         (unless method
+                           (error "ObjC method ~a not found on class ~a"
+                                  sel-name (objc-cffi:class-name class-key)))
+                         (setf wrapper (compile-msg-send-wrapper-for-method sel-name method)
+                               (gethash class-key cache) wrapper)))
+                     (convert-result-from-objc (apply wrapper id args)))))
+          (setf (df gf) #'dispatch)
+          (closer-mop:set-funcallable-instance-function gf #'dispatch)
+          #'dispatch))))
 
 
 (defun add-clos-method (objc-method objc-class &key output-stream class-method)
@@ -148,6 +222,7 @@ value (CLOS instance or primitive type)"
 	 (slots (list (list :name 'objc:objc-id
 			    :initform `(invoke ',class-symbol-name alloc)
 			    :initfunction (lambda () (invoke class-symbol-name alloc))
+			    :initargs '(:objc-id)
 			    :readers '(objc:objc-id)
 			    :writers '((setf objc:objc-id)))))
 	 (metaclass-slots (list (list :name 'objc:objc-id
@@ -201,22 +276,52 @@ value (CLOS instance or primitive type)"
     (when (fboundp symbol) (fmakunbound symbol))
     (unintern symbol "OBJC")))
 
+(defun extract-framework-name-from-path (path)
+  "Given a dylib path like
+'/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit',
+return 'AppKit'. NIL if PATH is NIL or has no .framework segment
+(e.g. '/usr/lib/libobjc.A.dylib')."
+  (when path
+    (let ((seg (search ".framework/" path)))
+      (when seg
+        (let* ((before (subseq path 0 seg))
+               (slash (position #\/ before :from-end t)))
+          (if slash
+              (subseq before (1+ slash))
+              before))))))
+
+(defvar *class-framework-cache* nil
+  "Hash table mapping ObjC class name (string) to framework short name
+(string). Built lazily on first access by walking class_getImageName once
+for every loaded class, so framework-class is O(1) afterwards. Invalidate
+with clear-framework-class-cache when new classes/frameworks are loaded.")
+
+(defun build-class-framework-cache ()
+  (let* ((classes (get-class-list))
+         (h (make-hash-table :test #'equal)))
+    (when *cl-objc-verbose*
+      (format *trace-output* "~&[framework-class] building cache for ~a classes~%"
+              (length classes))
+      (force-output *trace-output*))
+    (dolist (objc-class classes)
+      (let ((fw (extract-framework-name-from-path
+                 (class-get-image-name objc-class))))
+        (when fw
+          (setf (gethash (class-name objc-class) h) fw))))
+    (setf *class-framework-cache* h)))
+
+(defun clear-framework-class-cache ()
+  "Drop the class→framework cache so the next framework-class call rebuilds
+it. Call after loading a new framework or registering a new class."
+  (setf *class-framework-cache* nil))
+
 (defun framework-class (class-name)
-  "Find the framework short name handling CLASS-NAME"
-  (objc-cffi::load-framework "Foundation")
-  (let ((all-frameworks (invoke 'ns-bundle all-frameworks))
-	(class-name-string (invoke (invoke 'ns-string alloc) :init-with-utf8-string class-name)))
-    (loop 
-       for i below (invoke all-frameworks count)
-       for framework = (invoke all-frameworks :object-at-index i)
-       when (and 
-	     (not (objc-nil-object-p framework))
-	     (not (eq objc-nil-class (invoke framework :class-named class-name-string))))
-       do 
-	 (let ((bundle-id (invoke framework bundle-identifier)))
-	   (unless (objc-nil-object-p bundle-id)
-	       (let ((full-name (invoke bundle-id utf8-string)))
-		 (return (car (last (split-string full-name #\.))))))))))
+  "Return the framework short name (e.g. \"AppKit\") that defines the ObjC
+class named CLASS-NAME, or NIL if it isn't part of a framework. Served from
+*class-framework-cache*."
+  (unless *class-framework-cache*
+    (build-class-framework-cache))
+  (gethash class-name *class-framework-cache*))
 
 (defun update-clos-bindings (&key output-stream force for-framework)
   "Generate CLOS classes/generic function for each ObjC
@@ -226,24 +331,49 @@ defined, except if FORCE is set. UPDATE-CLOS-BINDINGS writes the
 bindings on OUTPUT-STREAM if provided."
   (when output-stream
     (format output-stream ";;; CLOS BINDINGS FILE~%;;;THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC-USER\")~%~%"))
-  (dolist (objc-class (get-class-ordered-list))
-    ;; Adding Classes
-    (when (and (or (not for-framework)
-                   (string-equal for-framework (framework-class (class-name objc-class)))
-                   ;; FIXME: these class can't be found using [framework classNamed:] in Objective-C
-                   ;; should be inside Foundation.framework. But now it's hidden in the runtime for some
-                   ;; reason.
-                   (string-equal "Foundation" for-framework)
-                   #+(or)(string-equal "__NSCFNumber" (class-name objc-class))
-                   #+(or)(string-equal "NSObject" (class-name objc-class)))
-	   (or force
-	       (not (find-class (export-class-symbol objc-class) nil))))
-      (add-clos-class objc-class output-stream))
-    ;; Adding Generic Functions for ObjC methods
-    (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
-      (when(and (not (private-method-p method)) 
-		(not (fboundp (export-method-symbol method))))
-       (add-clos-method method objc-class :output-stream output-stream)))))
+  (let* ((all-classes (get-class-ordered-list))
+         (total (length all-classes))
+         (classes-added 0)
+         (methods-added 0)
+         (i 0))
+    (when *cl-objc-verbose*
+      (format *trace-output* "~&[update-clos-bindings] start: ~a classes, for-framework=~a, output-stream=~a~%"
+              total for-framework (if output-stream "yes" "no")))
+    (dolist (objc-class all-classes)
+      (incf i)
+      (when (and *cl-objc-verbose* (zerop (mod i 100)))
+        (format *trace-output* "~&[update-clos-bindings] ~a/~a (~a) classes-added=~a methods-added=~a~%"
+                i total (class-name objc-class) classes-added methods-added)
+        (force-output *trace-output*))
+      (when (or (not for-framework)
+                (string-equal for-framework (framework-class (class-name objc-class)))
+                ;; Some classes that should belong to Foundation have no
+                ;; .framework image (hidden in the runtime, not findable
+                ;; via [framework classNamed:]). Pull them in too — but
+                ;; only when caller asked for Foundation, not for every
+                ;; class on the system.
+                (and (string-equal "Foundation" for-framework)
+                     (null (framework-class (class-name objc-class)))))
+        ;; Adding Classes
+        (when (or force
+                  (not (find-class (export-class-symbol objc-class) nil)))
+          (when *cl-objc-verbose*
+            (format *trace-output* "~&[update-clos-bindings]   adding class ~a~%" (class-name objc-class)))
+          (incf classes-added)
+          (add-clos-class objc-class output-stream))
+        ;; Adding Generic Functions for ObjC methods. Selectors unique to
+        ;; classes outside FOR-FRAMEWORK are left for lazy creation via
+        ;; OBJC-CLOS::ENSURE-CLOS-SELECTOR — otherwise iterating every class
+        ;; on the system (~26k on macOS) dominates load time even when the
+        ;; class filter has narrowed what we actually want.
+        (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
+          (when (and (not (private-method-p method))
+                     (not (fboundp (export-method-symbol method))))
+            (incf methods-added)
+            (add-clos-method method objc-class :output-stream output-stream)))))
+    (when *cl-objc-verbose*
+      (format *trace-output* "~&[update-clos-bindings] done: ~a/~a classes processed, ~a classes added, ~a methods added~%"
+              i total classes-added methods-added))))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 

@@ -2,6 +2,8 @@
 
 ;;; Name translators
 (defparameter *acronyms* '("UTF"
+			   "URL"
+			   "AV"
 			   "FTP"
 			   "HTTP")
   "Acronyms used in name translators")
@@ -55,6 +57,30 @@
 	      (mapcar #'replace-acronyms-1 
 		      (mapcar #'convert-selector-part (split-string selector #\:)))))))
 
+(defun upcase-acronym (acronym string)
+  "Upcase ACRONYM in the ObjC selector STRING where it forms a whole
+word: capitalized (\"Url\") or lowercase at the start of the
+selector (\"url\"), and not followed by a lowercase letter. This turns
+\"initWithUrl:\" into \"initWithURL:\" but leaves \"isAvailable\"
+alone when ACRONYM is \"AV\"."
+  (let ((lower (string-downcase acronym))
+	(capitalized (string-capitalize acronym))
+	(len (length acronym))
+	(string-len (length string)))
+    (with-output-to-string (out)
+      (loop with i = 0
+	    while (< i string-len)
+	    do (let ((end (+ i len)))
+		 (if (and (<= end string-len)
+			  (or (string= capitalized string :start2 i :end2 end)
+			      (and (zerop i) (string= lower string :end2 end)))
+			  (or (= end string-len)
+			      (not (lower-case-p (char string end)))))
+		     (progn (princ (string-upcase acronym) out)
+			    (setf i end))
+		     (progn (princ (char string i) out)
+			    (incf i))))))))
+
 (defun symbols-to-objc-selector (lst)
   "Translate a list of symbols to a string naming a translator"
   (flet ((convert-selector-part (part)
@@ -76,12 +102,8 @@
 		  (princ el out)
 		  (if (keywordp (car lst))
 		      (princ #\: out)))))))
-      (dolist (acronym *acronyms*) 
-	(setf string 
-	      (let ((pos (search (string-downcase acronym) string)))
-		(if (and pos (zerop pos))
-		    (simple-replace-string (string-downcase acronym) (string-upcase acronym) string)
-		    (simple-replace-string (string-capitalize (string-downcase acronym)) (string-upcase acronym) string)))))
+      (dolist (acronym *acronyms*)
+	(setf string (upcase-acronym acronym string)))
       string)))
 
 (defun selector (&rest symbols)
@@ -363,10 +385,21 @@ e.g.
 (defmacro with-object (obj &body actions)
   "Calls messages with OBJ as receveir. ACTIONS is a list of
 selector and arguments passed to invoke."
-  `(progn 
+  `(progn
      ,@(mapcar (lambda (action)
 		 `(invoke ,obj ,@action))
 	       actions)))
+
+(defmacro with-autorelease-pool (() &body body)
+  "Allocate an NSAutoreleasePool around BODY and drain it on exit.
+Equivalent to Objective-C's @autoreleasepool { ... } block — any objects
+inside BODY that are autoreleased (directly via -autorelease, or implicitly
+via convenience constructors that return autoreleased instances) get
+released when the form unwinds, including via non-local transfer."
+  (let ((pool (gensym "POOL-")))
+    `(let ((,pool (invoke (invoke 'ns-autorelease-pool alloc) init)))
+       (unwind-protect (progn ,@body)
+         (invoke ,pool drain)))))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 

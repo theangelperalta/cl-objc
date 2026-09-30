@@ -20,9 +20,6 @@
 ;;   (fresh-line))
 
 
-(defun lisp-string-to-nsstring (string)
-  (invoke (invoke 'ns-string alloc) :init-with-utf8-string string))
-
 (defun make-rect (x y width height)
   (destructuring-bind (x y width height)
       (mapcar (lambda (field) (coerce field 'double-float)) (list x y width height))
@@ -86,16 +83,15 @@ to be on the main thread."
   (fresh-line))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
+  (with-autorelease-pool ()
   (let ((app (invoke 'ns-application shared-application))
 	(frame (make-rect 100 100 480 360))
 	;; (frame (objc-cffi::cg-make-rect 0.0d0 0.0d0 360.0d0 480.0d0))
 	;; (frame (make-rect 100.0d0 100.0d0 100.0d0 100.0d0))
 	;; (frame (invoke (invoke 'ns-screen main-screen) frame))
 	;; (nsbundle (invoke 'ns-bundle :load-nib-named (lisp-string-to-nsstring "MainMenu") :owner cl-objc::*nsapp* ))
-	(button-rect (make-rect 10 10 40 40))
-	(bye-rect (make-rect 100 10 40 40)))
-	; Start nsautorelease pool
-	(invoke 'ns-autorelease-pool new)
+	(button-rect (make-rect 10 10 100 40))
+	(bye-rect (make-rect 120 10 100 40)))
     (objc-let* ((delegate 'app-delegate init)
 	       (win 'ns-window)
 	       (hel 'ns-button :init-with-frame button-rect)
@@ -106,17 +102,18 @@ to be on the main thread."
 	       (adios 'ns-sound
 		      :init-with-contents-of-file (lisp-string-to-nsstring "/System/Library/Sounds/Basso.aiff" )
 		      :by-reference 1)
-			(menubar 'ns-menu :init-with-title (lisp-string-to-nsstring "Chicken"))
-			;; (invoke menubar autorelease)
-			(appMenuItem 'ns-menu-item :init-with-title (lisp-string-to-nsstring "Hello Menu") :action (cffi:null-pointer) :key-equivalent (lisp-string-to-nsstring "k"))
-			;; (invoke appMenuItem autorelease)
+			(menubar 'ns-menu :init-with-title (lisp-string-to-nsstring "Main Menu"))
+			(app-menu-item 'ns-menu-item :init-with-title (lisp-string-to-nsstring "") :action (cffi:null-pointer) :key-equivalent (lisp-string-to-nsstring ""))
+			(app-menu 'ns-menu :init-with-title (lisp-string-to-nsstring "Hello Menu"))
+			(hello-menu-item 'ns-menu-item :init-with-title (lisp-string-to-nsstring "Say Hello") :action (cffi:null-pointer) :key-equivalent (lisp-string-to-nsstring "k"))
                 )
 
       ;; (load-nib "MainMenu.nib" app)
 
-			;; (invoke menubar autorelease)
-			;; (invoke appMenuItem autorelease)
-			(invoke menubar :add-item appMenuItem)
+			;; Set up the submenu with an item, attach it to the menu bar item
+			(invoke app-menu :add-item hello-menu-item)
+			(invoke app-menu-item :set-submenu app-menu)
+			(invoke menubar :add-item app-menu-item)
 			(invoke cl-objc::*nsapp* :set-main-menu menubar)
       (invoke cl-objc::*nsapp* :set-delegate delegate)
 					; setting up window
@@ -148,5 +145,5 @@ to be on the main thread."
       (invoke win :make-key-and-order-front (cffi:null-pointer))
       (invoke app :set-activation-policy 0)
       (invoke app :activate-ignoring-other-apps 1)
-      (invoke app run))))
+      (invoke app run)))))
 	  )

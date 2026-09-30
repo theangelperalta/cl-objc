@@ -81,6 +81,15 @@
 (defmethod translate-to-foreign (sel (type objc-selector-type))
   sel)
 
+(defmethod translate-into-foreign-memory ((sel objc-selector) (type objc-selector-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value sel 'uid)))
+
+(defmethod translate-into-foreign-memory ((name string) (type objc-selector-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value (sel-register-name name) 'uid)))
+
+(defmethod translate-into-foreign-memory (sel (type objc-selector-type) pointer)
+  (setf (mem-ref pointer :pointer) sel))
+
 ;;; Methods
 
 (defcfun ("sel_isMapped" sel-is-mapped) :boolean
@@ -327,15 +336,15 @@
       nil))
 
 (defmethod translate-to-foreign ((var-list list) (type objc-ivar-list-type))
-  (let ((ret (foreign-alloc 'objc-ivar-list-cstruct))
+  (let ((ret (foreign-alloc '(:struct objc-ivar-list-cstruct)))
 	(length (length var-list)))
-    (setf (foreign-slot-value ret 'objc-ivar-list-cstruct 'ivar_count) length
-	  (foreign-slot-value ret 'objc-ivar-list-cstruct 'ivar_list) (foreign-alloc 'objc-ivar-cstruct :count length))
-    (loop 
+    (setf (foreign-slot-value ret '(:struct objc-ivar-list-cstruct) 'ivar_count) length
+	  (foreign-slot-value ret '(:struct objc-ivar-list-cstruct) 'ivar_list) (foreign-alloc '(:struct objc-ivar-cstruct) :count length))
+    (loop
        for ivar-idx below length
-       for ivar-ptr = (foreign-slot-pointer ret 'objc-ivar-list-cstruct 'ivar_list) then (inc-pointer ivar-ptr (foreign-type-size 'objc-ivar-cstruct))
+       for ivar-ptr = (foreign-slot-pointer ret '(:struct objc-ivar-list-cstruct) 'ivar_list) then (inc-pointer ivar-ptr (foreign-type-size '(:struct objc-ivar-cstruct)))
        for var in var-list
-       do (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr objc-ivar-cstruct)
+       do (with-foreign-slots ((ivar_name ivar_type ivar_offset) ivar-ptr (:struct objc-ivar-cstruct))
 	    (setf ivar_name (ivar-name var)
 		  ivar_type (objc-types:encode-types (ivar-type var))
 		  ivar_offset (ivar-offset var))))
@@ -343,7 +352,7 @@
 
 (defmethod free-translated-object (method-list-ptr (type objc-ivar-list-type) param)
   (declare (ignore param))
-  (foreign-free (foreign-slot-value method-list-ptr 'objc-ivar-list-cstruct 'ivar_list))
+  (foreign-free (foreign-slot-value method-list-ptr '(:struct objc-ivar-list-cstruct) 'ivar_list))
   (foreign-free method-list-ptr))
 
 ;;; utilities
@@ -501,6 +510,12 @@
   "Returns the size of instances of a class."
   (class objc-class-pointer))
 
+(defcfun ("class_getImageName" class-get-image-name) :string
+  "Returns the path of the dylib that defines CLASS (e.g.
+'/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit'),
+or NIL for classes with no image (created dynamically at runtime)."
+  (class objc-class-pointer))
+
 (defcfun ("class_copyMethodList" objc-get-class-method-list) :pointer
   "Describes the instance methods implemented by a class."
   (class objc-class-pointer)
@@ -563,9 +578,14 @@ of CLASS"
 (defmethod translate-from-foreign (class-ptr (type objc-class-type))
   (if (not (null-pointer-p class-ptr))
       (handler-case
-          (or (gethash (objc-get-class-name class-ptr) *objc-classes*)
+          ;; Only trust a cached entry whose pointer still matches: classes
+          ;; created at runtime get a new address in each process, so an
+          ;; entry saved in a Lisp image can point at freed memory.
+          (or (let ((cached (gethash (objc-get-class-name class-ptr) *objc-classes*)))
+                (when (and cached (pointer-eq (slot-value cached 'class-ptr) class-ptr))
+                  cached))
               (with-foreign-slots ((isa)
-				 class-ptr objc-class-cstruct)
+				 class-ptr (:struct objc-class-cstruct))
 	    (let* ((super_class (objc-get-class-superclass class-ptr))
                 (name (objc-get-class-name class-ptr))
                 (new-isa (objc-get-meta-class-ptr name))
@@ -610,12 +630,12 @@ of CLASS"
   (slot-value (objc-get-class class-name) 'class-ptr))
 
 (defmethod translate-from-foreign (protocol-list-ptr (type objc-protocol-list-type))
-  (loop 
-     for ptr = protocol-list-ptr then (foreign-slot-value ptr 'objc-protocol-list-cstruct 'next)
+  (loop
+     for ptr = protocol-list-ptr then (foreign-slot-value ptr '(:struct objc-protocol-list-cstruct) 'next)
      until (null-pointer-p ptr)
-     nconc (loop 
-	      for idx below (foreign-slot-value ptr 'objc-protocol-list-cstruct 'count) 
-	      for protocol-ptr = (foreign-slot-pointer ptr 'objc-protocol-list-cstruct 'protocols) then (inc-pointer protocol-ptr (foreign-type-size 'objc-object-cstruct))
+     nconc (loop
+	      for idx below (foreign-slot-value ptr '(:struct objc-protocol-list-cstruct) 'count)
+	      for protocol-ptr = (foreign-slot-pointer ptr '(:struct objc-protocol-list-cstruct) 'protocols) then (inc-pointer protocol-ptr (foreign-type-size '(:struct objc-object-cstruct)))
 	      for protocol = (mem-ref protocol-ptr 'objc-protocol-pointer)
 	      collecting protocol)))
 
@@ -810,6 +830,14 @@ ObjectiveC object OBJ"
   "Translation of a class object into an objc-object for message
 calling"
   (slot-value class 'class-ptr))
+
+;; translate-into-foreign-memory is needed when cffi-libffi prepares
+;; arguments for foreign-funcall with struct return types.
+(defmethod translate-into-foreign-memory ((obj objc-object) (type objc-object-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value obj 'id)))
+
+(defmethod translate-into-foreign-memory ((class objc-class) (type objc-object-type) pointer)
+  (setf (mem-ref pointer :pointer) (slot-value class 'class-ptr)))
 
 ;;; Utilities
 (defmethod super-classes ((obj objc-object))

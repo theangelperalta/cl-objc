@@ -1,0 +1,8 @@
+("quicklisp" .
+ (:class qlot/source/dist:source-dist
+  :initargs (:distribution "https://beta.quicklisp.org/dist/quicklisp.txt" :%version :latest)
+  :version "2026-01-01"))
+("cffi" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/theangelperalta/cffi.git" :branch "feature/fsbv-defcallback")
+  :version "git-1ffa6df51f92fd1916824756de4b6624875e983b"))

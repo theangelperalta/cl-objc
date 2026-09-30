@@ -132,7 +132,7 @@
   (handler-case
       (parse-with-lexer (typestr-lexer str) *objc-type-parser*)
   (t (c)
-    (v:debug :objc-types "Failed to parse type string: |~a| : |~a|~%" str c))))
+    #+(or)(v:debug :objc-types "Failed to parse type string: |~a| : |~a|~%" str c))))
 
 (defun objc-foreign-type-size (type)
   (cond 

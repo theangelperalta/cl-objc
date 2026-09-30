@@ -16,32 +16,78 @@ TYPE exists."
   (probe-file (framework-bindings-pathname framework-name type)))
 
 (defmacro with-framework-file (framework-name type force &body body)
-  (let ((pathname (gensym)))
+  (let ((pathname (gensym))
+        (t0 (gensym "T0-")))
     `(let ((,pathname (framework-bindings-pathname ,framework-name ',type)))
        (when (or ,force (not (probe-file ,pathname)))
-	 (with-open-file (out ,pathname
-			      :direction :output :if-exists :supersede :if-does-not-exist :create)
-	   (format *trace-output* "~%Compiling ~a bindings for ~a framework in ~a~%"
-		   (symbol-name ',type)
-		   ,framework-name
-		   ,pathname)
-	   ,@body)
-	 (compile-file ,pathname :verbose nil :print nil)))))
+         (let ((,t0 (get-internal-real-time)))
+           (with-open-file (out ,pathname
+                                :direction :output :if-exists :supersede :if-does-not-exist :create)
+             (format *trace-output* "~%Writing ~a bindings for ~a to ~a~%"
+                     (symbol-name ',type) ,framework-name ,pathname)
+             (force-output *trace-output*)
+             ,@body)
+           (when objc-clos:*cl-objc-verbose*
+             (format *trace-output* "~&[with-framework-file] write done in ~,1fs~%"
+                     (/ (- (get-internal-real-time) ,t0) internal-time-units-per-second))
+             (force-output *trace-output*))
+           (setf ,t0 (get-internal-real-time))
+           (format *trace-output* "~&Compiling ~a bindings for ~a...~%" (symbol-name ',type) ,framework-name)
+           (force-output *trace-output*)
+           (compile-file ,pathname :verbose nil :print nil)
+           (when objc-clos:*cl-objc-verbose*
+             (format *trace-output* "~&[with-framework-file] compile-file done in ~,1fs~%"
+                     (/ (- (get-internal-real-time) ,t0) internal-time-units-per-second))
+             (force-output *trace-output*)))))))
 
 (defparameter *frameworks* nil "The list of frameworks loaded.
 Each element is a cons with car eq to the short name of the
 framework and cons is wheter or not its clos binding are been
 loaded.")
 
+(defun ensure-framework-clos-bindings (framework-name)
+  "Make sure CLOS bindings (classes + generic functions) are present in
+the image for FRAMEWORK-NAME. If a precompiled CLOS fasl exists under
+*FRAMEWORK-DIRECTORY*, load it as a fast path; then run
+UPDATE-CLOS-BINDINGS to cover any classes the runtime has added since
+the cache was generated. Idempotent across calls within an image."
+  (let ((entry (assoc framework-name *frameworks* :test #'string-equal)))
+    (when (and entry (cdr entry))
+      (return-from ensure-framework-clos-bindings)))
+  (let* ((clos-source (framework-bindings-pathname framework-name 'clos))
+         (clos-fasl (compile-file-pathname clos-source)))
+    (when (probe-file clos-fasl)
+      (format *trace-output* "~&Loading cached CLOS bindings for ~a from ~a~%"
+              framework-name clos-fasl)
+      (force-output *trace-output*)
+      (handler-case (load clos-fasl)
+        (error (c)
+          (format *trace-output*
+                  "~&Failed to load cached CLOS bindings (~a); falling back to in-memory generation~%"
+                  c)
+          (force-output *trace-output*)))))
+  (format *trace-output* "~&Updating CLOS bindings for ~a framework...~%" framework-name)
+  (force-output *trace-output*)
+  (objc-clos:update-clos-bindings :for-framework framework-name)
+  (let ((entry (assoc framework-name *frameworks* :test #'string-equal)))
+    (if entry
+        (rplacd entry t)
+        (push (cons framework-name t) *frameworks*))))
+
 (defmacro import-framework (framework-name &optional clos)
-  "Import the ObjC framework FRAMEWORK-NAME. If CLOS or
-OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true then load also
-the CLOS bindings."
+  "Import the ObjC framework FRAMEWORK-NAME, loading its STATIC bindings
+(struct layouts, C functions, type definitions).
+
+If CLOS or OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true, CLOS
+bindings are made available via ENSURE-FRAMEWORK-CLOS-BINDINGS, which
+prefers a precompiled CLOS fasl when one is present and otherwise
+generates them in memory. Otherwise CLOS bindings are produced lazily on
+demand via OBJC-CLOS:ENSURE-CLOS-BINDINGS / ENSURE-CLOS-CLASS."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal))
-	    (clos-loaded (cdr framework-loaded-p)))
+     (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal)))
        (unless framework-loaded-p
 	 (load-framework ,framework-name)
+	 (objc-clos:clear-framework-class-cache)
 	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'static))))
 	   (unless (probe-file compiled-file)
 	     (compile-file (framework-bindings-pathname ,framework-name 'static) :verbose nil :print nil)
@@ -50,19 +96,11 @@ the CLOS bindings."
 		     compiled-file))
 	   (load compiled-file))
 	 (push (cons ,framework-name nil) *frameworks*))
-       (when (and (not clos-loaded)
-		  (or ,clos objc-clos:*automatic-clos-bindings-update*))
-	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'clos))))
-	   (unless (probe-file compiled-file)
-	     (compile-file (framework-bindings-pathname ,framework-name 'clos) :verbose nil :print nil)
-	     (format *trace-output* "~%Compiling CLOS bindings for ~a framework in ~a~%"
-		     ,framework-name
-		     compiled-file))
-	   (load compiled-file))
-	 (rplacd (assoc ,framework-name *frameworks* :test #'string-equal) t)))
+       (when (or ,clos objc-clos:*automatic-clos-bindings-update*)
+	 (ensure-framework-clos-bindings ,framework-name)))
      *frameworks*))
 
-(defmacro compile-framework ((framework-name &key force (clos-bindings t)) &body other-bindings)
+(defmacro compile-framework ((framework-name &key force (clos-bindings nil)) &body other-bindings)
   "Create bindings for FRAMEWORK-NAME. Frameworks will be
 searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*. The bindings
 will not be loaded."
@@ -76,8 +114,7 @@ will not be loaded."
 
      (with-framework-file ,framework-name static ,force
        (update-cstruct-database :output-stream out)
-       (format out "~{~s~%~}" (quote ,other-bindings))
-       (format out "~%~%)"))
+       (format out "~{~s~%~}" (quote ,other-bindings)))
      t))
 
 ;; Copyright (c) 2007, Luigi Panzeri

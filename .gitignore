@@ -6,6 +6,7 @@
 *.so
 *.fasl
 *.xfasl
+system-index.txt
 .DS_Store
 doc/*.aux
 doc/manual/
@@ -67,3 +68,4 @@ venv
 *-STATIC.lisp
 
 class_introspection
+.qlot/
