@@ -165,7 +165,8 @@
 	   "CONVERTER"
 	   "APP-DELEGATE"
 	   "CIRCLE-VIEW"
-	   "VIDEO-PLAYER"))
+	   "VIDEO-PLAYER"
+	   "TODO-APP"))
 
 (defpackage "CL-OBJC-USER"
   (:use "COMMON-LISP" "CL-OBJC" "OBJC-CFFI" "OBJC-READER" "OBJC-CLOS"))

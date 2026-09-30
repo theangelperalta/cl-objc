@@ -55,6 +55,11 @@
   :components ((:file "video-player"))
   :depends-on (:cl-objc :swank))
 
+(defsystem cl-objc/examples/todo
+  :pathname "examples/todo/"
+  :components ((:file "todo"))
+  :depends-on (:cl-objc :swank))
+
 (defsystem cl-objc.doc
   :components ((:module :doc
 			:components ((:file "docstrings")
