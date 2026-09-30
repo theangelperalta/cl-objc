@@ -1,13 +1,11 @@
 ## CL-OBJC
 A Common Lisp / Objective-C bridge for building native macOS Cocoa applications using [CFFI](https://common-lisp.net/project/cffi/). Write your application logic and UI entirely in Common Lisp — no Objective-C source files, no Interface Builder.
 
-> This is a revival of the original project by Geoff Cant and Luigi Panzeri. Active development is on the `story/revival` branch.
-
 ---
 
 ## Status
 
-All three original examples are working on Apple Silicon (arm64). The bridge supports:
+All four examples — the three originals and a new video player — are working on Apple Silicon (arm64). The bridge supports:
 
 - Calling any Objective-C method via `invoke`
 - Defining new Objective-C classes and methods from Lisp at runtime
