@@ -9,6 +9,7 @@
   (define-objc-struct ((cg-size :class c-cg-size) "CGSize") (width :DOUBLE) (height :DOUBLE))
   (define-objc-struct ((cg-point :class c-cg-point) "CGPoint") (x :DOUBLE) (y :DOUBLE))
   (define-objc-struct ((cg-rect :class c-cg-rect) "CGRect") (origin (:struct cg-point)) (size (:struct cg-size)))
+  (define-objc-struct ((ns-edge-insets :class c-ns-edge-insets) "NSEdgeInsets") (top :double) (left :double) (bottom :double) (right :double))
   (cffi:defctype ns-time-interval :double)
   (cffi:defcvar ("NSForegroundColorAttributeName" *ns-foreground-color-attribute-name*) objc-id)
   (cffi:defcvar ("NSModalPanelRunLoopMode" *ns-modal-panel-run-loop-mode*) objc-id)

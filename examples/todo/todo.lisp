@@ -216,15 +216,6 @@ keep classes registered with the ObjC runtime."
    :origin (cl-objc::make-cg-point :x (float x 1d0) :y (float y 1d0))
    :size (cl-objc::make-cg-size :width (float width 1d0) :height (float height 1d0))))
 
-;; cl-objc doesn't define NSEdgeInsets, which the scroll view's content
-;; insets use. The struct machinery expects its names in CL-OBJC.
-(in-package :cl-objc)
-
-(define-objc-struct ((ns-edge-insets :class c-ns-edge-insets) "NSEdgeInsets")
-  (top :double) (left :double) (bottom :double) (right :double))
-
-(in-package "CL-OBJC-EXAMPLES")
-
 ;; NSAutoresizingMaskOptions
 (defconstant +min-x-margin+ 1)
 (defconstant +width-sizable+ 2)
