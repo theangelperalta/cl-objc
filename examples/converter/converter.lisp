@@ -107,11 +107,13 @@ to be on the main thread."
     )
 
   (with-object amount-of-currency-lbl
-    (:set-string-value (lisp-string-to-nsstring "Amount of Currency 1"))
+    (:set-string-value (lisp-string-to-nsstring "Amount of Currency"))
     (:set-bezeled 0)
     (:set-draws-background 0)
     (:set-editable 0)
     (:set-selectable 0)
+    ;; NSTextAlignmentRight - 2
+    (:set-alignment 2)
     )
 
   (with-object rate-lbl
@@ -120,6 +122,8 @@ to be on the main thread."
     (:set-draws-background 0)
     (:set-editable 0)
     (:set-selectable 0)
+    ;; NSTextAlignmentRight - 2
+    (:set-alignment 2)
     )
 
   (with-object result-lbl
@@ -128,6 +132,8 @@ to be on the main thread."
     (:set-draws-background 0)
     (:set-editable 0)
     (:set-selectable 0)
+    ;; NSTextAlignmentRight - 2
+    (:set-alignment 2)
     )
 
   (with-object style-line

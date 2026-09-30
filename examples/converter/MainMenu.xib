@@ -721,7 +721,7 @@
                         <constraints>
                             <constraint firstAttribute="width" constant="132" id="JdF-J1-qUX"/>
                         </constraints>
-                        <textFieldCell key="cell" lineBreakMode="clipping" title="Amount of Currency 1" id="4zK-mX-bwD">
+                        <textFieldCell key="cell" lineBreakMode="clipping" title="Amount of Currency" id="4zK-mX-bwD">
                             <font key="font" metaFont="system"/>
                             <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
