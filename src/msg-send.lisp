@@ -270,18 +270,23 @@ so NSString itself receives alloc and initWithUTF8String:."
 
 (defun coerce-objc-args (args method)
   "Coerce Lisp strings to NSString objects for arguments where the
-ObjC method expects an object (objc-id) type.
+ObjC method expects an object (objc-id) type, and integers to Lisp
+booleans where it expects a BOOL, so 0 means NO as it does in ObjC.
 
 Returns the coerced argument list and, as a second value, the list of
 NSStrings created, which the caller must release after the call."
   (let ((arg-types (method-argument-types method))
 	(created '()))
     (values (mapcar (lambda (arg type)
-		      (if (and (stringp arg) (eq type 'objc-id))
-			  (let ((nsstring (lisp-string-to-nsstring arg)))
-			    (push nsstring created)
-			    nsstring)
-			  arg))
+		      (cond ((and (stringp arg) (eq type 'objc-id))
+			     (let ((nsstring (lisp-string-to-nsstring arg)))
+			       (push nsstring created)
+			       nsstring))
+			    ;; CFFI's :boolean treats any non-NIL value,
+			    ;; including 0, as true.
+			    ((and (integerp arg) (eq type :boolean))
+			     (/= arg 0))
+			    (t arg)))
 		    args arg-types)
 	    created)))
 

@@ -121,3 +121,15 @@ as a double (or vice versa)."
                         when (and (consp k) (string= (car k) "collide:"))
                         collect (cdr k))))
         (ok (= 2 (length (remove-duplicates keys :test #'string=))))))))
+
+(deftest untyped-bool-arguments
+  (testing "Integers passed for BOOL arguments follow ObjC truthiness: 0 is
+NO. CFFI's :boolean alone would turn 0 into YES."
+    (flet ((bool-round-trip (value)
+             (untyped-objc-msg-send
+              (untyped-objc-msg-send (objc-get-class "NSNumber") "numberWithBool:" value)
+              "boolValue")))
+      (ok (null (bool-round-trip 0)))
+      (ok (bool-round-trip 1))
+      (ok (null (bool-round-trip nil)))
+      (ok (bool-round-trip t)))))
