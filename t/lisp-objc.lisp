@@ -124,6 +124,28 @@ big struct as input parameter"
 	(y 2))
     (ok (= (invoke (invoke x :lisp-add2 y) int-value)  3))))
 
+(deftest redefining-method-reuses-callback
+  (testing "Redefining a method reuses its callback, so redefining it more
+often than SBCL has room for callbacks still works."
+    (loop :for i :from 1 :to 300
+          :do (eval `(define-objc-method redefined-often (:return-type :int)
+                         ((self ns-number))
+                       ,i)))
+    (ok (= 300 (invoke (invoke 'ns-number :number-with-int 0) redefined-often))))
+  (testing "Redefining a method with a different signature doesn't signal.
+SBCL can't redefine a callback with a different signature, so the new
+signature gets its own callback. (The Objective-C runtime keeps the
+method's original type encoding either way.)"
+    (eval '(define-objc-method resigned (:return-type :int) ((self ns-number))
+            1))
+    (ok (handler-case
+            (progn
+              (eval '(define-objc-method resigned (:return-type :double)
+                         ((self ns-number))
+                       2.5d0))
+              t)
+          (error () nil)))))
+
 
 (define-objc-class ns-test-1 ns-number
     ((counter :int)))

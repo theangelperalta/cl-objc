@@ -56,6 +56,20 @@ typedef, else TYPE itself."
        (cffi::type-keyword (cffi::actual-type (funcall (gethash interned-type cffi::*default-type-parsers*)))))
       (t type))))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun method-callback-name (class selector class-method return-type types)
+    "Return the name of the callback that implements SELECTOR on CLASS.
+
+The name is the same every time a method is (re)defined with the same
+signature, so redefining it reuses the callback instead of allocating a new
+one. SBCL keeps callbacks in a small, fixed area that is never freed, and
+can't redefine a callback with a different signature, so the signature is
+part of the name."
+    (let ((*package* (find-package "KEYWORD")))
+      (intern (format nil "~:[-~;+~][~A ~A] ~S ~S"
+                      class-method class selector return-type types)
+              "OBJC-CFFI"))))
+
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
   "Add an ObjectiveC method to CLASS returning the CFFI
@@ -74,7 +88,7 @@ the new definition discarding the previous one.
 Return a new ObjectiveC Method object." 
   (multiple-value-bind (var-list type-list)
       (parse-argument-list argument-list)
-    (let* ((callback (gentemp (format nil "~A-CALLBACK-" (remove #\: name))))
+    (let* ((callback (method-callback-name class name class-method return-type type-list))
 	   (new-method (gensym)))
       (let ((has-declare))
 	`(progn
