@@ -1,29 +1,35 @@
 (in-package "OBJC-CFFI")
 
-;;; Build and load the exception shim dylib at load time if needed.
-(eval-when (:load-toplevel :execute)
-  (let* ((base (asdf:system-source-directory :cl-objc))
-         (src  (merge-pathnames "src/exception-shim.m" base))
-         (lib  (merge-pathnames "src/libobjc-exception-shim.dylib" base)))
-    (unless (uiop:file-exists-p lib)
-      (format t "~&; Building ObjC exception shim...~%")
-      (uiop:run-program
-       (list "clang" "-framework" "Foundation" "-dynamiclib"
-             "-o" (namestring lib) (namestring src))
-       :output *standard-output*
-       :error-output *error-output*))
-    (load-foreign-library lib)))
-
-(defcfun ("cl_objc_protected_call" %protected-call) :boolean
-  (fn          :pointer)
-  (ctx         :pointer)
-  (out-exception (:pointer :pointer)))
-
-(defcfun ("cl_nsexception_name"    %exception-name)    :string (exception :pointer))
-(defcfun ("cl_nsexception_reason"  %exception-reason)  :string (exception :pointer))
-(defcfun ("cl_nsexception_release" %exception-release) :void   (exception :pointer))
-
-;;; Condition
+;;; Objective-C exceptions
+;;
+;; An NSException raised by a message sent from Lisp can't be caught with
+;; @try/@catch around the Lisp code: the system unwinder searches for a
+;; handler before unwinding anything, and it stops at the first Lisp frame
+;; because Lisp frames have no unwind info. The search fails, and libobjc
+;; calls its uncaught-exception handler before aborting, with the stack
+;; still intact.
+;;
+;; So we install our own uncaught-exception handler and signal an
+;; OBJC-EXCEPTION from it, right where the exception was raised. Lisp
+;; handlers anywhere up the stack (HANDLER-CASE, the debugger's ABORT
+;; restart, ...) then unwind back into Lisp as usual.
+;;
+;; Costs of doing this:
+;; - The ObjC and C frames between the raise and the Lisp handler are
+;;   abandoned without running their cleanups. A lock held there (for
+;;   example by @synchronized) stays held, and objects they would have
+;;   released leak. Cocoa isn't exception-safe, so treat an OBJC-EXCEPTION
+;;   as a bug report: save your work and consider restarting the image.
+;; - Each exception leaks the NSException and the C++ runtime's
+;;   bookkeeping for it.
+;; - Returning normally from the handler aborts the process, so the
+;;   condition has no CONTINUE restart.
+;;
+;; Foundation installs its own handler when it's loaded, so LOAD-FRAMEWORK
+;; installs ours again after loading each framework.
+;;
+;; Exceptions raised and caught entirely inside Objective-C (no Lisp frames
+;; in between) never reach the handler and behave as they always have.
 
 (define-condition objc-exception (error)
   ((name   :initarg :name   :reader objc-exception-name)
@@ -33,38 +39,50 @@
                      (objc-exception-name c)
                      (objc-exception-reason c)))))
 
-;;; Trampoline
-;;
-;; defcallback produces a static C function pointer.  The actual thunk to
-;; execute is communicated via a dynamically bound variable, so nesting and
-;; per-thread use are both safe.
+(defun %exception-string (exception selector-name)
+  "Return the NSString property SELECTOR-NAME of EXCEPTION as a Lisp string."
+  (let ((string (foreign-funcall "objc_msgSend"
+                                 :pointer exception
+                                 :pointer (foreign-funcall "sel_registerName"
+                                                           :string selector-name
+                                                           :pointer)
+                                 :pointer)))
+    (foreign-funcall "objc_msgSend"
+                     :pointer string
+                     :pointer (foreign-funcall "sel_registerName"
+                                               :string "UTF8String"
+                                               :pointer)
+                     :string)))
 
-(defvar *protected-call-thunk*  nil)
-(defvar *protected-call-result* nil)
+(defcallback %uncaught-exception-handler :void ((exception :pointer))
+  ;; Never return: returning lets libobjc abort the process.
+  (error 'objc-exception
+         :name (%exception-string exception "name")
+         :reason (%exception-string exception "reason")))
 
-(defcallback %thunk-trampoline :void ((ctx :pointer))
-  (declare (ignore ctx))
-  (setf *protected-call-result* (funcall *protected-call-thunk*)))
+(defvar *previous-uncaught-exception-handler* nil
+  "The uncaught-exception handler that was installed before ours.")
+
+(defun install-objc-exception-handler ()
+  "Make Objective-C exceptions that reach Lisp signal OBJC-EXCEPTION.
+Safe to call more than once."
+  (let ((ours (callback %uncaught-exception-handler))
+        (previous (foreign-funcall "objc_setUncaughtExceptionHandler"
+                                   :pointer (callback %uncaught-exception-handler)
+                                   :pointer)))
+    (unless (pointer-eq previous ours)
+      (setf *previous-uncaught-exception-handler* previous))
+    (values)))
+
+(install-objc-exception-handler)
+
+;; The handler is process state, so a saved image has to install it again.
+#+sbcl
+(pushnew 'install-objc-exception-handler sb-ext:*init-hooks*)
 
 (defmacro with-objc-exception-handling (&body body)
-  "Evaluate BODY. If an Objective-C exception is raised, signal
-OBJC-EXCEPTION instead of crashing the process. Returns the primary
-value of BODY on success."
-  (let ((exc (gensym "EXC-")))
-    `(let ((*protected-call-thunk*  (lambda () ,@body))
-           (*protected-call-result* nil))
-       (with-foreign-object (,exc :pointer)
-         (setf (mem-ref ,exc :pointer) (null-pointer))
-         (unless (%protected-call (callback %thunk-trampoline)
-                                  (null-pointer)
-                                  ,exc)
-           (let ((e (mem-ref ,exc :pointer)))
-             (if (null-pointer-p e)
-                 (error 'objc-exception
-                        :name   "unknown"
-                        :reason "a non-NSException C++ exception was thrown")
-                 (let ((name   (%exception-name e))
-                       (reason (%exception-reason e)))
-                   (%exception-release e)
-                   (error 'objc-exception :name name :reason reason)))))
-         *protected-call-result*))))
+  "Evaluate BODY.
+
+Kept for compatibility: Objective-C exceptions that reach Lisp now always
+signal OBJC-EXCEPTION, so this is the same as PROGN."
+  `(progn ,@body))

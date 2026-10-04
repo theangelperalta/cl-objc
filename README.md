@@ -137,10 +137,21 @@ By default, `import-framework` loads only the STATIC bindings (struct layouts, C
 | `(objc-let* ((var class init-msg)) body)` | Alloc/init an ObjC object |
 | `(with-ivar-accessors class body)` | Bind ivar getters/setters in scope |
 | `(with-super (invoke self ...) body)` | Route message to superclass |
-| `(with-objc-exception-handling body)` | Catch ObjC exceptions; signals `objc-exception` instead of crashing |
 | `(ensure-clos-bindings 'ns-string)` | Lazily create CLOS class + method GFs for one ObjC class |
 
 A reader macro provides Smalltalk-style bracket syntax: `[receiver message: arg]`. Activate it with `(objc-reader:activate-objc-reader-macro)`.
+
+### Objective-C exceptions
+
+An `NSException` that reaches Lisp signals an `objc-exception` condition instead of crashing the process. Use `objc-exception-name` and `objc-exception-reason` to read it:
+
+```lisp
+(handler-case (invoke (invoke 'ns-array array) :object-at-index 5)
+  (objc-exception (e)
+    (format t "~a: ~a" (objc-exception-name e) (objc-exception-reason e))))
+```
+
+Recovering from an Objective-C exception isn't fully safe. Cocoa isn't exception-safe, and the Objective-C frames between the raise and your handler are skipped without running their cleanups, so a lock held there stays held. Treat `objc-exception` as a bug report: save your work and consider restarting the image.
 
 ---
 
