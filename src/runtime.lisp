@@ -156,21 +156,30 @@ inconsistent after an exception. Set ~S to NIL to keep running instead.~%"
 
 (defun call-with-method-error-handling (function return-type class selector class-method)
   (let ((*in-lisp-method* t))
-    (if (catch-method-errors-p)
-        (call-catching-method-errors function return-type class selector class-method)
-        (funcall function))))
+    (with-lisp-float-traps
+      (if (catch-method-errors-p)
+          (call-catching-method-errors function return-type class selector class-method)
+          (funcall function)))))
+
+(defun interrupt-p (condition)
+  #+sbcl (typep condition 'sb-sys:interactive-interrupt)
+  #-sbcl (declare (ignore condition)))
 
 (defun call-catching-method-errors (function return-type class selector class-method)
   (block method
     (handler-bind
-        ((error (lambda (condition)
-                  (report-method-error
-                   condition
-                   (format nil "~:[-~;+~][~A ~A]" class-method class selector))
-                  (when (and *exit-on-objc-exception*
-                             (typep condition 'objc-exception))
-                    (exit-after-objc-exception))
-                  (return-from method (method-error-return-value return-type)))))
+        ;; SERIOUS-CONDITION also covers running out of stack or heap, which
+        ;; would otherwise go to the debugger. Interrupts (Control-C) still do.
+        ((serious-condition
+           (lambda (condition)
+             (unless (interrupt-p condition)
+               (report-method-error
+                condition
+                (format nil "~:[-~;+~][~A ~A]" class-method class selector))
+               (when (and *exit-on-objc-exception*
+                          (typep condition 'objc-exception))
+                 (exit-after-objc-exception))
+               (return-from method (method-error-return-value return-type))))))
       (funcall function))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -220,10 +229,11 @@ Return a new ObjectiveC Method object."
 	     ;; values during [super keyDown:]. Those messages go to their
 	     ;; receiver as usual, not to its superclass.
 	     (let ((*super-call* nil))
-	       (call-with-method-error-handling
-		(lambda ()
-		  ,@(if has-declare (cdr body) body))
-		',return-type ,class ,name ,class-method)))
+	       (flet ((method-body ()
+			,@(if has-declare (cdr body) body)))
+		 (declare (dynamic-extent #'method-body))
+		 (call-with-method-error-handling
+		  #'method-body ',return-type ,class ,name ,class-method))))
 	   (let ((,new-method
 		  (register-method ,class
 				   ,name

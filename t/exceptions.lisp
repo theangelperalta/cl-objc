@@ -242,3 +242,37 @@ This also checks the handler is installed again when the image starts."
           (ok (eql 0 code))
           (ok (search "result: 0" output))
           (ok (search "still running" output)))))))
+
+;;; Floating-point traps
+
+(defun nan-double ()
+  "Return a quiet NaN, built from its bits."
+  (sb-kernel:make-double-float #x7FF80000 0))
+
+(define-objc-method divide-by-zero (:return-type :double) ((self ns-number))
+  (/ 1d0 (- (invoke self double-value) (invoke self double-value))))
+
+(deftest float-traps
+  (testing "Messages can return NaNs and infinities without signaling."
+    (ok (sb-ext:float-nan-p
+         (invoke (invoke 'ns-number :number-with-double (nan-double)) double-value))))
+  (testing "A Lisp method keeps Lisp's float traps, even when Objective-C
+calls it with them masked."
+    (let ((*catch-method-errors* nil))
+      (ok (handler-case
+              (progn (invoke (invoke 'ns-number :number-with-double 1d0) divide-by-zero)
+                     nil)
+            (division-by-zero () t)))))
+  (testing "Float traps are as they were afterwards."
+    (ok (equal '(:overflow :invalid :divide-by-zero)
+               (getf (sb-int:get-floating-point-modes) :traps)))))
+
+(define-objc-method failing-storage (:return-type :int) ((self ns-number))
+  (error 'storage-condition))
+
+(deftest caught-serious-conditions
+  (testing "Serious conditions that aren't errors, such as running out of
+memory, are caught too."
+    (multiple-value-bind (result output) (call-failing "failingStorage")
+      (ok (eql 0 result))
+      (ok (search "-[NSNumber failingStorage]" output)))))

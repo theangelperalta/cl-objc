@@ -1,5 +1,33 @@
 (in-package "CL-OBJC-UTILS")
 
+(defmacro with-foreign-float-traps-masked (&body body)
+  "Run BODY, a call into foreign code, with floating-point traps masked.
+
+C code such as Cocoa's can produce NaNs and infinities as part of normal
+work. SBCL checks the floating-point exception flags after a foreign call
+and would signal an error for them, so mask the traps for the call."
+  #+sbcl `(sb-int:with-float-traps-masked
+              (:overflow :invalid :divide-by-zero :inexact :underflow)
+            ,@body)
+  #-sbcl `(progn ,@body))
+
+(defmacro with-lisp-float-traps (&body body)
+  "Run BODY, Lisp code called from foreign code, with SBCL's usual
+floating-point traps enabled, so it signals errors for invalid operations,
+division by zero and overflow as Lisp code normally does. Foreign code
+typically calls it with the traps masked."
+  #+sbcl (let ((modes (gensym "MODES-")))
+           `(let ((,modes (sb-int:get-floating-point-modes)))
+              (unwind-protect
+                   (progn
+                     (sb-int:set-floating-point-modes
+                      :traps '(:overflow :invalid :divide-by-zero)
+                      :accrued-exceptions nil
+                      :current-exceptions nil)
+                     ,@body)
+                (apply #'sb-int:set-floating-point-modes ,modes))))
+  #-sbcl `(progn ,@body))
+
 (defmacro with-gensyms (names &body forms)
   `(let ,(loop for n in names collect `(,n (gensym)))
      ,@forms))
