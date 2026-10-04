@@ -96,14 +96,52 @@ where there is no one to use the debugger.")
           (setf (mem-aref memory :uint8 i) 0))
         (mem-ref memory type)))))
 
+(defvar *exit-on-objc-exception* t
+  "Whether to exit when a caught error in a Lisp method is an OBJC-EXCEPTION.
+
+Applies only when *CATCH-METHOD-ERRORS* catches the error. Cocoa isn't
+exception-safe, so after an exception the application may hold locks or
+inconsistent state; by default it reports the exception and exits, as
+Apple recommends. Set this to NIL to keep running instead.")
+
+(defvar *method-error-counts*
+  (make-hash-table :test 'equal #+sbcl :synchronized #+sbcl t)
+  "How many errors each Lisp method has had, by method name.")
+
+(defun report-method-error (condition method-name)
+  "Report CONDITION from METHOD-NAME on *ERROR-OUTPUT*.
+
+The first error in a method gets a backtrace. Later ones are counted and
+reported in one line when the count reaches a power of two, so a method that
+fails on every call, such as -drawRect:, doesn't flood the log."
+  (let ((count (incf (gethash method-name *method-error-counts* 0))))
+    (cond ((= count 1)
+           (format *error-output* "~&Error in ~A: ~A~%" method-name condition)
+           #+sbcl (sb-debug:print-backtrace :count 30 :stream *error-output*))
+          ((zerop (logand count (1- count)))
+           (format *error-output* "~&Error in ~A again (~:D times so far): ~A~%"
+                   method-name count condition)))))
+
+(defun exit-after-objc-exception ()
+  (format *error-output* "~&Exiting because Objective-C state may be ~
+inconsistent after an exception. Set ~S to NIL to keep running instead.~%"
+          '*exit-on-objc-exception*)
+  (finish-output *error-output*)
+  ;; Don't unwind: that would run cleanups through the abandoned frames.
+  #+sbcl (sb-ext:exit :code 1 :abort t)
+  #-sbcl (uiop:quit 1 nil))
+
 (defun call-with-method-error-handling (function return-type class selector class-method)
   (if (catch-method-errors-p)
       (block method
         (handler-bind
             ((error (lambda (condition)
-                      (format *error-output* "~&Error in ~:[-~;+~][~A ~A]: ~A~%"
-                              class-method class selector condition)
-                      #+sbcl (sb-debug:print-backtrace :count 30 :stream *error-output*)
+                      (report-method-error
+                       condition
+                       (format nil "~:[-~;+~][~A ~A]" class-method class selector))
+                      (when (and *exit-on-objc-exception*
+                                 (typep condition 'objc-exception))
+                        (exit-after-objc-exception))
                       (return-from method (method-error-return-value return-type)))))
           (funcall function)))
       (funcall function)))

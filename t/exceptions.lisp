@@ -73,10 +73,30 @@ and reports which method failed."
       (ok (search "Error in -[NSNumber failingInt]: failing-int" output)))
     (ok (eql 0d0 (call-failing "failingDouble")))
     (ok (objc-nil-object-p (call-failing "failingObject"))))
-  (testing "An Objective-C exception raised inside a method is caught too."
-    (multiple-value-bind (result output) (call-failing "failingObjcException")
-      (ok (eql 0 result))
-      (ok (search "NSRangeException" output)))))
+  (testing "With *EXIT-ON-OBJC-EXCEPTION* NIL, an Objective-C exception
+raised inside a method is caught too."
+    (let ((*exit-on-objc-exception* nil))
+      (multiple-value-bind (result output) (call-failing "failingObjcException")
+        (ok (eql 0 result))
+        (ok (search "NSRangeException" output))))))
+
+(define-objc-method failing-repeatedly (:return-type :int) ((self ns-number))
+  (error "failing-repeatedly"))
+
+(deftest repeated-method-errors-are-summarized
+  (testing "Only the first error in a method gets a backtrace. Repeats are
+reported in one line at powers of two."
+    (let ((outputs (loop :repeat 9
+                         :collect (nth-value 1 (call-failing "failingRepeatedly")))))
+      (ok (search "Error in -[NSNumber failingRepeatedly]: failing-repeatedly"
+                  (first outputs)))
+      (ok (search "0: (" (first outputs)))
+      (loop :for count :in '(2 4 8)
+            :for output := (nth (1- count) outputs)
+            :do (ok (search (format nil "again (~D times so far)" count) output))
+                (ok (not (search "0: (" output))))
+      (loop :for count :in '(3 5 6 7 9)
+            :do (ok (string= "" (nth (1- count) outputs)))))))
 
 (deftest uncaught-method-errors-reach-caller
   (testing "With *CATCH-METHOD-ERRORS* NIL, or :AUTO outside a saved

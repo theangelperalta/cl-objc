@@ -22,7 +22,7 @@
 				       (:file "exceptions" :depends-on ("packages" "cffi"))
 				       (:file "structs" :depends-on ("packages" "utils" "objc-types" "lisp-interface"))
 				       (:file "msg-send" :depends-on ("packages" "utils" "objc-types" "cffi"))
-				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils" "clos"))
+				       (:file "runtime" :depends-on ("packages" "objc-types" "cffi" "utils" "clos" "exceptions"))
 				       (:file "objc-types" :depends-on ("packages"))
 				       (:file "lisp-interface" :depends-on ("packages" "utils" "cffi"))
 				       (:file "clos" :depends-on ("packages" 
