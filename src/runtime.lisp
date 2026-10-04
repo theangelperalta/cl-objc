@@ -14,7 +14,25 @@
   (method_imp objc-method-pointer)
   (types :string))
 
+(defvar *defined-method-encodings* (make-hash-table :test 'equal)
+  "The type encoding each Lisp-defined method was first registered with.")
+
+(defun check-method-encoding (class selector-name types class-method)
+  "Warn if a Lisp method is being redefined with a different type encoding.
+class_replaceMethod keeps a method's original encoding, so Objective-C
+callers would keep using the old signature."
+  (let* ((key (list class selector-name (and class-method t)))
+         (original (gethash key *defined-method-encodings*)))
+    (cond ((null original)
+           (setf (gethash key *defined-method-encodings*) types))
+          ((string/= original types)
+           (warn "Redefining ~:[-~;+~][~A ~A] with type encoding ~S, but ~
+Objective-C keeps its original encoding ~S, so callers will use the old ~
+signature. Restart the image to change a method's signature."
+                 class-method class selector-name types original)))))
+
 (defun register-method (class selector-name types callback class-method)
+  (check-method-encoding class selector-name types class-method)
   (let ((class (objc-lookup-class class)))
     (assert (not (eq class objc-nil-class)))
     (let* ((selector (sel-register-name selector-name))
@@ -67,7 +85,11 @@ of its return type (0, NIL, a null object or a zeroed struct) to its
 Objective-C caller, so the application keeps running.
 
 The default, :AUTO, catches errors only when running as a saved executable,
-where there is no one to use the debugger.")
+where there is no one to use the debugger.
+
+A caught error never reaches handlers in the Lisp code that sent the
+message, because the method returns normally. To handle a method's errors
+yourself, bind this to NIL around the message.")
 
 (defvar *running-saved-executable* nil
   "True when this image is a saved executable. Set at startup.")
@@ -77,10 +99,11 @@ where there is no one to use the debugger.")
                 (probe-file sb-ext:*core-pathname*))
   #-sbcl nil)
 
+(defun note-running-saved-executable ()
+  (setf *running-saved-executable* (running-saved-executable-p)))
+
 #+sbcl
-(pushnew (lambda ()
-           (setf *running-saved-executable* (running-saved-executable-p)))
-         sb-ext:*init-hooks*)
+(pushnew 'note-running-saved-executable sb-ext:*init-hooks*)
 
 (defun catch-method-errors-p ()
   (if (eq *catch-method-errors* :auto)
@@ -132,19 +155,23 @@ inconsistent after an exception. Set ~S to NIL to keep running instead.~%"
   #-sbcl (uiop:quit 1 nil))
 
 (defun call-with-method-error-handling (function return-type class selector class-method)
-  (if (catch-method-errors-p)
-      (block method
-        (handler-bind
-            ((error (lambda (condition)
-                      (report-method-error
-                       condition
-                       (format nil "~:[-~;+~][~A ~A]" class-method class selector))
-                      (when (and *exit-on-objc-exception*
-                                 (typep condition 'objc-exception))
-                        (exit-after-objc-exception))
-                      (return-from method (method-error-return-value return-type)))))
-          (funcall function)))
-      (funcall function)))
+  (let ((*in-lisp-method* t))
+    (if (catch-method-errors-p)
+        (call-catching-method-errors function return-type class selector class-method)
+        (funcall function))))
+
+(defun call-catching-method-errors (function return-type class selector class-method)
+  (block method
+    (handler-bind
+        ((error (lambda (condition)
+                  (report-method-error
+                   condition
+                   (format nil "~:[-~;+~][~A ~A]" class-method class selector))
+                  (when (and *exit-on-objc-exception*
+                             (typep condition 'objc-exception))
+                    (exit-after-objc-exception))
+                  (return-from method (method-error-return-value return-type)))))
+      (funcall function))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun method-callback-name (class selector class-method return-type types)

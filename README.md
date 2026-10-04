@@ -159,6 +159,14 @@ During development, an error inside a `define-objc-method` body, including an `o
 
 `*catch-method-errors*` controls this. The default, `:auto`, catches errors only in a saved executable. Set it to `t` or `nil` to always or never catch them.
 
+A caught error never reaches handlers in the Lisp code that sent the message, because the method returns normally. To handle a method's errors yourself in a saved executable, bind `*catch-method-errors*` to `nil` around the message:
+
+```lisp
+(let ((*catch-method-errors* nil))
+  (handler-case (invoke obj :lisp-method)
+    (error (e) ...)))
+```
+
 Only the first error in each method gets a backtrace. Repeats are counted and reported in one line when the count reaches 2, 4, 8 and so on, so a `drawRect:` that fails on every redraw doesn't flood the log.
 
 When a caught error is an `objc-exception`, the application reports it and exits, because Objective-C state may be inconsistent after an exception (Apple recommends the same). Set `*exit-on-objc-exception*` to `nil` to keep running instead.

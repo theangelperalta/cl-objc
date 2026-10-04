@@ -25,6 +25,10 @@
 ;; - Returning normally from the handler aborts the process, so the
 ;;   condition has no CONTINUE restart.
 ;;
+;; An exception on a thread that isn't running Lisp code, such as a GCD
+;; worker, goes to the handler that was installed before ours, so it's
+;; reported and the process aborts as before.
+;;
 ;; Foundation installs its own handler when it's loaded, so LOAD-FRAMEWORK
 ;; installs ours again after loading each framework.
 ;;
@@ -39,29 +43,65 @@
                      (objc-exception-name c)
                      (objc-exception-reason c)))))
 
-(defun %exception-string (exception selector-name)
-  "Return the NSString property SELECTOR-NAME of EXCEPTION as a Lisp string."
-  (let ((string (foreign-funcall "objc_msgSend"
-                                 :pointer exception
-                                 :pointer (foreign-funcall "sel_registerName"
-                                                           :string selector-name
-                                                           :pointer)
-                                 :pointer)))
-    (foreign-funcall "objc_msgSend"
-                     :pointer string
-                     :pointer (foreign-funcall "sel_registerName"
-                                               :string "UTF8String"
-                                               :pointer)
-                     :string)))
+(defun %selector (name)
+  (foreign-funcall "sel_registerName" :string name :pointer))
 
-(defcallback %uncaught-exception-handler :void ((exception :pointer))
-  ;; Never return: returning lets libobjc abort the process.
-  (error 'objc-exception
-         :name (%exception-string exception "name")
-         :reason (%exception-string exception "reason")))
+;; The uncaught-exception handler sends messages directly, so it doesn't
+;; depend on the rest of cl-objc.
+(defun %send-for-object (receiver selector-name)
+  (foreign-funcall "objc_msgSend" :pointer receiver :pointer (%selector selector-name)
+                   :pointer))
+
+(defun %nsstring-to-lisp (string)
+  (foreign-funcall "objc_msgSend" :pointer string :pointer (%selector "UTF8String")
+                   :string))
+
+(defun %nsexception-p (object)
+  (plusp (foreign-funcall "objc_msgSend"
+                          :pointer object
+                          :pointer (%selector "isKindOfClass:")
+                          :pointer (foreign-funcall "objc_getClass"
+                                                    :string "NSException" :pointer)
+                          :unsigned-char)))
+
+(defun %exception-name-and-reason (object)
+  "Return the name and reason of the thrown OBJECT. @throw accepts any
+object, so for one that isn't an NSException, return its class name and
+description."
+  (if (%nsexception-p object)
+      (values (%nsstring-to-lisp (%send-for-object object "name"))
+              (%nsstring-to-lisp (%send-for-object object "reason")))
+      (values (if (null-pointer-p object)
+                  "nil"
+                  (foreign-funcall "object_getClassName" :pointer object :string))
+              (%nsstring-to-lisp (%send-for-object object "description")))))
 
 (defvar *previous-uncaught-exception-handler* nil
   "The uncaught-exception handler that was installed before ours.")
+
+(defvar *in-lisp-method* nil
+  "True while a Lisp method called from Objective-C is running.")
+
+(defun lisp-running-on-this-thread-p ()
+  "Whether Lisp code is running on this thread, below the exception.
+
+Threads that Lisp didn't create, such as GCD workers, only run Lisp inside
+callbacks. An exception raised there with no Lisp method running has no
+Lisp code to return to, so it goes to the previous handler instead."
+  (or *in-lisp-method*
+      #+sbcl (not (typep sb-thread:*current-thread* 'sb-thread:foreign-thread))
+      #-sbcl t))
+
+(defcallback %uncaught-exception-handler :void ((exception :pointer))
+  (if (lisp-running-on-this-thread-p)
+      (multiple-value-bind (name reason) (%exception-name-and-reason exception)
+        ;; Never return from here: returning lets libobjc abort the process.
+        (error 'objc-exception :name name :reason reason))
+      (let ((previous *previous-uncaught-exception-handler*))
+        ;; Report it the way the process would have without us. libobjc
+        ;; aborts when we return.
+        (when (and previous (not (null-pointer-p previous)))
+          (foreign-funcall-pointer previous () :pointer exception :void)))))
 
 (defun install-objc-exception-handler ()
   "Make Objective-C exceptions that reach Lisp signal OBJC-EXCEPTION.

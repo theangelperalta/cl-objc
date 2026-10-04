@@ -132,19 +132,23 @@ often than SBCL has room for callbacks still works."
                          ((self ns-number))
                        ,i)))
     (ok (= 300 (invoke (invoke 'ns-number :number-with-int 0) redefined-often))))
-  (testing "Redefining a method with a different signature doesn't signal.
-SBCL can't redefine a callback with a different signature, so the new
-signature gets its own callback. (The Objective-C runtime keeps the
-method's original type encoding either way.)"
+  (testing "Redefining a method with a different signature warns, because
+Objective-C keeps the method's original type encoding."
     (eval '(define-objc-method resigned (:return-type :int) ((self ns-number))
             1))
-    (ok (handler-case
-            (progn
-              (eval '(define-objc-method resigned (:return-type :double)
-                         ((self ns-number))
-                       2.5d0))
-              t)
-          (error () nil)))))
+    (ok (signals (eval '(define-objc-method resigned (:return-type :double)
+                            ((self ns-number))
+                          2.5d0))
+                 'warning)))
+  (testing "Class methods get their own callback names."
+    (ok (string= "+[NSNumber magic]"
+                 (subseq (symbol-name (objc-cffi::method-callback-name
+                                       "NSNumber" "magic" t :int '(objc-id objc-sel)))
+                         0 17)))
+    (ok (string= "-[NSNumber magic]"
+                 (subseq (symbol-name (objc-cffi::method-callback-name
+                                       "NSNumber" "magic" nil :int '(objc-id objc-sel)))
+                         0 17)))))
 
 
 (define-objc-class ns-test-1 ns-number

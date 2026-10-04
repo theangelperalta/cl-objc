@@ -108,3 +108,137 @@ executable, the error reaches the Lisp code that sent the message."
                        nil)
               (simple-error (e)
                 (equal "failing-int" (princ-to-string e)))))))))
+
+(define-objc-method outer-calls-failing (:return-type :int) ((self ns-number))
+  (+ 100 (untyped-objc-msg-send self "failingInt")))
+
+(deftest handling-method-errors-yourself
+  (testing "Where method errors are caught, binding *CATCH-METHOD-ERRORS* to
+NIL around a message lets the sender's own handlers get them."
+    (let ((*catch-method-errors* t)
+          (*exit-on-objc-exception* t))
+      (let ((*catch-method-errors* nil))
+        (ok (handler-case
+                (progn (untyped-objc-msg-send (invoke 'ns-number :number-with-int 7)
+                                              "failingInt")
+                       nil)
+              (simple-error () t)))
+        (ok (handler-case
+                (progn (untyped-objc-msg-send (invoke 'ns-number :number-with-int 7)
+                                              "failingObjcException")
+                       nil)
+              (objc-exception () t)))))))
+
+(deftest nested-method-errors
+  (testing "An error in a method called from another Lisp method stays with
+the method it came from."
+    (multiple-value-bind (result output) (call-failing "outerCallsFailing")
+      (ok (eql 100 result))
+      (ok (search "-[NSNumber failingInt]" output))
+      (ok (not (search "outerCallsFailing" output))))))
+
+(deftest non-nsexception-throw
+  (testing "Throwing an object that isn't an NSException reports its class
+and description."
+    (let* ((string (invoke 'ns-string :string-with-utf8-string
+                           "not an exception, just a string"))
+           (condition
+             (handler-case
+                 (progn (cffi:foreign-funcall "objc_exception_throw"
+                                              :pointer (slot-value string 'objc-cffi::id)
+                                              :void)
+                        nil)
+               (objc-exception (e) e))))
+      (ok (typep condition 'objc-exception))
+      (ok (search "String" (objc-exception-name condition)))
+      (ok (equal "not an exception, just a string"
+                 (objc-exception-reason condition))))))
+
+;;; Tests that end the process run in a child SBCL
+
+(defun child-sbcl-script (body)
+  "Return a script that loads this cl-objc into a fresh SBCL, then BODY."
+  (let ((quicklisp-home (let ((symbol (find-symbol "*QUICKLISP-HOME*" "QL")))
+                          (and symbol (symbol-value symbol)))))
+    (format nil "~@[(load ~S)~%~](asdf:load-asd ~S)~%(asdf:load-system :cl-objc)~%~
+(in-package :cl-objc-user)~%(import-framework \"Foundation\")~%~A~%"
+            (and quicklisp-home
+                 (namestring (merge-pathnames "setup.lisp" quicklisp-home)))
+            (namestring (asdf:system-source-file :cl-objc))
+            body)))
+
+(defun run-child-sbcl (body)
+  "Run BODY in a child SBCL that has cl-objc loaded. Return its output and
+exit code."
+  (uiop:with-temporary-file (:pathname script :type "lisp" :keep nil)
+    (with-open-file (out script :direction :output :if-exists :supersede)
+      (write-string (child-sbcl-script body) out))
+    (multiple-value-bind (output error-output code)
+        (uiop:run-program (list (namestring sb-ext:*runtime-pathname*)
+                                "--no-userinit" "--non-interactive"
+                                "--load" (namestring script))
+                          :output :string :error-output :output
+                          :ignore-error-status t)
+      (declare (ignore error-output))
+      (values output code))))
+
+(deftest exception-on-thread-without-lisp
+  (testing "An exception raised on a GCD thread that isn't running Lisp goes
+to the previous handler, so the process reports it and aborts as before."
+    (let ((output (run-child-sbcl "
+(let ((exception (invoke 'ns-exception :exception-with-name
+                         (invoke 'ns-string :string-with-utf8-string \"ThreadTest\")
+                         :reason (invoke 'ns-string :string-with-utf8-string \"on a GCD thread\")
+                         :user-info (cffi:null-pointer))))
+  (invoke exception retain)
+  (cffi:foreign-funcall \"dispatch_async_f\"
+                        :pointer (cffi:foreign-funcall \"dispatch_get_global_queue\"
+                                                       :long 0 :unsigned-long 0 :pointer)
+                        :pointer (slot-value exception 'objc-cffi::id)
+                        :pointer (cffi:foreign-symbol-pointer \"objc_exception_throw\")
+                        :void)
+  (sleep 5)
+  (format t \"~&main thread survived~%\"))")))
+      (ok (search "uncaught exception 'ThreadTest'" output))
+      (ok (not (search "OBJC-EXCEPTION" output)))
+      (ok (not (search "main thread survived" output))))))
+
+(deftest saved-executable-method-errors
+  (testing "In a saved executable, an Objective-C exception in a method is
+reported and exits with status 1, unless *EXIT-ON-OBJC-EXCEPTION* is NIL.
+This also checks the handler is installed again when the image starts."
+    (uiop:with-temporary-file (:pathname executable :keep nil)
+      (run-child-sbcl (format nil "
+(defun main ()
+  (when (uiop:getenv \"KEEP_RUNNING\")
+    (setf *exit-on-objc-exception* nil))
+  (eval '(define-objc-method saved-app-failing (:return-type :int) ((self ns-number))
+          (invoke (invoke 'ns-array array) :object-at-index 5)
+          1))
+  (format t \"~~&result: ~~A~~%\"
+          (invoke (invoke 'ns-number :number-with-int 1) saved-app-failing))
+  (format t \"~~&still running~~%\")
+  (sb-ext:exit))
+(dolist (thread (bt:all-threads))
+  (unless (eq thread (bt:current-thread))
+    (bt:destroy-thread thread)
+    (sb-thread:join-thread thread :default nil)))
+(sb-ext:save-lisp-and-die ~S :toplevel 'main :executable t)"
+                              (namestring executable)))
+      (flet ((run (&rest environment)
+               (multiple-value-bind (output error-output code)
+                   (uiop:run-program (append (when environment (list* "env" environment))
+                                             (list (namestring executable)))
+                                     :output :string :error-output :output
+                                     :ignore-error-status t)
+                 (declare (ignore error-output))
+                 (values output code))))
+        (multiple-value-bind (output code) (run)
+          (ok (eql 1 code))
+          (ok (search "Error in -[NSNumber savedAppFailing]: ObjC exception NSRangeException" output))
+          (ok (search "Exiting because" output))
+          (ok (not (search "still running" output))))
+        (multiple-value-bind (output code) (run "KEEP_RUNNING=1")
+          (ok (eql 0 code))
+          (ok (search "result: 0" output))
+          (ok (search "still running" output)))))))
