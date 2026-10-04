@@ -124,6 +124,32 @@ big struct as input parameter"
 	(y 2))
     (ok (= (invoke (invoke x :lisp-add2 y) int-value)  3))))
 
+;; Struct accessors inside method bodies have to be standalone functions
+;; (see README, Known Limitations).
+(defun make-test-rect (x y width height)
+  (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x x :y y)
+                         :size (cl-objc::make-cg-size :width width :height height)))
+
+(defun test-rect-width (rect)
+  (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)))
+
+(define-objc-method test-rect (:return-type (:struct cg-rect)) ((self ns-number))
+  (make-test-rect 1d0 2d0 3d0 4d0))
+
+(define-objc-method :width-of-rect (:return-type :double)
+    ((self ns-number) (rect (:struct cg-rect)))
+  (test-rect-width rect))
+
+(deftest lisp-method-struct-return-and-argument
+  (testing "A Lisp method can return a struct by value. Its type encoding
+uses the Objective-C struct name, so the result reads back."
+    (let ((rect (invoke (invoke 'ns-number :number-with-int 0) test-rect)))
+      (ok (= 3d0 (test-rect-width rect)))
+      (ok (= 2d0 (cl-objc::cg-point-y (cl-objc::cg-rect-origin rect))))))
+  (testing "A Lisp method can take a struct by value."
+    (ok (= 7.5d0 (invoke (invoke 'ns-number :number-with-int 0)
+                         :width-of-rect (make-test-rect 0d0 0d0 7.5d0 1d0))))))
+
 (deftest redefining-method-reuses-callback
   (testing "Redefining a method reuses its callback, so redefining it more
 often than SBCL has room for callbacks still works."

@@ -276,3 +276,25 @@ memory, are caught too."
     (multiple-value-bind (result output) (call-failing "failingStorage")
       (ok (eql 0 result))
       (ok (search "-[NSNumber failingStorage]" output)))))
+
+(define-objc-method failing-rect (:return-type (:struct cg-rect)) ((self ns-number))
+  (error "failing-rect"))
+
+(define-objc-method :failing-with-rect (:return-type :int)
+    ((self ns-number) (rect (:struct cg-rect)))
+  (declare (ignore rect))
+  (error "failing-with-rect"))
+
+(deftest caught-method-errors-with-structs
+  (testing "A caught error in a struct-returning method returns a zeroed
+struct."
+    (let ((*catch-method-errors* t)
+          (*error-output* (make-broadcast-stream)))
+      (let ((rect (invoke (invoke 'ns-number :number-with-int 0) failing-rect)))
+        (ok (= 0d0 (cl-objc::cg-size-width (cl-objc::cg-rect-size rect))))
+        (ok (= 0d0 (cl-objc::cg-point-x (cl-objc::cg-rect-origin rect)))))))
+  (testing "A caught error in a method that takes a struct returns zero."
+    (let ((*catch-method-errors* t)
+          (*error-output* (make-broadcast-stream)))
+      (ok (eql 0 (invoke (invoke 'ns-number :number-with-int 0)
+                         :failing-with-rect (make-test-rect 0d0 0d0 1d0 1d0)))))))
