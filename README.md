@@ -153,6 +153,12 @@ An `NSException` that reaches Lisp signals an `objc-exception` condition instead
 
 Recovering from an Objective-C exception isn't fully safe. Cocoa isn't exception-safe, and the Objective-C frames between the raise and your handler are skipped without running their cleanups, so a lock held there stays held. Treat `objc-exception` as a bug report: save your work and consider restarting the image.
 
+### Errors in Lisp methods
+
+During development, an error inside a `define-objc-method` body, including an `objc-exception`, goes to the debugger as usual. In a saved executable there's no one to use the debugger, so the method instead prints the error and a backtrace to `*error-output*` and returns a zero value of its return type (`0`, `nil`, a null object or a zeroed struct). The application keeps running.
+
+`*catch-method-errors*` controls this. The default, `:auto`, catches errors only in a saved executable. Set it to `t` or `nil` to always or never catch them.
+
 ---
 
 ## Known Limitations

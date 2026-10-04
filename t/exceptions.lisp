@@ -39,3 +39,52 @@ lets OBJC-EXCEPTION through."
     (ok (= 3 (with-objc-exception-handling (+ 1 2))))
     (ok (handler-case (with-objc-exception-handling (raise-range-exception) nil)
           (objc-exception () t)))))
+
+;;; Errors in Lisp methods
+
+(define-objc-method failing-int (:return-type :int) ((self ns-number))
+  (error "failing-int"))
+
+(define-objc-method failing-double (:return-type :double) ((self ns-number))
+  (error "failing-double"))
+
+(define-objc-method failing-object () ((self ns-number))
+  (error "failing-object"))
+
+(define-objc-method failing-objc-exception (:return-type :int) ((self ns-number))
+  (raise-range-exception)
+  1)
+
+(defun call-failing (selector)
+  "Send SELECTOR to an NSNumber with method errors caught. Return the
+result and what the method printed to *ERROR-OUTPUT*."
+  (let* ((*catch-method-errors* t)
+         (number (invoke 'ns-number :number-with-int 7))
+         result
+         (output (with-output-to-string (*error-output*)
+                   (setf result (untyped-objc-msg-send number selector)))))
+    (values result output)))
+
+(deftest caught-method-errors-return-zero
+  (testing "A caught error returns a zero value of the method's return type
+and reports which method failed."
+    (multiple-value-bind (result output) (call-failing "failingInt")
+      (ok (eql 0 result))
+      (ok (search "Error in -[NSNumber failingInt]: failing-int" output)))
+    (ok (eql 0d0 (call-failing "failingDouble")))
+    (ok (objc-nil-object-p (call-failing "failingObject"))))
+  (testing "An Objective-C exception raised inside a method is caught too."
+    (multiple-value-bind (result output) (call-failing "failingObjcException")
+      (ok (eql 0 result))
+      (ok (search "NSRangeException" output)))))
+
+(deftest uncaught-method-errors-reach-caller
+  (testing "With *CATCH-METHOD-ERRORS* NIL, or :AUTO outside a saved
+executable, the error reaches the Lisp code that sent the message."
+    (dolist (setting '(nil :auto))
+      (let ((*catch-method-errors* setting))
+        (ok (handler-case
+                (progn (invoke (invoke 'ns-number :number-with-int 7) failing-int)
+                       nil)
+              (simple-error (e)
+                (equal "failing-int" (princ-to-string e)))))))))

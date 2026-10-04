@@ -56,6 +56,58 @@ typedef, else TYPE itself."
        (cffi::type-keyword (cffi::actual-type (funcall (gethash interned-type cffi::*default-type-parsers*)))))
       (t type))))
 
+;;; Errors in Lisp methods
+
+(defvar *catch-method-errors* :auto
+  "Whether an error in a Lisp method is caught at the method boundary.
+
+When NIL, the error goes to the debugger as usual. When true, the method
+prints the error and a backtrace to *ERROR-OUTPUT* and returns a zero value
+of its return type (0, NIL, a null object or a zeroed struct) to its
+Objective-C caller, so the application keeps running.
+
+The default, :AUTO, catches errors only when running as a saved executable,
+where there is no one to use the debugger.")
+
+(defvar *running-saved-executable* nil
+  "True when this image is a saved executable. Set at startup.")
+
+(defun running-saved-executable-p ()
+  #+sbcl (equal (probe-file sb-ext:*runtime-pathname*)
+                (probe-file sb-ext:*core-pathname*))
+  #-sbcl nil)
+
+#+sbcl
+(pushnew (lambda ()
+           (setf *running-saved-executable* (running-saved-executable-p)))
+         sb-ext:*init-hooks*)
+
+(defun catch-method-errors-p ()
+  (if (eq *catch-method-errors* :auto)
+      *running-saved-executable*
+      *catch-method-errors*))
+
+(defun method-error-return-value (type)
+  "Return the value of TYPE whose foreign representation is all zeros."
+  (unless (eq type :void)
+    (let ((size (foreign-type-size type)))
+      (with-foreign-object (memory :uint8 size)
+        (dotimes (i size)
+          (setf (mem-aref memory :uint8 i) 0))
+        (mem-ref memory type)))))
+
+(defun call-with-method-error-handling (function return-type class selector class-method)
+  (if (catch-method-errors-p)
+      (block method
+        (handler-bind
+            ((error (lambda (condition)
+                      (format *error-output* "~&Error in ~:[-~;+~][~A ~A]: ~A~%"
+                              class-method class selector condition)
+                      #+sbcl (sb-debug:print-backtrace :count 30 :stream *error-output*)
+                      (return-from method (method-error-return-value return-type)))))
+          (funcall function)))
+      (funcall function)))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun method-callback-name (class selector class-method return-type types)
     "Return the name of the callback that implements SELECTOR on CLASS.
@@ -103,9 +155,10 @@ Return a new ObjectiveC Method object."
 	     ;; values during [super keyDown:]. Those messages go to their
 	     ;; receiver as usual, not to its superclass.
 	     (let ((*super-call* nil))
-	       ,(if has-declare
-		    `(progn ,@(cdr body))
-		    `(progn ,@body))))
+	       (call-with-method-error-handling
+		(lambda ()
+		  ,@(if has-declare (cdr body) body))
+		',return-type ,class ,name ,class-method)))
 	   (let ((,new-method
 		  (register-method ,class
 				   ,name
