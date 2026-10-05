@@ -182,19 +182,119 @@ inconsistent after an exception. Set ~S to NIL to keep running instead.~%"
                (return-from method (method-error-return-value return-type))))))
       (funcall function))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun method-callback-name (class selector class-method return-type types)
-    "Return the name of the callback that implements SELECTOR on CLASS.
+;;; Method implementations
+;;
+;; Each Lisp method is an Objective-C block, turned into the method's IMP by
+;; imp_implementationWithBlock. The block's invoke function is a callback
+;; shared by every method with the same signature, which finds the method's
+;; Lisp function by the block's address.
+;;
+;; SBCL keeps callbacks in a small, fixed area that is never freed (room for
+;; a couple of hundred), so sharing them by signature lets an application
+;; define any number of methods. The IMPs themselves live in libobjc's
+;; trampoline pages.
 
-The name is the same every time a method is (re)defined with the same
-signature, so redefining it reuses the callback instead of allocating a new
-one. SBCL keeps callbacks in a small, fixed area that is never freed, and
-can't redefine a callback with a different signature, so the signature is
-part of the name."
+(defstruct (lisp-method (:constructor make-lisp-method
+                            (function return-type class selector class-method)))
+  function return-type class selector class-method)
+
+(defvar *method-blocks* (make-hash-table :test 'equal)
+  "The block and IMP of each Lisp method, by (class selector class-method).")
+
+(defvar *block-methods* (make-hash-table #+sbcl :synchronized #+sbcl t)
+  "The LISP-METHOD each block runs, by the block's address.")
+
+(defvar *method-block-descriptor* nil)
+
+(defconstant +block-is-global+ (ash 1 28)
+  "Block flag: the block is never copied or freed, so _Block_copy returns it.")
+
+(defconstant +block-size+ 32
+  "The size of a block literal with no captured variables: isa, flags,
+reserved, invoke and descriptor.")
+
+(defun method-block-descriptor ()
+  (or *method-block-descriptor*
+      (setf *method-block-descriptor*
+            (let ((descriptor (foreign-alloc :unsigned-long :count 2)))
+              (setf (mem-aref descriptor :unsigned-long 0) 0
+                    (mem-aref descriptor :unsigned-long 1) +block-size+)
+              descriptor))))
+
+(defun make-method-block ()
+  (let ((block (foreign-alloc :uint8 :count +block-size+)))
+    (setf (mem-ref block :pointer 0) (foreign-symbol-pointer "_NSConcreteGlobalBlock")
+          (mem-ref block :int32 8) +block-is-global+
+          (mem-ref block :int32 12) 0
+          (mem-ref block :pointer 16) (null-pointer)
+          (mem-ref block :pointer 24) (method-block-descriptor))
+    block))
+
+(defun forget-lisp-methods ()
+  "Forget the blocks and IMPs of Lisp methods. A restored image starts with
+an empty Objective-C runtime, so they belonged to the old process."
+  (clrhash *method-blocks*)
+  (clrhash *block-methods*)
+  (clrhash *defined-method-encodings*)
+  (setf *method-block-descriptor* nil))
+
+#+sbcl
+(pushnew 'forget-lisp-methods sb-ext:*init-hooks*)
+
+(defun install-lisp-method (class selector class-method types return-type
+                            trampoline function)
+  "Make FUNCTION the implementation of SELECTOR on CLASS, run through the
+shared callback TRAMPOLINE. Return the Objective-C method."
+  (let* ((key (list class selector (and class-method t)))
+         (entry (or (gethash key *method-blocks*)
+                    (setf (gethash key *method-blocks*)
+                          (let ((block (make-method-block)))
+                            (cons block (foreign-funcall "imp_implementationWithBlock"
+                                                         :pointer block :pointer))))))
+         (block (car entry)))
+    (setf (gethash (pointer-address block) *block-methods*)
+          (make-lisp-method function return-type class selector class-method))
+    ;; A redefinition with a new signature needs that signature's callback.
+    (setf (mem-ref block :pointer 16) trampoline)
+    (register-method class selector types (cdr entry) class-method)))
+
+(defun lisp-method-for-block (block)
+  (or (gethash (pointer-address block) *block-methods*)
+      (error "No Lisp method for block ~A" block)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun method-trampoline-name (return-type types)
+    "Return the name of the callback shared by methods with this signature.
+SBCL can't redefine a callback with a different signature, so the signature
+is the name."
     (let ((*package* (find-package "KEYWORD")))
-      (intern (format nil "~:[-~;+~][~A ~A] ~S ~S"
-                      class-method class selector return-type types)
-              "OBJC-CFFI"))))
+      (intern (format nil "Lisp method ~S ~S" return-type types) "OBJC-CFFI"))))
+
+(defmacro define-method-trampoline (name return-type types)
+  "Define the callback NAME shared by Lisp methods whose signature is
+RETURN-TYPE and TYPES (self, _cmd, then the arguments). A block's invoke
+function gets the block in place of _cmd."
+  (let ((block (gensym "BLOCK-"))
+        (self (gensym "SELF-"))
+        (arguments (loop :repeat (length (cddr types)) :collect (gensym "ARG-"))))
+    `(cffi:defcallback ,name ,return-type
+         ((,block :pointer) (,self ,(first types))
+          ,@(mapcar #'list arguments (cddr types)))
+       (let ((method (lisp-method-for-block ,block))
+             ;; ObjC can call back into Lisp from inside a WITH-SUPER
+             ;; call, e.g. a table view asking its data source for cell
+             ;; values during [super keyDown:]. Those messages go to their
+             ;; receiver as usual, not to its superclass.
+             (*super-call* nil))
+         (flet ((method-body ()
+                  (funcall (lisp-method-function method) ,self ,@arguments)))
+           (declare (dynamic-extent #'method-body))
+           (call-with-method-error-handling
+            #'method-body
+            (lisp-method-return-type method)
+            (lisp-method-class method)
+            (lisp-method-selector method)
+            (lisp-method-class-method method)))))))
 
 (defmacro add-objc-method ((name class &key (return-type 'objc-id) (class-method nil))
 			   argument-list &body body)
@@ -214,35 +314,32 @@ the new definition discarding the previous one.
 Return a new ObjectiveC Method object." 
   (multiple-value-bind (var-list type-list)
       (parse-argument-list argument-list)
-    (let* ((callback (method-callback-name class name class-method return-type type-list))
-	   (new-method (gensym)))
-      (let ((has-declare))
-	`(progn
-	   (cffi:defcallback ,callback ,return-type ,(mapcar #'list var-list type-list)
-	     ,(when (and (listp (first body)) (eq (car (first body)) 'cl:declare))
-		    (setf has-declare t)
-		    (first body))
-	     ,(intern "SELF")		; to avoid warning
-	     ,(intern "SEL")		; to avoid warning
-	     ;; ObjC can call back into Lisp from inside a WITH-SUPER
-	     ;; call, e.g. a table view asking its data source for cell
-	     ;; values during [super keyDown:]. Those messages go to their
-	     ;; receiver as usual, not to its superclass.
-	     (let ((*super-call* nil))
-	       (flet ((method-body ()
-			,@(if has-declare (cdr body) body)))
-		 (declare (dynamic-extent #'method-body))
-		 (call-with-method-error-handling
-		  #'method-body ',return-type ,class ,name ,class-method))))
-	   (let ((,new-method
-		  (register-method ,class
-				   ,name
-				   (objc-types:encode-types (append (list ',return-type) ',type-list) t)
-				   (callback ,callback)
-				   ,class-method)))
-	     (when objc-clos:*automatic-clos-bindings-update*
-	       (objc-clos:add-clos-method ,new-method (objc-get-class ,class) :class-method ,class-method))
-	     ,new-method))))))
+    (destructuring-bind (self sel &rest arguments) var-list
+      (let ((trampoline (method-trampoline-name return-type type-list))
+            (declarations (loop :while (and (consp (first body))
+                                            (eq (car (first body)) 'cl:declare))
+                                :collect (pop body)))
+            (selector (gensym "SELECTOR-"))
+            (new-method (gensym "METHOD-")))
+        `(progn
+           (define-method-trampoline ,trampoline ,return-type ,type-list)
+           (let ((,new-method
+                   (install-lisp-method
+                    ,class ,name ,class-method
+                    (objc-types:encode-types (append (list ',return-type) ',type-list) t)
+                    ',return-type
+                    (callback ,trampoline)
+                    (let ((,selector (sel-register-name ,name)))
+                      (lambda (,self ,@arguments)
+                        ,@declarations
+                        (declare (ignorable ,self))
+                        (let ((,sel ,selector))
+                          (declare (ignorable ,sel))
+                          ,@body))))))
+             (when objc-clos:*automatic-clos-bindings-update*
+               (objc-clos:add-clos-method ,new-method (objc-get-class ,class)
+                                          :class-method ,class-method))
+             ,new-method))))))
 
 ;;;; Adding Objective-C classes at runtime
 

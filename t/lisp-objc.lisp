@@ -166,15 +166,31 @@ Objective-C keeps the method's original type encoding."
                             ((self ns-number))
                           2.5d0))
                  'warning)))
-  (testing "Class methods get their own callback names."
-    (ok (string= "+[NSNumber magic]"
-                 (subseq (symbol-name (objc-cffi::method-callback-name
-                                       "NSNumber" "magic" t :int '(objc-id objc-sel)))
-                         0 17)))
-    (ok (string= "-[NSNumber magic]"
-                 (subseq (symbol-name (objc-cffi::method-callback-name
-                                       "NSNumber" "magic" nil :int '(objc-id objc-sel)))
-                         0 17)))))
+  (testing "Many different methods with one signature share a callback,
+so an application can define more methods than SBCL has room for
+callbacks."
+    (loop :for i :from 1 :to 300
+          :do (eval `(define-objc-method ,(intern (format nil "MANY-METHODS-~D" i))
+                         (:return-type :int)
+                         ((self ns-number))
+                       ,i)))
+    (let ((number (invoke 'ns-number :number-with-int 0)))
+      (ok (= 1 (untyped-objc-msg-send number "manyMethods1")))
+      (ok (= 300 (untyped-objc-msg-send number "manyMethods300")))))
+  (testing "An instance method and a class method with the same selector
+are separate."
+    (eval '(define-objc-method same-selector (:return-type :int) ((self ns-number))
+            1))
+    (eval '(define-objc-method same-selector (:return-type :int :class-method t)
+            ((self ns-number))
+            2))
+    (ok (= 1 (invoke (invoke 'ns-number :number-with-int 0) same-selector)))
+    (ok (= 2 (invoke 'ns-number same-selector))))
+  (testing "A method body sees the lexical environment it's defined in."
+    (eval '(let ((offset 40))
+            (define-objc-method plus-offset (:return-type :int) ((self ns-number))
+              (+ offset (invoke self int-value)))))
+    (ok (= 42 (invoke (invoke 'ns-number :number-with-int 2) plus-offset)))))
 
 
 (define-objc-class ns-test-1 ns-number
