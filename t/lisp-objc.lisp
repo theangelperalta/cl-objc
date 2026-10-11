@@ -124,6 +124,74 @@ big struct as input parameter"
 	(y 2))
     (ok (= (invoke (invoke x :lisp-add2 y) int-value)  3))))
 
+;; Struct accessors inside method bodies have to be standalone functions
+;; (see README, Known Limitations).
+(defun make-test-rect (x y width height)
+  (cl-objc::make-cg-rect :origin (cl-objc::make-cg-point :x x :y y)
+                         :size (cl-objc::make-cg-size :width width :height height)))
+
+(defun test-rect-width (rect)
+  (cl-objc::cg-size-width (cl-objc::cg-rect-size rect)))
+
+(define-objc-method test-rect (:return-type (:struct cg-rect)) ((self ns-number))
+  (make-test-rect 1d0 2d0 3d0 4d0))
+
+(define-objc-method :width-of-rect (:return-type :double)
+    ((self ns-number) (rect (:struct cg-rect)))
+  (test-rect-width rect))
+
+(deftest lisp-method-struct-return-and-argument
+  (testing "A Lisp method can return a struct by value. Its type encoding
+uses the Objective-C struct name, so the result reads back."
+    (let ((rect (invoke (invoke 'ns-number :number-with-int 0) test-rect)))
+      (ok (= 3d0 (test-rect-width rect)))
+      (ok (= 2d0 (cl-objc::cg-point-y (cl-objc::cg-rect-origin rect))))))
+  (testing "A Lisp method can take a struct by value."
+    (ok (= 7.5d0 (invoke (invoke 'ns-number :number-with-int 0)
+                         :width-of-rect (make-test-rect 0d0 0d0 7.5d0 1d0))))))
+
+(deftest redefining-method-reuses-callback
+  (testing "Redefining a method reuses its callback, so redefining it more
+often than SBCL has room for callbacks still works."
+    (loop :for i :from 1 :to 300
+          :do (eval `(define-objc-method redefined-often (:return-type :int)
+                         ((self ns-number))
+                       ,i)))
+    (ok (= 300 (invoke (invoke 'ns-number :number-with-int 0) redefined-often))))
+  (testing "Redefining a method with a different signature warns, because
+Objective-C keeps the method's original type encoding."
+    (eval '(define-objc-method resigned (:return-type :int) ((self ns-number))
+            1))
+    (ok (signals (eval '(define-objc-method resigned (:return-type :double)
+                            ((self ns-number))
+                          2.5d0))
+                 'warning)))
+  (testing "Many different methods with one signature share a callback,
+so an application can define more methods than SBCL has room for
+callbacks."
+    (loop :for i :from 1 :to 300
+          :do (eval `(define-objc-method ,(intern (format nil "MANY-METHODS-~D" i))
+                         (:return-type :int)
+                         ((self ns-number))
+                       ,i)))
+    (let ((number (invoke 'ns-number :number-with-int 0)))
+      (ok (= 1 (untyped-objc-msg-send number "manyMethods1")))
+      (ok (= 300 (untyped-objc-msg-send number "manyMethods300")))))
+  (testing "An instance method and a class method with the same selector
+are separate."
+    (eval '(define-objc-method same-selector (:return-type :int) ((self ns-number))
+            1))
+    (eval '(define-objc-method same-selector (:return-type :int :class-method t)
+            ((self ns-number))
+            2))
+    (ok (= 1 (invoke (invoke 'ns-number :number-with-int 0) same-selector)))
+    (ok (= 2 (invoke 'ns-number same-selector))))
+  (testing "A method body sees the lexical environment it's defined in."
+    (eval '(let ((offset 40))
+            (define-objc-method plus-offset (:return-type :int) ((self ns-number))
+              (+ offset (invoke self int-value)))))
+    (ok (= 42 (invoke (invoke 'ns-number :number-with-int 2) plus-offset)))))
+
 
 (define-objc-class ns-test-1 ns-number
     ((counter :int)))

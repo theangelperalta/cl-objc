@@ -1,12 +1,6 @@
 CL=sbcl
 
-SHIM_SRC = src/exception-shim.m
-SHIM_LIB = src/libobjc-exception-shim.dylib
-
-all: $(SHIM_LIB) unit-tests
-
-$(SHIM_LIB): $(SHIM_SRC)
-	clang -framework Foundation -dynamiclib -o $@ $<
+all: unit-tests
 
 unit-tests:
 	$(CL) --dynamic-space-size 8192 --load ~/quicklisp/setup.lisp --non-interactive \
@@ -25,6 +19,3 @@ unit-tests-debug:
 		    --eval '(setf (v:repl-level) :debug)' \
 		    --eval '(setf rove:*enable-debug-on-error* t)' \
 		    --eval "(asdf:test-system :cl-objc)" \
-
-clean:
-	rm -f $(SHIM_LIB)

@@ -855,7 +855,10 @@ calling"
     `(progn
       (define-foreign-library ,name
 	(t (:framework ,framework-name)))
-      (use-foreign-library ,name))))
+      (use-foreign-library ,name)
+      ;; Loading Foundation installs its own uncaught-exception handler,
+      ;; replacing ours.
+      (install-objc-exception-handler))))
 
 ;; Copyright (c) 2007, Luigi Panzeri, Geoff Cant
 ;; All rights reserved. 

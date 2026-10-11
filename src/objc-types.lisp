@@ -148,8 +148,7 @@
          (encode-types (mapcar (lambda (type) (encode-type type align)) type-definition-types)))
   (if (not align)
       (format nil "~{~A~}" encode-types)
-      (let* ((return-type (first types))
-             (alignment 0)
+      (let* ((alignment 0)
              (inputed-types (append (cdr types))))
         (loop for type in types
               for inputed-type in inputed-types
@@ -157,7 +156,9 @@
               sum (if (equalp inputed-type :void) 0 (cffi:foreign-type-size inputed-type)) into stack-size
               collect (encode-type remove-typedef-type alignment) into encoded-types
               do (setf alignment (+ alignment (if (equalp inputed-type :void) 0 (cffi:foreign-type-size inputed-type))))
-              finally (return (format nil "~a~d~{~A~}" (encode-type return-type) stack-size encoded-types)))))))
+              finally (return (format nil "~a~d~{~A~}"
+                                      (encode-type (first type-definition-types))
+                                      stack-size encoded-types)))))))
 
 (defun lookup-type-char (type)
   (first (find type typemap :key #'second)))

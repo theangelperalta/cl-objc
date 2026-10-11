@@ -137,10 +137,39 @@ By default, `import-framework` loads only the STATIC bindings (struct layouts, C
 | `(objc-let* ((var class init-msg)) body)` | Alloc/init an ObjC object |
 | `(with-ivar-accessors class body)` | Bind ivar getters/setters in scope |
 | `(with-super (invoke self ...) body)` | Route message to superclass |
-| `(with-objc-exception-handling body)` | Catch ObjC exceptions; signals `objc-exception` instead of crashing |
 | `(ensure-clos-bindings 'ns-string)` | Lazily create CLOS class + method GFs for one ObjC class |
 
 A reader macro provides Smalltalk-style bracket syntax: `[receiver message: arg]`. Activate it with `(objc-reader:activate-objc-reader-macro)`.
+
+### Objective-C exceptions
+
+An `NSException` that reaches Lisp signals an `objc-exception` condition instead of crashing the process. Use `objc-exception-name` and `objc-exception-reason` to read it:
+
+```lisp
+(handler-case (invoke (invoke 'ns-array array) :object-at-index 5)
+  (objc-exception (e)
+    (format t "~a: ~a" (objc-exception-name e) (objc-exception-reason e))))
+```
+
+Recovering from an Objective-C exception isn't fully safe. Cocoa isn't exception-safe, and the Objective-C frames between the raise and your handler are skipped without running their cleanups, so a lock held there stays held. Treat `objc-exception` as a bug report: save your work and consider restarting the image.
+
+### Errors in Lisp methods
+
+During development, an error inside a `define-objc-method` body, including an `objc-exception`, goes to the debugger as usual. In a saved executable there's no one to use the debugger, so the method instead prints the error and a backtrace to `*error-output*` and returns a zero value of its return type (`0`, `nil`, a null object or a zeroed struct). The application keeps running.
+
+`*catch-method-errors*` controls this. The default, `:auto`, catches errors only in a saved executable. Set it to `t` or `nil` to always or never catch them.
+
+A caught error never reaches handlers in the Lisp code that sent the message, because the method returns normally. To handle a method's errors yourself in a saved executable, bind `*catch-method-errors*` to `nil` around the message:
+
+```lisp
+(let ((*catch-method-errors* nil))
+  (handler-case (invoke obj :lisp-method)
+    (error (e) ...)))
+```
+
+Only the first error in each method gets a backtrace. Repeats are counted and reported in one line when the count reaches 2, 4, 8 and so on, so a `drawRect:` that fails on every redraw doesn't flood the log.
+
+When a caught error is an `objc-exception`, the application reports it and exits, because Objective-C state may be inconsistent after an exception (Apple recommends the same). Set `*exit-on-objc-exception*` to `nil` to keep running instead.
 
 ---
 

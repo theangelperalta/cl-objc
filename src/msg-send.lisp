@@ -46,7 +46,8 @@
 			     (append (list id sel) (odd-positioned-elements args))
 			     (append (list (if superp '(:struct objc-super) 'objc-id) 'objc-sel) (even-positioned-elements args))
 			     return-type
-			     `,(append
+			     `(with-foreign-float-traps-masked
+				,(append
 				     (list 'cffi:foreign-funcall)
 			       (cond
 				 (superp (list "objc_msgSendSuper"))
@@ -56,8 +57,7 @@
 					(interpose (mapcar #'cffi-foreign-type
 							   (even-positioned-elements args))
 						   (cddr gensyms))
-					(list (cffi-foreign-type return-type)))
-			       ))))
+					(list (cffi-foreign-type return-type))))))))
 (defun cffi-foreign-type (type)
 "Necessary to check for foreign type or struct"
 	(cond
@@ -155,14 +155,15 @@ the CFFI variadic function limitation (cffi#290)."
                      (varargs (gensym-list (length arg-types))))
                 (compile nil
                          `(lambda ,varargs
-                            (cffi:foreign-funcall ,foreign-func
-                                                  ,receiver-type ,(first varargs)
-                                                  objc-sel ,sel
-                                                  ,@(loop for type in arg-types
-                                                          for var in (rest varargs)
-                                                          collect type
-                                                          collect var)
-                                                  ,cffi-return-type))))))))
+                            (with-foreign-float-traps-masked
+                              (cffi:foreign-funcall ,foreign-func
+                                                    ,receiver-type ,(first varargs)
+                                                    objc-sel ,sel
+                                                    ,@(loop for type in arg-types
+                                                            for var in (rest varargs)
+                                                            collect type
+                                                            collect var)
+                                                    ,cffi-return-type)))))))))
 
 (defparameter *super-call* nil
   "If this variable is set to t, the objc_msgSend will be translated to ")
