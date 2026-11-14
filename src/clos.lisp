@@ -186,16 +186,19 @@ the resulting function does no further CFFI method lookups when called."
           #'dispatch))))
 
 
-(defun add-clos-method (objc-method objc-class &key output-stream class-method)
+(defun add-clos-method (objc-method objc-class &key output-stream class-method (define t))
+  "Define the generic function for OBJC-METHOD, and write its definition
+to OUTPUT-STREAM if given. When DEFINE is NIL, only write it."
   (declare (ignore objc-class class-method))
   (let* ((method-symbol-name (export-method-symbol objc-method))
 	 (lambda-list (compute-lambda-list (method-selector objc-method))))
 
     (prog1
-	(closer-mop:ensure-generic-function-using-class nil 
-							method-symbol-name
-							:generic-function-class 'objc-generic-function
-							:lambda-list lambda-list)
+	(when define
+	  (closer-mop:ensure-generic-function-using-class nil 
+							  method-symbol-name
+							  :generic-function-class 'objc-generic-function
+							  :lambda-list lambda-list))
       (when output-stream
 	(format output-stream "(eval-when (:compile-toplevel :load-toplevel) (export (intern \"~a\" \"OBJC\") \"OBJC\"))~%(defgeneric ~s ~s
 ~2t(:documentation \"Invokes the ~a method\")
@@ -212,7 +215,9 @@ the resulting function does no further CFFI method lookups when called."
       (setq position (position :initfunction ret))
       (setq ret (append (subseq ret 0 position) (subseq ret (+ 2 position)))))))
 
-(defun add-clos-class (objc-class &optional output-stream)
+(defun add-clos-class (objc-class &optional output-stream (define t))
+  "Define the CLOS class and metaclass for OBJC-CLASS, and write their
+definitions to OUTPUT-STREAM if given. When DEFINE is NIL, only write them."
   (let* ((class-symbol-name (export-class-symbol objc-class))
 	 (metaclass-symbol-name (export-symbol (metaclass-name class-symbol-name)))
 	 (super-classes
@@ -231,16 +236,17 @@ the resulting function does no further CFFI method lookups when called."
 				      :allocation :class
 				      :readers '(objc:objc-id)
 				      :writers '((setf objc:objc-id))))))
-    ;; Add the class
-    (closer-mop:ensure-class class-symbol-name
-			     :direct-superclasses super-classes
-			     :direct-slots slots
-			     :metaclass 'objc-clos-class)
-    ;; Add metaclass
-    (closer-mop:ensure-class metaclass-symbol-name
-			     :direct-superclasses metaclass-superclasses
-			     :direct-slots metaclass-slots
-			     :metaclass 'objc-clos-class)
+    (when define
+      ;; Add the class
+      (closer-mop:ensure-class class-symbol-name
+			       :direct-superclasses super-classes
+			       :direct-slots slots
+			       :metaclass 'objc-clos-class)
+      ;; Add metaclass
+      (closer-mop:ensure-class metaclass-symbol-name
+			       :direct-superclasses metaclass-superclasses
+			       :direct-slots metaclass-slots
+			       :metaclass 'objc-clos-class))
 
     (when output-stream
       (let ((*package* (find-package "CL-OBJC-USER")))
@@ -323,18 +329,25 @@ class named CLASS-NAME, or NIL if it isn't part of a framework. Served from
     (build-class-framework-cache))
   (gethash class-name *class-framework-cache*))
 
-(defun update-clos-bindings (&key output-stream force for-framework)
+(defun update-clos-bindings (&key output-stream force for-framework (define t))
   "Generate CLOS classes/generic function for each ObjC
 class/method behaving to FOR-FRAMEWORK. The default behavior is
 to not redefine a class/generic function if it is already
 defined, except if FORCE is set. UPDATE-CLOS-BINDINGS writes the
-bindings on OUTPUT-STREAM if provided."
+bindings on OUTPUT-STREAM if provided.
+
+When DEFINE is NIL, the bindings are only written to OUTPUT-STREAM and
+not defined in the image, which then stays as small as if they had
+never been generated."
   (when output-stream
     (format output-stream ";;; CLOS BINDINGS FILE~%;;;THIS FILE WAS AUTOMATICALLY GENERATED~%;;; LOOK AT GENERATE-FRAMEWORK-BINDINGS.LISP OR AT THE FUNCTION OBJC-CFFI:COMPILE-FRAMEWORK TO SEE HOW YOU CAN BUILD FILE LIKE THIS~%~%(in-package \"CL-OBJC-USER\")~%~%"))
   (let* ((all-classes (get-class-ordered-list))
          (total (length all-classes))
          (classes-added 0)
          (methods-added 0)
+         ;; Generic functions written but not defined, so that FBOUNDP
+         ;; can't tell they are done.
+         (written-methods (make-hash-table :test #'eq))
          (i 0))
     (when *cl-objc-verbose*
       (format *trace-output* "~&[update-clos-bindings] start: ~a classes, for-framework=~a, output-stream=~a~%"
@@ -360,17 +373,22 @@ bindings on OUTPUT-STREAM if provided."
           (when *cl-objc-verbose*
             (format *trace-output* "~&[update-clos-bindings]   adding class ~a~%" (class-name objc-class)))
           (incf classes-added)
-          (add-clos-class objc-class output-stream))
+          (add-clos-class objc-class output-stream define))
         ;; Adding Generic Functions for ObjC methods. Selectors unique to
         ;; classes outside FOR-FRAMEWORK are left for lazy creation via
         ;; OBJC-CLOS::ENSURE-CLOS-SELECTOR — otherwise iterating every class
         ;; on the system (~26k on macOS) dominates load time even when the
         ;; class filter has narrowed what we actually want.
         (dolist (method (append (get-instance-methods objc-class) (get-class-methods objc-class)))
-          (when (and (not (private-method-p method))
-                     (not (fboundp (export-method-symbol method))))
-            (incf methods-added)
-            (add-clos-method method objc-class :output-stream output-stream)))))
+          (let ((symbol (export-method-symbol method)))
+            (when (and (not (private-method-p method))
+                       (not (fboundp symbol))
+                       (not (gethash symbol written-methods)))
+              (incf methods-added)
+              (unless define
+                (setf (gethash symbol written-methods) t))
+              (add-clos-method method objc-class :output-stream output-stream
+                                                 :define define))))))
     (when *cl-objc-verbose*
       (format *trace-output* "~&[update-clos-bindings] done: ~a/~a classes processed, ~a classes added, ~a methods added~%"
               i total classes-added methods-added))))

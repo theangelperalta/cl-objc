@@ -145,9 +145,14 @@ will not be loaded."
      (load-framework ,framework-name)
      (when (or ,clos-bindings objc-clos:*automatic-clos-bindings-update*)
        (with-framework-file (,framework-name clos :force ,force)
+	 ;; Only write the bindings: the file is loaded when they are
+	 ;; asked for (see ENSURE-FRAMEWORK-CLOS-BINDINGS). Defining them
+	 ;; here too would leave thousands of classes and generic
+	 ;; functions in every image that loads cl-objc for the first time.
 	 (objc-clos:update-clos-bindings :output-stream out
 					 :force t
-					 :for-framework ,framework-name)))
+					 :for-framework ,framework-name
+					 :define nil)))
 
      (with-framework-file (,framework-name static :force ,force
                                            :inputs (quote ,other-bindings))
