@@ -11,7 +11,7 @@
     :maintainer "Angel Peralta <acort3255@gmail.com>"
     :version "0.5"
   :description "Common Lisp / ObjectiveC Interface"
-  :depends-on (#:cffi #:cffi-libffi #:yacc #:closer-mop #:org.tfeb.hax #:trivial-main-thread #:verbose)
+  :depends-on (#:cffi #:cffi-libffi #:yacc #:closer-mop #:org.tfeb.hax #:trivial-main-thread)
   :defsystem-depends-on (#:cffi-grovel #:cffi-libffi)
     :components ((:module :src
 			  :components ((:file "packages")

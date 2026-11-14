@@ -133,8 +133,8 @@
   "Parse a method type signature"
   (handler-case
       (parse-with-lexer (typestr-lexer str) *objc-type-parser*)
-  (t (c)
-    #+(or)(v:debug :objc-types "Failed to parse type string: |~a| : |~a|~%" str c))))
+    ;; Unparseable type strings yield NIL; callers treat the type as unknown.
+    (t () nil)))
 
 (defun objc-foreign-type-size (type)
   (cond 
