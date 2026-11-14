@@ -111,9 +111,41 @@ the cache was generated. Idempotent across calls within an image."
         (rplacd entry t)
         (push (cons framework-name t) *frameworks*))))
 
+(defvar *framework-bindings-generators* (make-hash-table :test #'equalp)
+  "Map a framework name to a function that writes and compiles its
+bindings files. Filled by DEFINE-FRAMEWORK-BINDINGS.")
+
+(defmacro define-framework-bindings ((framework-name &key (clos-bindings nil)) &body other-bindings)
+  "Register how to generate the bindings of FRAMEWORK-NAME, without
+generating them. IMPORT-FRAMEWORK generates them the first time the
+framework is imported, so an image that never imports a framework
+never pays for its bindings. CLOS-BINDINGS and OTHER-BINDINGS are as
+in COMPILE-FRAMEWORK."
+  `(setf (gethash ,framework-name *framework-bindings-generators*)
+         (lambda ()
+           (compile-framework (,framework-name :clos-bindings ,clos-bindings)
+             ,@other-bindings))))
+
+(defun ensure-framework-bindings (framework-name)
+  "Make sure the bindings files of FRAMEWORK-NAME exist and are current,
+generating them with the function registered by DEFINE-FRAMEWORK-BINDINGS,
+or with no extra bindings if none is registered. Files that are already
+current are left alone."
+  ;; Generating the bindings interns the names of structs and their
+  ;; slots in *PACKAGE*. Bind it as it was when the bindings were
+  ;; generated while cl-objc loaded, so that the names don't depend on
+  ;; the package that happens to be current when a framework is imported.
+  (let ((*package* (find-package "CL-OBJC"))
+        (generator (gethash framework-name *framework-bindings-generators*)))
+    (if generator
+        (funcall generator)
+        (compile-framework (framework-name)))))
+
 (defmacro import-framework (framework-name &optional clos)
   "Import the ObjC framework FRAMEWORK-NAME, loading its STATIC bindings
-(struct layouts, C functions, type definitions).
+(struct layouts, C functions, type definitions). The bindings are
+generated the first time they are needed and cached in
+*FRAMEWORK-DIRECTORY*; see DEFINE-FRAMEWORK-BINDINGS.
 
 If CLOS or OBJC-CLOS:*AUTOMATIC-CLOS-BINDINGS-UPDATE* is true, CLOS
 bindings are made available via ENSURE-FRAMEWORK-CLOS-BINDINGS, which
@@ -124,6 +156,7 @@ demand via OBJC-CLOS:ENSURE-CLOS-BINDINGS / ENSURE-CLOS-CLASS."
      (let* ((framework-loaded-p (assoc ,framework-name *frameworks* :test #'string-equal)))
        (unless framework-loaded-p
 	 (load-framework ,framework-name)
+	 (ensure-framework-bindings ,framework-name)
 	 (objc-clos:clear-framework-class-cache)
 	 (let ((compiled-file (compile-file-pathname (framework-bindings-pathname ,framework-name 'static))))
 	   (unless (probe-file compiled-file)
@@ -145,9 +178,14 @@ will not be loaded."
      (load-framework ,framework-name)
      (when (or ,clos-bindings objc-clos:*automatic-clos-bindings-update*)
        (with-framework-file (,framework-name clos :force ,force)
+	 ;; Only write the bindings: the file is loaded when they are
+	 ;; asked for (see ENSURE-FRAMEWORK-CLOS-BINDINGS). Defining them
+	 ;; here too would leave thousands of classes and generic
+	 ;; functions in every image that loads cl-objc for the first time.
 	 (objc-clos:update-clos-bindings :output-stream out
 					 :force t
-					 :for-framework ,framework-name)))
+					 :for-framework ,framework-name
+					 :define nil)))
 
      (with-framework-file (,framework-name static :force ,force
                                            :inputs (quote ,other-bindings))

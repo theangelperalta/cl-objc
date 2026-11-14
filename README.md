@@ -103,6 +103,8 @@ Examples must be started from a Swank server running on the main thread. See eac
 
 ### CLOS bindings
 
+Loading cl-objc doesn't generate any bindings. The first `import-framework` of a framework generates its bindings and caches them in `src/frameworks/`, and later imports load the cache. An application that only uses `invoke` never generates bindings, so an executable saved from it stays small.
+
 By default, `import-framework` loads only the STATIC bindings (struct layouts, C functions). CLOS classes and generic functions are generated **lazily on demand**:
 
 - `(invoke ...)` works immediately with no CLOS setup — it dispatches directly through the ObjC runtime.
