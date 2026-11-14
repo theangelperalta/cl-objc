@@ -58,7 +58,6 @@ A todo list in an `NSTableView` whose data source and delegate are a Lisp class.
   - `closer-mop`
   - `org.tfeb.hax`
   - `trivial-main-thread`
-  - `verbose`
   - `swank` (for running examples from the REPL)
   - `rove` (for tests)
 
