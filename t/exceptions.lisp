@@ -157,10 +157,14 @@ and description."
 ;;; Tests that end the process run in a child SBCL
 
 (defun child-sbcl-script (body)
-  "Return a script that loads this cl-objc into a fresh SBCL, then BODY."
+  "Return a script that loads this cl-objc into a fresh SBCL, then BODY.
+Loading is silenced: when cl-objc has to be compiled first, compiler
+messages would otherwise appear in the output that tests search."
   (let ((quicklisp-home (let ((symbol (find-symbol "*QUICKLISP-HOME*" "QL")))
                           (and symbol (symbol-value symbol)))))
-    (format nil "~@[(load ~S)~%~](asdf:load-asd ~S)~%(asdf:load-system :cl-objc)~%~
+    (format nil "~@[(load ~S)~%~](asdf:load-asd ~S)~%(let ((*standard-output* (make-broadcast-stream))~%~
+      (*error-output* (make-broadcast-stream)))~%~
+  (asdf:load-system :cl-objc))~%~
 (in-package :cl-objc-user)~%(import-framework \"Foundation\")~%~A~%"
             (and quicklisp-home
                  (namestring (merge-pathnames "setup.lisp" quicklisp-home)))

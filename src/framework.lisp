@@ -111,6 +111,29 @@ the cache was generated. Idempotent across calls within an image."
         (rplacd entry t)
         (push (cons framework-name t) *frameworks*))))
 
+(defmacro compile-framework ((framework-name &key force (clos-bindings nil)) &body other-bindings)
+  "Create bindings for FRAMEWORK-NAME. Frameworks will be
+searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*. The bindings
+will not be loaded."
+  `(progn 
+     (load-framework-named ,framework-name)
+     (when (or ,clos-bindings objc-clos:*automatic-clos-bindings-update*)
+       (with-framework-file (,framework-name clos :force ,force)
+	 ;; Only write the bindings: the file is loaded when they are
+	 ;; asked for (see ENSURE-FRAMEWORK-CLOS-BINDINGS). Defining them
+	 ;; here too would leave thousands of classes and generic
+	 ;; functions in every image that loads cl-objc for the first time.
+	 (objc-clos:update-clos-bindings :output-stream out
+					 :force t
+					 :for-framework ,framework-name
+					 :define nil)))
+
+     (with-framework-file (,framework-name static :force ,force
+                                           :inputs (quote ,other-bindings))
+       (update-cstruct-database :output-stream out)
+       (format out "~{~s~%~}" (quote ,other-bindings)))
+     t))
+
 (defvar *framework-bindings-generators* (make-hash-table :test #'equalp)
   "Map a framework name to a function that writes and compiles its
 bindings files. Filled by DEFINE-FRAMEWORK-BINDINGS.")
@@ -169,29 +192,6 @@ demand via OBJC-CLOS:ENSURE-CLOS-BINDINGS / ENSURE-CLOS-CLASS."
        (when (or ,clos objc-clos:*automatic-clos-bindings-update*)
 	 (ensure-framework-clos-bindings ,framework-name)))
      *frameworks*))
-
-(defmacro compile-framework ((framework-name &key force (clos-bindings nil)) &body other-bindings)
-  "Create bindings for FRAMEWORK-NAME. Frameworks will be
-searched in CFFI:*DARWIN-FRAMEWORK-DIRECTORIES*. The bindings
-will not be loaded."
-  `(progn 
-     (load-framework ,framework-name)
-     (when (or ,clos-bindings objc-clos:*automatic-clos-bindings-update*)
-       (with-framework-file (,framework-name clos :force ,force)
-	 ;; Only write the bindings: the file is loaded when they are
-	 ;; asked for (see ENSURE-FRAMEWORK-CLOS-BINDINGS). Defining them
-	 ;; here too would leave thousands of classes and generic
-	 ;; functions in every image that loads cl-objc for the first time.
-	 (objc-clos:update-clos-bindings :output-stream out
-					 :force t
-					 :for-framework ,framework-name
-					 :define nil)))
-
-     (with-framework-file (,framework-name static :force ,force
-                                           :inputs (quote ,other-bindings))
-       (update-cstruct-database :output-stream out)
-       (format out "~{~s~%~}" (quote ,other-bindings)))
-     t))
 
 ;; Copyright (c) 2007, Luigi Panzeri
 ;; All rights reserved. 

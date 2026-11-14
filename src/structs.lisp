@@ -1,5 +1,8 @@
 (in-package :objc-cffi)
 
+;; Defined in clos.lisp, which is compiled after this file.
+(declaim (special objc-clos:*cl-objc-verbose*))
+
 ;; Name translators
 
 (defun symbol-to-objc-class-name (symbol)

@@ -95,22 +95,6 @@ size and shifts the arguments after them.")
 (defmethod translate-into-foreign-memory (sel (type objc-selector-type) pointer)
   (setf (mem-ref pointer :pointer) sel))
 
-;;; Methods
-
-(defcfun ("sel_isMapped" sel-is-mapped) :boolean
-  "Returns true if a selector is registered in the ObjC runtime."
-  (sel objc-sel))
-
-(defcfun ("sel_getName" sel-get-name) :string
-  (sel objc-sel))
-
-(defcfun ("sel_registerName" sel-register-name) objc-sel
-  (str :string))
-
-(defcfun ("sel_getUid" sel-get-uid) objc-sel
-  "Returns the selector named NAME."
-  (str :string))
-
 ;;; CLOS definitions
 (defclass objc-method ()
   ((name :initarg :name 
@@ -640,7 +624,7 @@ of CLASS"
      until (null-pointer-p ptr)
      nconc (loop
 	      for idx below (foreign-slot-value ptr '(:struct objc-protocol-list-cstruct) 'count)
-	      for protocol-ptr = (foreign-slot-pointer ptr '(:struct objc-protocol-list-cstruct) 'protocols) then (inc-pointer protocol-ptr (foreign-type-size '(:struct objc-object-cstruct)))
+	      for protocol-ptr = (foreign-slot-pointer ptr '(:struct objc-protocol-list-cstruct) 'protocols) then (inc-pointer protocol-ptr (foreign-type-size :pointer))
 	      for protocol = (mem-ref protocol-ptr 'objc-protocol-pointer)
 	      collecting protocol)))
 
@@ -850,6 +834,14 @@ calling"
     (super-classes class)))
 
 ;;; Framework loading
+(defun load-framework-named (framework-name)
+  "Load the framework named FRAMEWORK-NAME, a string that may be computed
+at run time, unlike LOAD-FRAMEWORK's argument."
+  (load-foreign-library `(:framework ,framework-name))
+  ;; Loading Foundation installs its own uncaught-exception handler,
+  ;; replacing ours.
+  (install-objc-exception-handler))
+
 (defmacro load-framework (framework-name)
   (let  ((name (intern (concatenate 'string (string-upcase framework-name) "-FRAMEWORK"))))
     `(progn
