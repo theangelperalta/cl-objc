@@ -65,6 +65,13 @@ already current for INPUTS; see FRAMEWORK-BINDINGS-STAMP."
            (format *trace-output* "~&Compiling ~a bindings for ~a...~%" (symbol-name ',type) ,framework-name)
            (force-output *trace-output*)
            (compile-file ,pathname :verbose nil :print nil)
+           ;; Writing the bindings converts every class in the runtime,
+           ;; and the class caches would keep all of them, with their
+           ;; methods and ivars, for the life of the image: hundreds of
+           ;; megabytes in a saved executable. Entries are rebuilt on
+           ;; demand, so drop them.
+           (clrhash *objc-classes*)
+           (objc-clos:clear-framework-class-cache)
            (when objc-clos:*cl-objc-verbose*
              (format *trace-output* "~&[with-framework-file] compile-file done in ~,1fs~%"
                      (/ (- (get-internal-real-time) ,t0) internal-time-units-per-second))
